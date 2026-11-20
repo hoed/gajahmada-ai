@@ -1,0 +1,12 @@
+node:
+  host: "0.0.0.0"
+  port: 8000
+  name: "gajahmada-alpha"
+
+network:
+  bootstrap_peers:
+    - "http://127.0.0.1:8001" 
+
+ai:
+  model_path: "./models/llama-2-7b-chat.Q4_K_M.gguf"
+  embedding_model: "all-MiniLM-L6-v2"

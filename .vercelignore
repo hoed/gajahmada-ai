@@ -1,0 +1,12 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+interface/node_modules/
+models/
+*.gguf
+node_key.pem
+knowledge_store/
+.git/

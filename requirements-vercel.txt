@@ -1,0 +1,10 @@
+# FIX #11: Lightweight requirements for Vercel serverless deployment
+# (no llama-cpp-python, faiss-cpu, sentence-transformers — too large for Vercel)
+fastapi>=0.103.0
+uvicorn>=0.23.2
+pydantic>=2.3.0
+cryptography>=41.0.3
+httpx>=0.25.0
+click>=8.1.7
+PyYAML>=6.0.1
+psutil>=5.9.5

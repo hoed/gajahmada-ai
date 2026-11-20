@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "noEmit": true,
+    "types": [],
+    "lib": ["DOM", "ESNext"]
+  },
+  "include": ["html/**/*.js"]
+}

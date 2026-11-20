@@ -1,0 +1,54 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "main.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "50mb",
+        "includeFiles": [
+          "interface/html/**",
+          "config.yaml",
+          "gajahmada_ai/**"
+        ]
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/health",
+      "dest": "main.py"
+    },
+    {
+      "src": "/node/(.*)",
+      "dest": "main.py"
+    },
+    {
+      "src": "/ai/(.*)",
+      "dest": "main.py"
+    },
+    {
+      "src": "/knowledge/(.*)",
+      "dest": "main.py"
+    },
+    {
+      "src": "/security/(.*)",
+      "dest": "main.py"
+    },
+    {
+      "src": "/ui/(.*)",
+      "dest": "main.py"
+    },
+    {
+      "src": "/ui",
+      "dest": "main.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "main.py"
+    }
+  ],
+  "env": {
+    "VERCEL": "1"
+  }
+}
