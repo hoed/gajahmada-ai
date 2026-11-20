@@ -560,10 +560,33 @@ def clear_system_logs():
     return {"status": "cleared", "logs": system_logs}
 
 
-# ─── Static UI (Guaranteed on both Vercel Serverless & Localhost) ─────────
+# ─── Static UI (Guaranteed No-Cache on both Vercel Serverless & Localhost) ─
+@app.middleware("http")
+async def disable_ui_cache(request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/ui") or request.url.path.endswith((".html", ".css", ".js", ".png")):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+
+@app.get("/logo.png", include_in_schema=False)
+@app.get("/ui/logo.png", include_in_schema=False)
+def serve_logo():
+    return FileResponse(
+        os.path.join(UI_PATH, "logo.png"),
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
+
+
 @app.get("/ui", include_in_schema=False)
+@app.get("/ui/", include_in_schema=False)
 def serve_ui_root():
-    return FileResponse(os.path.join(UI_PATH, "index.html"))
+    return FileResponse(
+        os.path.join(UI_PATH, "index.html"),
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
+    )
 
 
 if os.path.isdir(UI_PATH):

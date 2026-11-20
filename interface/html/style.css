@@ -314,19 +314,21 @@ body {
 }
 
 .gold-banner {
-  background: linear-gradient(135deg, #0d1512 0%, #14221c 100%);
-  border-right: 1px solid rgba(245, 158, 11, 0.45);
+  background: linear-gradient(135deg, #0b1310 0%, #13221c 100%);
+  border-right: 1px solid rgba(245, 158, 11, 0.5);
   color: #f59e0b;
   font-family: var(--font-sans);
   font-weight: 800;
-  font-size: 14px;
-  letter-spacing: 0.8px;
+  font-size: 15px;
+  letter-spacing: 0.6px;
   height: 100%;
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 0 14px 0 10px;
-  box-shadow: 2px 0 16px rgba(245, 158, 11, 0.15);
+  padding: 0 15px 0 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-shadow: 2px 0 16px rgba(245, 158, 11, 0.18);
 }
 
 .gm-logo-img {
@@ -334,7 +336,8 @@ body {
   height: 26px;
   object-fit: contain;
   flex-shrink: 0;
-  filter: drop-shadow(0 0 6px rgba(249, 115, 22, 0.55));
+  display: block;
+  filter: drop-shadow(0 0 6px rgba(249, 115, 22, 0.65));
 }
 
 .top-bar-title {

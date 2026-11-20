@@ -7,6 +7,17 @@
 document.addEventListener('DOMContentLoaded', () => {
   const API_URL = window.location.origin;
 
+  // Enforce GajahMada branding & logo in top-left corner even if HTML was cached
+  document.title = 'GajahMada — Sovereign Decentralized Node';
+  const elBrandBanner = document.getElementById('btn-brand-status') || document.querySelector('.gold-banner');
+  if (elBrandBanner) {
+    elBrandBanner.innerHTML = '<img src="/ui/logo.png?v=7.0" alt="GajahMada Logo" class="gm-logo-img" /><span>GajahMada</span>';
+  }
+  const elTopTitle = document.querySelector('.top-bar-title');
+  if (elTopTitle) {
+    elTopTitle.innerHTML = 'SOVEREIGN DECENTRALIZED NODE <span class="title-sub">// SYSTEM STATUS &amp; WEB3 ARCHITECTURE</span>';
+  }
+
   // ─── DOM REFERENCES ──────────────────────────────────────────────────────
   const elHdrNodeName  = document.getElementById('hdr-node-name');
   const elHdrNodeId    = document.getElementById('hdr-node-id');
