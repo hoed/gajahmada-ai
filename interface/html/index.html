@@ -11,10 +11,90 @@
   <link
     href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="/ui/style.css?v=7.0">
+  <link rel="stylesheet" href="/ui/style.css?v=8.0">
   <style>
-    .dashboard-viewport { grid-template-rows: 38px 0.85fr 1.68fr 0.78fr 18px !important; }
-    .middle-row { grid-template-columns: 0.68fr 1.95fr 0.68fr !important; gap: 6px !important; }
+    .dashboard-viewport { grid-template-rows: 38px 0.88fr 1.68fr 0.78fr 18px !important; }
+    .middle-row { grid-template-columns: 1.05fr 1.55fr 0.72fr !important; gap: 6px !important; }
+    .top-arch-grid {
+      flex: 1 !important;
+      min-height: 0 !important;
+      display: grid !important;
+      grid-template-columns: 215px 1fr 235px !important;
+      gap: 6px !important;
+      padding: 5px 6px !important;
+      background: #050807 !important;
+      overflow: hidden !important;
+    }
+    .top-cfg-box, .top-web3-box {
+      background: rgba(10, 17, 14, 0.92) !important;
+      border: 1px solid #28463b !important;
+      border-radius: 3px !important;
+      padding: 5px 8px !important;
+      font-size: 8.8px !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: space-between !important;
+      overflow: hidden !important;
+    }
+    .top-logs-box {
+      background: #040706 !important;
+      border: 1px solid #1e352c !important;
+      border-radius: 3px !important;
+      display: flex !important;
+      flex-direction: column !important;
+      min-height: 0 !important;
+      overflow: hidden !important;
+    }
+    .top-logs-hdr {
+      height: 19px !important;
+      min-height: 19px !important;
+      padding: 0 8px !important;
+      background: #0a120f !important;
+      border-bottom: 1px solid #172721 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      font-size: 8.5px !important;
+      color: #f59e0b !important;
+      font-weight: 700 !important;
+    }
+    .panel-3d-network {
+      border: 1px solid rgba(45, 212, 191, 0.45) !important;
+      background: radial-gradient(ellipse at 50% 50%, #0d1f1a 0%, #040706 88%) !important;
+    }
+    .network-3d-stage {
+      position: relative !important;
+      flex: 1 !important;
+      width: 100% !important;
+      height: 100% !important;
+      min-height: 0 !important;
+      overflow: hidden !important;
+    }
+    #universe-canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block !important;
+      cursor: pointer !important;
+    }
+    .net3d-legend {
+      position: absolute !important;
+      bottom: 5px !important;
+      left: 8px !important;
+      right: 8px !important;
+      display: flex !important;
+      justify-content: space-between !important;
+      align-items: center !important;
+      pointer-events: none !important;
+      font-size: 8px !important;
+      color: #8ca39a !important;
+      background: rgba(4, 7, 6, 0.72) !important;
+      padding: 2px 7px !important;
+      border-radius: 2px !important;
+      border: 1px solid rgba(45, 212, 191, 0.2) !important;
+    }
+    .net3d-legend-dots { display: flex !important; gap: 7px !important; }
+    .net3d-legend-dots span { display: flex !important; align-items: center !important; gap: 3px !important; }
+    .net3d-legend-dots i { width: 6px !important; height: 6px !important; border-radius: 50% !important; display: inline-block !important; }
     .gold-banner {
       background: linear-gradient(135deg, #0b1310 0%, #13221c 100%) !important;
       border-right: 1px solid rgba(245, 158, 11, 0.5) !important;
@@ -149,79 +229,68 @@
     </header>
 
     <!-- ═══════════════════════════════════════════════════════════════════
-         ROW 1: [01] SYSTEM ARCHITECTURE, MODULE CONFIG & WEB3 SERVER ARCH
+         ROW 1: [01] MODULE CONFIG, SYSTEM LOGS & 6 CORE MODULES
          ═══════════════════════════════════════════════════════════════════ -->
     <section class="panel panel-graph">
       <div class="panel-header">
         <div class="ph-left">
-          <span class="p-num teal">01</span>
-          <span class="p-title">SYSTEM ARCHITECTURE &amp; KNOWLEDGE EXPANSION</span>
+          <span class="p-num amber">01</span>
+          <span class="p-title">SYSTEM LOGS, MODULE CONFIGURATION &amp; WEB3 PIPELINE</span>
           <span class="p-sep">//</span>
-          <span class="p-sub">Klik node 3D, konfigurasi kiri, atau 6 kartu modul di bawah untuk mengeksekusi fungsi
-            nyata</span>
+          <span class="p-sub">GET /node/logs · POST /node/config · 6 Core Modules</span>
         </div>
         <div class="ph-right">
+          <button class="tiny-btn" id="btn-sync-logs" title="Tarik log terbaru dari server (GET /node/logs)">SYNC LOGS</button>
+          <button class="tiny-btn" id="btn-export-logs" title="Unduh file log sistem (.log)">EXPORT</button>
+          <button class="tiny-btn" id="btn-clear-logs" title="Bersihkan buffer log (DELETE /node/logs)">CLEAR</button>
           <span class="ph-meta">RAG DOCS <b id="graph-doc-count">0</b></span>
-          <span class="ph-meta">VECTORS <b id="graph-node-count">384-DIM</b></span>
           <span class="ph-meta">ENGINE <b id="graph-engine-name">L2-STORE</b></span>
           <span class="ph-live"><span class="live-dot"></span><span id="hdr-uptime">ONLINE</span></span>
         </div>
       </div>
 
-      <!-- 3D Rotating Architecture & Knowledge Graph Canvas + Interactive Overlays -->
-      <div class="graph-stage">
-        <canvas id="universe-canvas" title="Klik klaster modul 3D untuk menginspeksi &amp; menguji modul"></canvas>
-
-        <!-- Top-Left Overlay: INTERACTIVE MODULE CONFIGURATION (POST /node/config) -->
-        <div class="graph-overlay overlay-left">
-          <div class="ov-header">MODULE CONFIGURATION <span class="teal-txt">// KLIK UNTUK UBAH</span></div>
+      <!-- 3-Column Horizontal Stage: Left Config | Center System Logs | Right Web3 Arch -->
+      <div class="top-arch-grid">
+        <!-- Left Box: INTERACTIVE MODULE CONFIGURATION (POST /node/config) -->
+        <div class="top-cfg-box">
+          <div class="ov-header">MODULE CONFIGURATION <span class="teal-txt">// KLIK UBAH</span></div>
           <div class="ov-row clickable-cfg" id="cfg-row-name" title="Klik untuk ganti nama node (POST /node/config)">
-            <span class="ov-check">⚙</span><span>node.name</span><span class="ov-val"
-              id="cfg-val-name">gajahmada-alpha</span>
+            <span class="ov-check">⚙</span><span>node.name</span><span class="ov-val" id="cfg-val-name">gajahmada-alpha</span>
           </div>
-          <div class="ov-row clickable-cfg" id="cfg-row-tokens"
-            title="Klik untuk ubah batas max_tokens LLM (POST /node/config)">
+          <div class="ov-row clickable-cfg" id="cfg-row-tokens" title="Klik untuk ubah batas max_tokens LLM (POST /node/config)">
             <span class="ov-check">⚙</span><span>ai.max_tokens</span><span class="ov-val" id="cfg-val-tokens">512</span>
           </div>
-          <div class="ov-row clickable-cfg" id="cfg-row-temp"
-            title="Klik untuk ubah temperature LLM (POST /node/config)">
+          <div class="ov-row clickable-cfg" id="cfg-row-temp" title="Klik untuk ubah temperature LLM (POST /node/config)">
             <span class="ov-check">⚙</span><span>ai.temperature</span><span class="ov-val" id="cfg-val-temp">0.7</span>
           </div>
-          <div class="ov-row clickable-cfg" id="cfg-row-diff"
-            title="Klik untuk ubah PoW difficulty 1..3 (POST /node/config)">
-            <span class="ov-check">⚙</span><span>chain.pow_diff</span><span class="ov-val"
-              id="cfg-val-diff">difficulty=2</span>
+          <div class="ov-row clickable-cfg" id="cfg-row-diff" title="Klik untuk ubah PoW difficulty 1..3 (POST /node/config)">
+            <span class="ov-check">⚙</span><span>chain.pow_diff</span><span class="ov-val" id="cfg-val-diff">difficulty=2</span>
           </div>
           <div class="ov-row">
             <span class="ov-check">✓</span><span>ai.embedding</span><span class="ov-val">MiniLM-384d</span>
           </div>
-          <div class="ov-legend">
-            <span><i style="background:#2dd4bf"></i>core</span>
-            <span><i style="background:#a78bfa"></i>rag</span>
-            <span><i style="background:#fb7185"></i>api</span>
-            <span><i style="background:#fbbf24"></i>web3</span>
-            <span><i style="background:#38bdf8"></i>crypto</span>
+        </div>
+
+        <!-- Center Wide Box: SYSTEM LOGS (Swapped here so logs stream cleanly in wide view) -->
+        <div class="top-logs-box">
+          <div class="top-logs-hdr">
+            <span>SYSTEM LOGS // LIVE TELEMETRY STREAM (GET /node/logs)</span>
+            <span style="color:#4ade80">● STREAMING</span>
+          </div>
+          <div class="terminal-screen" id="watch-terminal">
+            <!-- Real server logs + live telemetry -->
           </div>
         </div>
 
-        <!-- Top-Right Overlay: INTERACTIVE WEB3 SERVER ARCHITECTURE PIPELINE -->
-        <div class="graph-overlay overlay-right">
+        <!-- Right Box: INTERACTIVE WEB3 SERVER ARCHITECTURE PIPELINE -->
+        <div class="top-web3-box">
           <div class="ov-header">WEB3 SERVER ARCH : <span id="ov-stage-label" class="teal-txt">INGEST</span></div>
           <div class="ov-list" id="ov-stage-steps">
-            <div class="ov-step done" data-arch="gateway" style="cursor:pointer"
-              title="Klik untuk uji FastAPI Gateway (GET /health)"><span>✓</span> 1. FastAPI REST Gateway (/ai, /node)
-            </div>
-            <div class="ov-step done" data-arch="rag" style="cursor:pointer"
-              title="Klik untuk uji pencarian vektor RAG (POST /knowledge/search)"><span>✓</span> 2. FAISS Vector RAG
-              Retrieval</div>
-            <div class="ov-step active" data-arch="llm" style="cursor:pointer"
-              title="Klik untuk uji inferensi LLM (POST /ai/chat)"><span>▶</span> 3. AIModelEngine Local Inference</div>
-            <div class="ov-step" data-arch="sign" style="cursor:pointer"
-              title="Klik untuk uji tanda tangan Ed25519 (POST /security/sign-verify)"><span>·</span> 4. Ed25519 Payload
-              Signature</div>
-            <div class="ov-step" data-arch="mine" style="cursor:pointer"
-              title="Klik untuk tambang blok PoW baru (POST /node/chain/mine)"><span>·</span> 5. SHA-256 PoW Ledger
-              Commit</div>
+            <div class="ov-step done" data-arch="gateway" style="cursor:pointer" title="Klik untuk uji FastAPI Gateway (GET /health)"><span>✓</span> 1. FastAPI REST Gateway (/ai, /node)</div>
+            <div class="ov-step done" data-arch="rag" style="cursor:pointer" title="Klik untuk uji pencarian vektor RAG (POST /knowledge/search)"><span>✓</span> 2. FAISS Vector RAG Retrieval</div>
+            <div class="ov-step active" data-arch="llm" style="cursor:pointer" title="Klik untuk uji inferensi LLM (POST /ai/chat)"><span>▶</span> 3. AIModelEngine Local Inference</div>
+            <div class="ov-step" data-arch="sign" style="cursor:pointer" title="Klik untuk uji tanda tangan Ed25519 (POST /security/sign-verify)"><span>·</span> 4. Ed25519 Payload Signature</div>
+            <div class="ov-step" data-arch="mine" style="cursor:pointer" title="Klik untuk tambang blok PoW baru (POST /node/chain/mine)"><span>·</span> 5. SHA-256 PoW Ledger Commit</div>
           </div>
         </div>
       </div>
@@ -299,28 +368,37 @@
     </section>
 
     <!-- ═══════════════════════════════════════════════════════════════════
-         ROW 2: [02] SYSTEM LOGS, [03] COMMAND INTERFACE, [04] MODULE DEPENDENCIES
+         ROW 2: [02] 3D NETWORK ANIMATION, [03] COMMAND INTERFACE, [04] DEPENDENCIES
          ═══════════════════════════════════════════════════════════════════ -->
     <section class="middle-row">
 
-      <!-- PANEL 02: SYSTEM LOGS (Connected to Real Backend GET/DELETE /node/logs) -->
-      <div class="panel panel-terminal">
+      <!-- PANEL 02: 3D NETWORK & SYSTEM ARCHITECTURE GRAPH (Tall Unobstructed 3D Viewport) -->
+      <div class="panel panel-3d-network">
         <div class="panel-header">
           <div class="ph-left">
-            <span class="p-num amber">02</span>
-            <span class="p-title">SYSTEM LOGS</span>
+            <span class="p-num teal">02</span>
+            <span class="p-title">3D NETWORK &amp; ARCHITECTURE GRAPH</span>
             <span class="p-sep">//</span>
-            <span class="p-sub">GET /node/logs · live telemetry</span>
+            <span class="p-sub">Klik klaster 3D untuk inspeksi modul</span>
           </div>
           <div class="ph-right">
-            <button class="tiny-btn" id="btn-sync-logs"
-              title="Tarik log terbaru dari server (GET /node/logs)">SYNC</button>
-            <button class="tiny-btn" id="btn-export-logs" title="Unduh file log sistem (.log)">EXPORT</button>
-            <button class="tiny-btn" id="btn-clear-logs" title="Bersihkan buffer log (DELETE /node/logs)">CLEAR</button>
+            <span class="ph-meta">VECTORS <b id="graph-node-count">384-DIM</b></span>
+            <span class="ph-live"><span class="live-dot"></span>3D LIVE</span>
           </div>
         </div>
-        <div class="terminal-screen" id="watch-terminal">
-          <!-- Real server logs + live telemetry -->
+        <div class="network-3d-stage">
+          <canvas id="universe-canvas" title="Klik klaster modul 3D untuk menginspeksi &amp; menguji modul"></canvas>
+          <div class="net3d-legend">
+            <div class="net3d-legend-dots">
+              <span><i style="background:#2dd4bf"></i>core</span>
+              <span><i style="background:#a78bfa"></i>rag</span>
+              <span><i style="background:#fb7185"></i>api</span>
+              <span><i style="background:#fbbf24"></i>web3</span>
+              <span><i style="background:#38bdf8"></i>crypto</span>
+              <span><i style="background:#f97316"></i>p2p</span>
+            </div>
+            <span>7 CLUSTERS · 175 NODES</span>
+          </div>
         </div>
       </div>
 
@@ -329,7 +407,7 @@
         <div class="panel-header command-hero-header">
           <div class="ph-left">
             <span class="p-num purple">03</span>
-            <span class="p-title hero-title">COMMAND INTERFACE // NEURAL LLM &amp; WEB3 CONSOLE</span>
+            <span class="p-title hero-title">COMMAND INTERFACE</span>
             <span class="sc-stage-pill" id="sub-stage-text">ingest</span>
             <div class="hdr-stars" id="task-stars-row">
               <span class="t-star lit">★</span>
@@ -343,12 +421,9 @@
             </div>
           </div>
           <div class="ph-right">
-            <button class="tiny-btn purple-btn" id="btn-inline-rag" title="Buka modal Knowledge Expansion">+ EXPAND
-              RAG</button>
+            <button class="tiny-btn purple-btn" id="btn-inline-rag" title="Buka modal Knowledge Expansion">+ RAG</button>
             <button class="tiny-btn" id="btn-clear-chat" title="Bersihkan layar percakapan">CLEAR</button>
-            <button class="tiny-btn teal-btn" id="btn-toggle-maximize"
-              title="Perbesar / Kembalikan ukuran Command Interface">⛶ MAXIMIZE</button>
-            <span class="ph-badge purple-badge" id="chat-status-badge">● LLM ONLINE</span>
+            <button class="tiny-btn teal-btn" id="btn-toggle-maximize" title="Perbesar / Kembalikan ukuran Command Interface">⛶ MAX</button>
           </div>
         </div>
 
@@ -753,7 +828,7 @@
     </div>
   </div>
 
-  <script src="/ui/app.js?v=7.0"></script>
+  <script src="/ui/app.js?v=8.0"></script>
 </body>
 
 </html>

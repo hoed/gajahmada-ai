@@ -220,11 +220,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const z1 = node.z * cosY + node.x * sinY;
     const y2 = node.y * cosX - z1 * sinX;
     const z2 = z1 * cosX + node.y * sinX;
-    const fov = 2.1;
+    const fov = 2.05;
     const scale = fov / (fov + z2 + 0.35);
     return {
-      sx: w * 0.5 + x1 * w * 0.44 * scale,
-      sy: h * 0.5 + y2 * h * 0.62 * scale,
+      sx: w * 0.5 + x1 * w * 0.42 * scale,
+      sy: h * 0.46 + y2 * h * 0.42 * scale,
       z: z2,
       scale,
     };
