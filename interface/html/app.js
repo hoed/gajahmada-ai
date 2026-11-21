@@ -202,9 +202,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const elPanelMetrics   = document.querySelector('.panel-metrics');
   const elPanel3DNetwork = document.getElementById('panel-02-3d') || document.querySelector('.panel-3d-network');
   const elPanelSubagents = document.getElementById('panel-command-center') || document.querySelector('.panel-subagents');
+  const elBrandTitleText = document.getElementById('brand-title-text');
   const mobileMediaQuery = window.matchMedia('(max-width: 1024px)');
 
   function syncMobileLogsPerformancePosition() {
+    if (elBrandTitleText) {
+      elBrandTitleText.textContent = mobileMediaQuery.matches ? 'GajahMada AI Nusantara' : 'GajahMada';
+    }
     if (!elTopArchGrid || !elBottomRow || !elSystemLogsBox || !elPanelMetrics) return;
     if (mobileMediaQuery.matches) {
       // Mobile/Tablet:
