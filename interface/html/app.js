@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.title = 'GajahMada — Sovereign Decentralized Node';
   const elBrandBanner = document.getElementById('btn-brand-status') || document.querySelector('.gold-banner');
   if (elBrandBanner) {
-    elBrandBanner.innerHTML = '<img src="/ui/logo.png?v=9.0" alt="GajahMada Logo" class="gm-logo-img" /><span>GajahMada</span>';
+    elBrandBanner.innerHTML = '<img src="/ui/logo.png?v=9.0" alt="GajahMada Logo" class="gm-logo-img" /><span id="brand-title-text">GajahMada<span class="brand-mobile-suffix"> AI Nusantara</span></span>';
   }
   const elTopTitle = document.querySelector('.top-bar-title');
   if (elTopTitle) {

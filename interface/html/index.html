@@ -74,7 +74,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="/ui/style.css?v=16.0">
+  <link rel="stylesheet" href="/ui/style.css?v=17.0">
   <style>
     /* Interactive clickable cues & HUD Action Toast */
     [data-interactive], .clickable-cfg, .ov-step, .pipe-card, .mcp-cell, .mcp-dot,
@@ -267,6 +267,9 @@
       flex-shrink: 0;
       display: block;
       filter: drop-shadow(0 0 6px rgba(249, 115, 22, 0.65));
+    }
+    .brand-mobile-suffix {
+      display: none;
     }
     .panel-subagents {
       border: 1.5px solid rgba(129, 140, 248, 0.75);
@@ -608,7 +611,7 @@
         <div class="gold-banner" id="btn-brand-status" style="cursor:pointer"
           title="Klik untuk menjalankan diagnostik penuh GajahMada">
           <img src="/ui/logo.png?v=7.0" alt="GajahMada Logo" class="gm-logo-img" />
-          <span id="brand-title-text">GajahMada<span class="brand-mobile-suffix" style="display:none"> AI Nusantara</span></span>
+          <span id="brand-title-text">GajahMada<span class="brand-mobile-suffix"> AI Nusantara</span></span>
         </div>
         <div class="top-bar-title">
           SOVEREIGN DECENTRALIZED NODE <span class="title-sub">// SYSTEM STATUS &amp; WEB3 ARCHITECTURE</span>
@@ -1324,8 +1327,8 @@
     </div>
   </div>
 
-  <script type="module" src="/ui/analytics.js?v=16.0"></script>
-  <script src="/ui/app.js?v=16.0"></script>
+  <script type="module" src="/ui/analytics.js?v=17.0"></script>
+  <script src="/ui/app.js?v=17.0"></script>
 </body>
 
 </html>
