@@ -1,0 +1,9 @@
+{
+  "name": "gajahmada",
+  "version": "2.0.0",
+  "description": "GajahMada — Sovereign Decentralized AI & Web3 Node Architecture",
+  "private": true,
+  "dependencies": {
+    "@vercel/analytics": "^1.5.0"
+  }
+}

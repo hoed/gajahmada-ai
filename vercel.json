@@ -16,6 +16,22 @@
   ],
   "routes": [
     {
+      "src": "/_vercel/(.*)",
+      "dest": "/_vercel/$1"
+    },
+    {
+      "src": "/robots.txt",
+      "dest": "main.py"
+    },
+    {
+      "src": "/sitemap.xml",
+      "dest": "main.py"
+    },
+    {
+      "src": "/manifest.json",
+      "dest": "main.py"
+    },
+    {
       "src": "/health",
       "dest": "main.py"
     },
@@ -44,7 +60,7 @@
       "dest": "main.py"
     },
     {
-      "src": "/(.*)",
+      "src": "/((?!_vercel).*)",
       "dest": "main.py"
     }
   ],

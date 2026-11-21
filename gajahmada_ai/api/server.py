@@ -6,9 +6,9 @@ import time
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -197,17 +197,90 @@ async def startup_event():
     ensure_initialized()
 
 
-# ─── Health & Root ────────────────────────────────────────────────────────
+# ─── Health, Root & SEO Endpoints ─────────────────────────────────────────
 @app.get("/")
-def root():
+def root(request: Request, format: Optional[str] = None):
     ensure_initialized()
+    accept = request.headers.get("accept", "")
+    # Serve the HTML Dashboard directly at root '/' for browsers & SEO crawlers
+    if format != "json" and ("text/html" in accept or "*/*" in accept) and os.path.exists(os.path.join(UI_PATH, "index.html")):
+        if "application/json" not in accept:
+            return FileResponse(
+                os.path.join(UI_PATH, "index.html"),
+                headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
+            )
     return {
         "status": "online",
-        "message": "GajahMada AI Network Node is running.",
+        "message": "GajahMada Network Node is running.",
         "mode": "serverless" if IS_VERCEL else "full",
         "ml_available": engine is not None,
         "uptime_sec": round(time.time() - START_TIME, 1),
         "ui_url": "/ui",
+    }
+
+
+@app.get("/api/status")
+def api_status():
+    ensure_initialized()
+    return {
+        "status": "online",
+        "message": "GajahMada Network Node is running.",
+        "mode": "serverless" if IS_VERCEL else "full",
+        "ml_available": engine is not None,
+        "uptime_sec": round(time.time() - START_TIME, 1),
+        "ui_url": "/ui",
+    }
+
+
+@app.get("/robots.txt", include_in_schema=False)
+def robots_txt():
+    content = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Allow: /ui\n"
+        "Sitemap: https://gajahmada.vercel.app/sitemap.xml\n"
+    )
+    return PlainTextResponse(content)
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+def sitemap_xml():
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://gajahmada.vercel.app/</loc>
+    <lastmod>2026-11-21</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://gajahmada.vercel.app/ui</loc>
+    <lastmod>2026-11-21</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+</urlset>"""
+    return Response(content=xml, media_type="application/xml")
+
+
+@app.get("/manifest.json", include_in_schema=False)
+def web_manifest():
+    return {
+        "name": "GajahMada — Sovereign Decentralized Node",
+        "short_name": "GajahMada",
+        "description": "Sovereign Decentralized AI & Web3 Node with 384-d Vector RAG, SHA-256 PoW Blockchain, Ed25519 Identity, and P2P Mesh.",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#040706",
+        "theme_color": "#040706",
+        "icons": [
+            {
+                "src": "/ui/logo.png",
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "any maskable",
+            }
+        ],
     }
 
 
@@ -576,6 +649,33 @@ async def disable_ui_cache(request, call_next):
 def serve_logo():
     return FileResponse(
         os.path.join(UI_PATH, "logo.png"),
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
+@app.get("/screenshot.jpg", include_in_schema=False)
+@app.get("/ui/screenshot.jpg", include_in_schema=False)
+def serve_screenshot():
+    return FileResponse(
+        os.path.join(UI_PATH, "screenshot.jpg"),
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
+@app.get("/style.css", include_in_schema=False)
+def serve_root_css():
+    return FileResponse(
+        os.path.join(UI_PATH, "style.css"),
+        media_type="text/css",
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
+
+
+@app.get("/app.js", include_in_schema=False)
+def serve_root_js():
+    return FileResponse(
+        os.path.join(UI_PATH, "app.js"),
+        media_type="application/javascript",
         headers={"Cache-Control": "no-store, max-age=0"},
     )
 

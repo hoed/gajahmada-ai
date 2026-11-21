@@ -11,12 +11,22 @@ document.addEventListener('DOMContentLoaded', () => {
   document.title = 'GajahMada — Sovereign Decentralized Node';
   const elBrandBanner = document.getElementById('btn-brand-status') || document.querySelector('.gold-banner');
   if (elBrandBanner) {
-    elBrandBanner.innerHTML = '<img src="/ui/logo.png?v=7.0" alt="GajahMada Logo" class="gm-logo-img" /><span>GajahMada</span>';
+    elBrandBanner.innerHTML = '<img src="/ui/logo.png?v=9.0" alt="GajahMada Logo" class="gm-logo-img" /><span>GajahMada</span>';
   }
   const elTopTitle = document.querySelector('.top-bar-title');
   if (elTopTitle) {
     elTopTitle.innerHTML = 'SOVEREIGN DECENTRALIZED NODE <span class="title-sub">// SYSTEM STATUS &amp; WEB3 ARCHITECTURE</span>';
   }
+
+  // Vercel Web Analytics helper (@vercel/analytics)
+  const trackAnalytics = (eventName, data = {}) => {
+    try {
+      if (typeof window.va === 'function') {
+        window.va('event', { name: eventName, data });
+      }
+    } catch { /* ignore */ }
+  };
+  trackAnalytics('hud_dashboard_loaded', { path: window.location.pathname });
 
   // ─── DOM REFERENCES ──────────────────────────────────────────────────────
   const elHdrNodeName  = document.getElementById('hdr-node-name');
