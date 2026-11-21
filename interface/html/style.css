@@ -331,6 +331,10 @@ body {
   box-shadow: 2px 0 16px rgba(245, 158, 11, 0.18);
 }
 
+.brand-mobile-suffix {
+  display: none;
+}
+
 .gm-logo-img {
   width: 26px;
   height: 26px;
@@ -1662,6 +1666,9 @@ body {
     height: 36px !important;
     border: 1px solid rgba(245, 158, 11, 0.5) !important;
     border-radius: 3px !important;
+  }
+  .brand-mobile-suffix {
+    display: inline !important;
   }
   .top-bar-title {
     white-space: normal !important;

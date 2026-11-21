@@ -203,14 +203,27 @@ document.addEventListener('DOMContentLoaded', () => {
   const elPanel3DNetwork = document.getElementById('panel-02-3d') || document.querySelector('.panel-3d-network');
   const elPanelSubagents = document.getElementById('panel-command-center') || document.querySelector('.panel-subagents');
   const elBrandTitleText = document.getElementById('brand-title-text');
+  const elBrandSuffix    = document.querySelector('.brand-mobile-suffix');
   const mobileMediaQuery = window.matchMedia('(max-width: 1024px)');
 
+  function isMobileDeviceViewport() {
+    return (
+      mobileMediaQuery.matches ||
+      window.innerWidth <= 1024 ||
+      (window.screen && window.screen.width <= 1024) ||
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '')
+    );
+  }
+
   function syncMobileLogsPerformancePosition() {
-    if (elBrandTitleText) {
-      elBrandTitleText.textContent = mobileMediaQuery.matches ? 'GajahMada AI Nusantara' : 'GajahMada';
+    const isMob = isMobileDeviceViewport();
+    if (elBrandSuffix) {
+      elBrandSuffix.style.display = isMob ? 'inline' : 'none';
+    } else if (elBrandTitleText) {
+      elBrandTitleText.textContent = isMob ? 'GajahMada AI Nusantara' : 'GajahMada';
     }
     if (!elTopArchGrid || !elBottomRow || !elSystemLogsBox || !elPanelMetrics) return;
-    if (mobileMediaQuery.matches) {
+    if (isMob) {
       // Mobile/Tablet:
       // 1. Place SYSTEM PERFORMANCE inside top-arch-grid & SYSTEM LOGS inside bottom-row
       if (elPanelMetrics.parentElement !== elTopArchGrid) {
