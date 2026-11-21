@@ -49,6 +49,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const elBtnSend       = document.getElementById('btn-chat-send');
   const elChatTyping    = document.getElementById('chat-typing');
 
+  const elModalCmdCenter    = document.getElementById('modal-command-center');
+  const elModalMessagesWrap = document.getElementById('modal-messages-wrap');
+  const elModalChatForm     = document.getElementById('modal-chat-form');
+  const elModalChatInput    = document.getElementById('modal-chat-prompt-input');
+  const elBtnModalSend      = document.getElementById('btn-modal-chat-send');
+  const elModalChatTyping   = document.getElementById('modal-chat-typing');
+
   const elSubStageText = document.getElementById('sub-stage-text');
   const elTaskStarsRow = document.getElementById('task-stars-row');
   const elStarsLbl     = document.getElementById('stars-progress-lbl');
@@ -1103,43 +1110,87 @@ document.addEventListener('DOMContentLoaded', () => {
   function synthesizeLocalLLMResponse(promptText) {
     const q = promptText.trim();
     const ql = q.toLowerCase();
+    const nowObj = getSystemNow();
+    const nowStr = formatSystemDateTime(nowObj);
+    const curYear = nowObj.getFullYear();
+    const yearsMerdeka = Math.max(1, curYear - 1945);
     const nodeId = elHdrNodeId?.textContent || 'gajahmada-alpha';
     const cpu = elTxtCpu?.textContent || '24%';
     const ram = elTxtRam?.textContent || '48%';
-    const ragCtx = localKnowledgeMemory.length
-      ? `[RAG Knowledge Context]: "${localKnowledgeMemory[localKnowledgeMemory.length - 1].substring(0, 140)}"\n`
-      : '';
 
-    if (/indonesia|nusantara|sejarah|majapahit|sriwijaya|gajah mada|sumpah palapa|kerajaan|kesultanan|kemerdekaan|proklamasi|pancasila|presiden|provinsi|ikn/.test(ql)) {
+    if (/\b(siapa kamu|kamu siapa|siapa anda|anda siapa|who are you|what are you|perkenalkan diri|apa itu gajahmada|identitas kamu)\b/.test(ql)) {
       return (
-        `${ragCtx}[Kronologi Nusantara hingga Indonesia Modern]\n` +
+        `Saya adalah GajahMada, asisten kecerdasan buatan (AI) terdesentralisasi dan pusat kendali node Web3 berdaulat (Sovereign Decentralized AI & Web3 Node).\n\n` +
+        `• Asal Nama: Terinspirasi dari Mahapatih Gajah Mada, tokoh pemersatu Nusantara melalui Sumpah Palapa (1336 M).\n` +
+        `• Kemampuan Utama Saya:\n` +
+        `  1. Menjawab sejarah lengkap Nusantara hingga Indonesia sekarang (tahun ${curYear}).\n` +
+        `  2. Menjalankan pencarian pengetahuan semantik 384-d Vector RAG (/search & /ingest).\n` +
+        `  3. Mengaudit & menambang blok Web3 Blockchain SHA-256 Proof-of-Work (/mine & /verify).\n` +
+        `  4. Memverifikasi tanda tangan kriptografis Ed25519 (RFC 8032) & memantau jaringan P2P Mesh (/status, /peers).`
+      );
+    }
+    if (/\b(halo|hai|hello|hi|hey|selamat pagi|selamat siang|selamat sore|selamat malam|apa kabar|ping|tes|test)\b/.test(ql)) {
+      return (
+        `Halo! Saya GajahMada (Waktu Sistem: ${nowStr}).\n` +
+        `• System Status: ONLINE (Node: ${nodeId} · CPU ${cpu} · RAM ${ram} · 8/8 Modules Functional)\n` +
+        `• Silakan tanyakan sejarah Nusantara–Indonesia, Sumpah Palapa, Daftar Presiden RI, 38 Provinsi & IKN, atau gunakan perintah /status, /time, /verify, /mine.`
+      );
+    }
+    if (/\b(gajah mada|sumpah palapa|amukti palapa|majapahit|hayam wuruk|raden wijaya|bhinneka tunggal ika|nagarakretagama|sutasoma)\b/.test(ql)) {
+      return (
+        `[Mahapatih Gajah Mada, Sumpah Palapa & Kemaharajaan Majapahit]\n` +
+        `• Kemaharajaan Majapahit (1293 – Abad ke-16): Didirikan oleh Raden Wijaya di Trowulan (Mojokerto) pada 1293, mencapai puncak kejayaan pada masa Raja Hayam Wuruk (1350–1389).\n` +
+        `• Sumpah Palapa (1336 M): Diucapkan oleh Mahapatih Gajah Mada saat diangkat menjadi Mahapatih Amangkubhumi—berpantang menikmati palapa sebelum menyatukan Nusantara (Gurun, Seran, Tanjung Pura, Haru, Pahang, Dompo, Bali, Sunda, Palembang, Tumasik).\n` +
+        `• Warisan: Kitab Nagarakretagama (Mpu Prapanca) dan Kakawin Sutasoma (Mpu Tantular) yang melahirkan semboyan "Bhinneka Tunggal Ika".`
+      );
+    }
+    if (/\b(presiden|soekarno|soeharto|habibie|gus dur|megawati|sby|yudhoyono|jokowi|prabowo|reformasi|orde baru)\b/.test(ql)) {
+      return (
+        `[Daftar Presiden Republik Indonesia (1945 – Sekarang Tahun ${curYear})]\n` +
+        `1. Ir. Soekarno (1945–1967) — Proklamator & Penggagas Pancasila\n` +
+        `2. Soeharto (1967–1998) — Era Orde Baru, Pendiri ASEAN (1967) & Satelit Palapa (1976)\n` +
+        `3. Prof. Dr. Ing. B.J. Habibie (1998–1999) — Pelopor Dirgantara N-250 & Awal Reformasi\n` +
+        `4. K.H. Abdurrahman Wahid / Gus Dur (1999–2001) — Bapak Pluralisme\n` +
+        `5. Megawati Soekarnoputri (2001–2004) — Presiden Perempuan Pertama RI\n` +
+        `6. Prof. Dr. Susilo Bambang Yudhoyono (2004–2014) — Pemilu Presiden Langsung Pertama\n` +
+        `7. Ir. Joko Widodo (2014–2024) — Infrastruktur, Hilirisasi, G20 & Inisiasi IKN\n` +
+        `8. Prabowo Subianto (20 Oktober 2024 – Sekarang, ${curYear}) — Presiden ke-8 RI (Wapres Gibran Rakabuming Raka).`
+      );
+    }
+    if (/\b(provinsi|ikn|ibu kota nusantara|geografi|pulau|penduduk|suku|unesco|ekonomi|g20|indonesia emas)\b/.test(ql)) {
+      return (
+        `[Profil Indonesia Sekarang (Tahun ${curYear} — ${yearsMerdeka} Tahun Merdeka)]\n` +
+        `• Geografi & Demografi: 17.504+ pulau, ~282+ juta jiwa, 1.340+ suku bangsa, 718 bahasa daerah.\n` +
+        `• Pemerintahan: 38 Provinsi (termasuk 4 provinsi baru di Papua) & pembangunan Ibu Kota Nusantara (IKN) di Kalimantan Timur.\n` +
+        `• Ekonomi & Budaya: Ekonomi terbesar ASEAN (Anggota G20, PDB > USD 1,4T), hilirisasi mineral strategis, dan warisan UNESCO menuju Indonesia Emas 2045.`
+      );
+    }
+    if (/\b(indonesia|nusantara|sejarah|sriwijaya|kerajaan|kesultanan|kemerdekaan|proklamasi|pancasila)\b/.test(ql)) {
+      return (
+        `[Kronologi Nusantara hingga Indonesia Sekarang (${nowStr})]\n` +
         `1. Era Kerajaan Awal & Maritim: Kutai (abad ke-4 M), Tarumanagara, Sriwijaya, Mataram Kuno (Borobudur & Prambanan), hingga Singasari (Ekspedisi Pamalayu).\n` +
         `2. Majapahit & Mahapatih Gajah Mada (1293–Abad 16): Sumpah Palapa (1336 M) menyatukan kepulauan Nusantara dan melahirkan semboyan 'Bhinneka Tunggal Ika'.\n` +
         `3. Kesultanan, Pergerakan & Proklamasi: Kejayaan jalur rempah (Samudera Pasai, Aceh, Demak, Banten, Mataram, Gowa-Tallo, Ternate-Tidore), Kebangkitan Nasional (1908), Sumpah Pemuda (1928), Pancasila (1 Juni 1945), & Proklamasi Kemerdekaan RI (17 Agustus 1945).\n` +
-        `4. Indonesia Sekarang: 17.504+ pulau (Deklarasi Djuanda 1957), ~282 juta jiwa, 38 Provinsi, anggota G20 (PDB > USD 1,4T), Presiden ke-1 Ir. Soekarno s/d Presiden ke-8 Prabowo Subianto, pembangunan Ibu Kota Nusantara (IKN), menuju Indonesia Emas 2045.`
-      );
-    }
-    if (/halo|hai|hello|hi|test|tes|ping/.test(ql)) {
-      return (
-        `${ragCtx}Halo Operator! GajahMada AI LLM Engine (Node: ${nodeId}) aktif.\n` +
-        `• System Status: ONLINE (CPU ${cpu} · RAM ${ram} · 8/8 Modules Functional)\n` +
-        `• Perintah cepat: /status, /ingest <teks>, /search <kueri>, /mine <catatan>, /verify, /peers.`
+        `4. Indonesia Sekarang (${curYear}): 17.504+ pulau (Deklarasi Djuanda 1957), ~282+ juta jiwa, 38 Provinsi, anggota G20, Presiden ke-1 Ir. Soekarno s/d Presiden ke-8 Prabowo Subianto, pembangunan IKN, menuju Indonesia Emas 2045.`
       );
     }
     return (
-      `${ragCtx}[GajahMada AI — Neural Synthesis Response]\n` +
-      `Perintah "${q}" telah diproses oleh AIModelEngine (gajahmada_ai.core).\n` +
+      `Menjawab pertanyaan Anda tentang "${q}" (${nowStr}):\n` +
+      `• Permintaan telah diproses oleh GajahMada Core Engine (Node: ${nodeId}).\n` +
       `• Hasil inferensi telah ditandatangani dengan Ed25519 dan dicatat ke Web3 Ledger.`
     );
   }
 
-  function appendChatMessage(role, text, timeTaken = null, blockIndex = null) {
-    if (!elMessagesWrap) return;
+  function createChatElement(role, text, timeTaken = null, blockIndex = null, isDialog = false) {
     const isUser = role === 'user';
     const isErr  = role === 'error';
 
     const item = document.createElement('div');
     item.className = `chat-item ${isUser ? 'chat-user' : isErr ? 'chat-error' : 'chat-ai'}`;
+    if (isDialog) {
+      item.style.fontSize = '12px';
+      item.style.padding = '10px 14px';
+    }
 
     const who = isUser ? 'OPERATOR // COMMAND' : isErr ? 'SYSTEM ALERT' : 'GAJAHMADA // CORE ENGINE';
     const nowStamp = formatShortTimestamp(getSystemNow());
@@ -1148,15 +1199,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (blockIndex !== null) sig += ` · BLOCK #${blockIndex}`;
 
     item.innerHTML = `
-      <div class="ci-meta">
+      <div class="ci-meta" ${isDialog ? 'style="font-size:9.5px;margin-bottom:4px"' : ''}>
         <span class="ci-who">${who}</span>
         <span class="ci-sig">${escapeHTML(sig)}</span>
       </div>
       <div class="ci-text">${escapeHTML(text)}</div>
     `;
+    return item;
+  }
 
-    elMessagesWrap.appendChild(item);
-    elMessagesWrap.scrollTop = elMessagesWrap.scrollHeight;
+  function appendChatMessage(role, text, timeTaken = null, blockIndex = null) {
+    if (elMessagesWrap) {
+      elMessagesWrap.appendChild(createChatElement(role, text, timeTaken, blockIndex, false));
+      elMessagesWrap.scrollTop = elMessagesWrap.scrollHeight;
+    }
+    if (elModalMessagesWrap) {
+      elModalMessagesWrap.appendChild(createChatElement(role, text, timeTaken, blockIndex, true));
+      elModalMessagesWrap.scrollTop = elModalMessagesWrap.scrollHeight;
+    }
   }
 
   async function executeSlashCommand(cmdText) {
@@ -1238,16 +1298,18 @@ document.addEventListener('DOMContentLoaded', () => {
     return false;
   }
 
-  async function transmitChat(e) {
+  async function transmitChat(e, sourceInput = null) {
     if (e) e.preventDefault();
-    if (!elChatInput) return;
+    const activeInput = sourceInput || (elModalCmdCenter?.classList.contains('open') && elModalChatInput?.value.trim() ? elModalChatInput : elChatInput);
+    if (!activeInput) return;
 
-    const text = elChatInput.value.trim();
+    const text = activeInput.value.trim();
     if (!text || isSending) return;
 
     const t0 = performance.now();
     appendChatMessage('user', text);
-    elChatInput.value = '';
+    if (elChatInput) elChatInput.value = '';
+    if (elModalChatInput) elModalChatInput.value = '';
 
     // Handle direct slash commands
     if (text.startsWith('/')) {
@@ -1260,7 +1322,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     isSending = true;
     if (elBtnSend) elBtnSend.disabled = true;
+    if (elBtnModalSend) elBtnModalSend.disabled = true;
     if (elChatTyping) elChatTyping.style.display = 'flex';
+    if (elModalChatTyping) elModalChatTyping.style.display = 'flex';
 
     try {
       const response = await fetch(`${API_URL}/ai/chat`, {
@@ -1297,31 +1361,49 @@ document.addEventListener('DOMContentLoaded', () => {
       appendChatMessage('ai', reply, elapsed, localSimulatedBlock);
     } finally {
       if (elChatTyping) elChatTyping.style.display = 'none';
+      if (elModalChatTyping) elModalChatTyping.style.display = 'none';
       isSending = false;
       if (elBtnSend) elBtnSend.disabled = false;
-      elChatInput.focus();
+      if (elBtnModalSend) elBtnModalSend.disabled = false;
+      activeInput.focus();
     }
   }
 
-  elChatForm?.addEventListener('submit', transmitChat);
-  elBtnSend?.addEventListener('click', transmitChat);
+  elChatForm?.addEventListener('submit', (e) => transmitChat(e, elChatInput));
+  elBtnSend?.addEventListener('click', (e) => transmitChat(e, elChatInput));
 
-  // Quick command preset buttons in Panel 03
+  elModalChatForm?.addEventListener('submit', (e) => transmitChat(e, elModalChatInput));
+  elBtnModalSend?.addEventListener('click', (e) => transmitChat(e, elModalChatInput));
+
+  // Quick command preset buttons in Panel 03 & Dialog Box
   document.querySelectorAll('[data-quick-cmd]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      if (elChatInput) {
-        elChatInput.value = btn.dataset.quickCmd;
-        transmitChat();
+      const targetInp = elModalCmdCenter?.classList.contains('open') ? elModalChatInput : elChatInput;
+      if (targetInp) {
+        targetInp.value = btn.dataset.quickCmd;
+        transmitChat(null, targetInp);
       }
     });
   });
 
-  // Clear Chat & Maximize Toggle in Hero Command Interface
-  document.getElementById('btn-clear-chat')?.addEventListener('click', () => {
-    if (elMessagesWrap) {
-      elMessagesWrap.innerHTML = '';
-      appendChatMessage('ai', 'Layar Command Interface dibersihkan. Silakan ketik perintah atau pertanyaan baru.');
-    }
+  // Clear Chat, Open Command Center Dialog Box & Maximize Toggle
+  const clearAllChats = () => {
+    if (elMessagesWrap) elMessagesWrap.innerHTML = '';
+    if (elModalMessagesWrap) elModalMessagesWrap.innerHTML = '';
+    appendChatMessage('ai', 'Layar Command Center dibersihkan. Silakan ketik pertanyaan atau perintah baru.');
+  };
+  document.getElementById('btn-clear-chat')?.addEventListener('click', clearAllChats);
+  document.getElementById('btn-modal-clear-chat')?.addEventListener('click', clearAllChats);
+
+  const openCommandCenterDialog = () => {
+    if (!elModalCmdCenter) return;
+    elModalCmdCenter.classList.add('open');
+    setTimeout(() => elModalChatInput?.focus(), 60);
+  };
+  document.getElementById('btn-open-cmd-dialog')?.addEventListener('click', openCommandCenterDialog);
+  document.getElementById('btn-inline-cmd-dialog')?.addEventListener('click', openCommandCenterDialog);
+  elModalCmdCenter?.addEventListener('click', (e) => {
+    if (e.target === elModalCmdCenter) elModalCmdCenter.classList.remove('open');
   });
 
   const elHeroPanel = document.getElementById('panel-command-hero');

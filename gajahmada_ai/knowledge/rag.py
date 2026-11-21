@@ -1,7 +1,15 @@
 import importlib
 import json
 import os
+import re
 from typing import Any, List, Optional
+
+_STOPWORDS = {
+    "yang", "dan", "di", "ke", "dari", "ini", "itu", "dengan", "untuk", "pada",
+    "adalah", "sebagai", "dalam", "atau", "juga", "oleh", "karena", "tentang",
+    "apa", "siapa", "kapan", "dimana", "bagaimana", "mengapa", "kenapa", "berapa",
+    "jelaskan", "tolong", "buatkan", "sebutkan", "ceritakan", "kamu", "anda", "saya",
+}
 
 
 def _try_import(module_name: str) -> Optional[Any]:
@@ -9,6 +17,11 @@ def _try_import(module_name: str) -> Optional[Any]:
         return importlib.import_module(module_name)
     except ImportError:
         return None
+
+
+def _extract_query_terms(text: str) -> List[str]:
+    tokens = re.findall(r"[a-z0-9]+", text.lower())
+    return [t for t in tokens if len(t) > 2 and t not in _STOPWORDS]
 
 
 class LocalKnowledge:
@@ -102,29 +115,38 @@ class LocalKnowledge:
         if self._dirty:
             self.save()
 
-    def search(self, query_embedding: List[float], k: int = 3) -> List[str]:
+    def search(self, query_embedding: List[float], k: int = 3, query_text: str = "") -> List[str]:
         if not self.doc_store:
             return []
 
         if len(query_embedding) != self.dimension:
             raise ValueError(f"Query embedding must be {self.dimension} dimensions, got {len(query_embedding)}.")
 
-        if self._has_faiss and self.index is not None and self.index.ntotal > 0 and self._np is not None:
-            try:
-                vector = self._np.array([query_embedding], dtype=self._np.float32)
-                _, indices = self.index.search(vector, k)
-                results = []
-                for idx in indices[0]:
-                    if 0 <= idx < len(self.doc_store):
-                        results.append(self.doc_store[idx])
-                return results
-            except Exception:
-                pass
+        q_terms = _extract_query_terms(query_text) if query_text else []
 
+        # Hybrid Semantic L2 + Lexical Keyword Overlap Ranking
         scored = []
-        for idx, vec in enumerate(self.vectors):
-            if len(vec) == len(query_embedding):
-                dist = sum((a - b) ** 2 for a, b in zip(query_embedding, vec))
-                scored.append((dist, idx))
+        for idx, doc in enumerate(self.doc_store):
+            doc_lower = doc.lower()
+            lexical_hits = sum(1 for t in q_terms if t in doc_lower)
+
+            # When query_text is provided (e.g. from /ai/chat), skip completely unrelated documents
+            if query_text and q_terms and lexical_hits == 0:
+                continue
+
+            vec_dist = 2.0
+            if idx < len(self.vectors) and len(self.vectors[idx]) == len(query_embedding):
+                vec_dist = sum((a - b) ** 2 for a, b in zip(query_embedding, self.vectors[idx]))
+
+            # Lower combined score is better (each lexical hit reduces distance significantly)
+            combined_score = vec_dist - (lexical_hits * 1.25)
+            scored.append((combined_score, idx))
+
+        if not scored and not query_text:
+            for idx, vec in enumerate(self.vectors):
+                if len(vec) == len(query_embedding):
+                    dist = sum((a - b) ** 2 for a, b in zip(query_embedding, vec))
+                    scored.append((dist, idx))
+
         scored.sort(key=lambda item: item[0])
         return [self.doc_store[idx] for _, idx in scored[:k] if idx < len(self.doc_store)]

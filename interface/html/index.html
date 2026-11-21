@@ -262,6 +262,7 @@
           <span class="repo-stars" id="hdr-auth-tag">VERIFY ED25519</span>
         </div>
         <div class="quick-modals-bar">
+          <button class="top-action-btn" id="btn-open-cmd-dialog" style="border-color:#818cf8;color:#c7d2fe;background:rgba(129,140,248,0.14)" title="Buka Command Center dalam bentuk Dialog Box">💬 COMMAND DIALOG</button>
           <button class="top-action-btn" id="btn-open-rag" title="Kelola &amp; Tambah Dokumen RAG (+ Cari Semantik)">+
             KNOWLEDGE EXPANSION</button>
           <button class="top-action-btn" id="btn-open-peer" title="Kelola P2P Mesh &amp; Broadcast Gossip">+ NETWORK
@@ -484,9 +485,10 @@
             </div>
           </div>
           <div class="ph-right">
+            <button class="tiny-btn teal-btn" id="btn-inline-cmd-dialog" title="Buka Command Center sebagai Popup Dialog Box">🗗 DIALOG</button>
             <button class="tiny-btn purple-btn" id="btn-inline-rag" title="Buka modal Knowledge Expansion">+ RAG</button>
             <button class="tiny-btn" id="btn-clear-chat" title="Bersihkan layar percakapan">CLEAR</button>
-            <button class="tiny-btn teal-btn" id="btn-toggle-maximize" title="Perbesar / Kembalikan ukuran Command Interface">⛶ MAX</button>
+            <button class="tiny-btn" id="btn-toggle-maximize" title="Perbesar / Kembalikan ukuran Command Interface">⛶ MAX</button>
           </div>
         </div>
 
@@ -890,8 +892,71 @@
     </div>
   </div>
 
-  <script type="module" src="/ui/analytics.js?v=9.0"></script>
-  <script src="/ui/app.js?v=9.0"></script>
+  <!-- MODAL 4: COMMAND CENTER DIALOG BOX (Interactive Popup AI Console) -->
+  <div class="hud-modal" id="modal-command-center">
+    <div class="modal-dialog" style="max-width:860px;width:95%;height:82vh;display:flex;flex-direction:column;border:1.5px solid #818cf8;box-shadow:0 0 50px rgba(129,140,248,0.3)">
+      <div class="modal-header" style="height:36px;background:linear-gradient(90deg,rgba(129,140,248,0.22) 0%,rgba(45,212,191,0.14) 100%);border-bottom:1px solid rgba(129,140,248,0.45)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <img src="/ui/logo.png?v=10.0" alt="GajahMada" style="width:20px;height:20px;object-fit:contain" />
+          <span style="color:#fff;font-size:11px;font-weight:800;letter-spacing:0.6px">[03] GAJAHMADA COMMAND CENTER // AI &amp; WEB3 DIALOG BOX</span>
+          <span class="ph-badge purple-badge" style="margin-left:4px">● AI ONLINE</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button type="button" class="tiny-btn" id="btn-modal-clear-chat" title="Bersihkan riwayat chat">CLEAR</button>
+          <button class="modal-close" data-close="modal-command-center">&times;</button>
+        </div>
+      </div>
+
+      <div class="modal-body" style="flex:1;min-height:0;max-height:none;display:flex;flex-direction:column;gap:8px;padding:12px">
+        <!-- Synchronized Dialog Chat Feed -->
+        <div class="chat-feed" id="modal-messages-wrap" style="flex:1;min-height:0;font-size:12px;padding:12px;gap:10px;background:#040709;border:1px solid rgba(129,140,248,0.35)">
+          <div class="chat-item chat-ai" style="font-size:12px;padding:10px 14px">
+            <div class="ci-meta" style="font-size:9.5px;margin-bottom:4px">
+              <span class="ci-who">GAJAHMADA // SOVEREIGN CORE ENGINE</span>
+              <span class="ci-sig">ED25519 · SHA-256 POW VERIFIED</span>
+            </div>
+            <div class="ci-text">Selamat datang di <b>GajahMada Command Center Dialog</b>. Anda dapat bertanya secara bebas (misal: <i>"siapa kamu"</i>, <i>"jelaskan sejarah Nusantara sampai Indonesia sekarang"</i>, <i>"apa isi Sumpah Palapa"</i>, <i>"siapa Presiden Indonesia sekarang"</i>) atau menjalankan perintah sistem.</div>
+          </div>
+        </div>
+
+        <!-- Typing Indicator inside Dialog -->
+        <div class="chat-typing-row" id="modal-chat-typing" style="display:none;font-size:10.5px">
+          <span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>
+          <span>GajahMada Core Engine sedang menyusun jawaban &amp; menambang blok SHA-256...</span>
+        </div>
+
+        <!-- Quick Exec Presets inside Dialog -->
+        <div class="command-presets-bar">
+          <span class="cp-label">QUICK EXEC:</span>
+          <button type="button" class="cp-chip" data-quick-cmd="Siapa kamu?">🤖 Siapa Kamu?</button>
+          <button type="button" class="cp-chip" data-quick-cmd="Jelaskan detail sejarah Nusantara sampai Indonesia sekarang">🇮🇩 Nusantara → Indonesia</button>
+          <button type="button" class="cp-chip" data-quick-cmd="Jelaskan Mahapatih Gajah Mada, Sumpah Palapa, dan Majapahit">🐘 Sumpah Palapa</button>
+          <button type="button" class="cp-chip" data-quick-cmd="Sebutkan daftar Presiden Republik Indonesia dari pertama sampai sekarang">👑 Daftar Presiden RI</button>
+          <button type="button" class="cp-chip" data-quick-cmd="Jelaskan 38 Provinsi, Ibu Kota Nusantara (IKN), dan Ekonomi Indonesia sekarang">🏛️ 38 Provinsi &amp; IKN</button>
+          <button type="button" class="cp-chip" data-quick-cmd="/status">📊 /status</button>
+          <button type="button" class="cp-chip" data-quick-cmd="/time">🕒 /time</button>
+          <button type="button" class="cp-chip" data-quick-cmd="/verify">🔐 /verify</button>
+        </div>
+
+        <!-- Dialog Prompt Input Bar -->
+        <form class="prompt-input-bar" id="modal-chat-form" autocomplete="off" style="height:42px;min-height:42px;padding:4px 8px 4px 12px">
+          <span class="prompt-prefix" style="font-size:15px">❯</span>
+          <input
+            type="text"
+            id="modal-chat-prompt-input"
+            style="flex:1;background:transparent;border:none;outline:none;color:#fff;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600"
+            placeholder="Ketik pertanyaan atau perintah ke GajahMada lalu tekan Enter..."
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button type="submit" class="prompt-send-btn" id="btn-modal-chat-send" style="padding:7px 18px;font-size:11px">TRANSMIT ↵</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/ui/analytics.js?v=10.0"></script>
+  <script src="/ui/app.js?v=10.0"></script>
 </body>
 
 </html>

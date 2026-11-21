@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import hashlib
 import importlib.metadata
 import os
@@ -6,6 +6,8 @@ import sys
 import time
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
+
+WIB_TZ = timezone(timedelta(hours=7), name="WIB")
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,13 +37,13 @@ UI_PATH = os.path.join(_ROOT, "interface", "html")
 CONFIG_PATH = os.path.join(_ROOT, "config.yaml")
 
 def get_system_time_info() -> Dict[str, Any]:
-    now = datetime.now().astimezone()
+    now = datetime.now(WIB_TZ)
     return {
         "iso": now.isoformat(),
-        "formatted": now.strftime("%Y-%m-%d %H:%M:%S %Z"),
+        "formatted": now.strftime("%Y-%m-%d %H:%M:%S WIB"),
         "date": now.strftime("%Y-%m-%d"),
         "time": now.strftime("%H:%M:%S"),
-        "timezone": now.strftime("%Z (UTC%z)"),
+        "timezone": "WIB (UTC+07:00)",
         "year": now.year,
         "epoch": round(now.timestamp(), 3),
     }
@@ -91,11 +93,11 @@ runtime_config: Dict[str, Any] = {
 
 
 def record_log(module: str, level: str, message: str):
-    now = datetime.now().astimezone()
+    now = datetime.now(WIB_TZ)
     entry = {
         "id": len(system_logs) + 1,
         "timestamp": now.timestamp(),
-        "time_str": now.strftime("%Y-%m-%d %H:%M:%S %Z"),
+        "time_str": now.strftime("%Y-%m-%d %H:%M:%S WIB"),
         "iso_time": now.isoformat(),
         "module": module,
         "level": level,
@@ -326,7 +328,7 @@ async def ai_chat(req: ChatRequest):
         try:
             query_emb = engine.create_embedding(req.prompt)
             if query_emb:
-                results = rag.search(query_emb, k=3)
+                results = rag.search(query_emb, k=2, query_text=req.prompt)
                 if results:
                     matched_docs = len(results)
                     context = "\n".join(results)
@@ -420,7 +422,7 @@ def knowledge_stats():
 def knowledge_search(req: SearchKnowledgeRequest):
     ensure_initialized()
     emb = engine.create_embedding(req.query)
-    results = rag.search(emb, k=req.k) if rag else []
+    results = rag.search(emb, k=req.k, query_text=req.query) if rag else []
     record_log("knowledge.rag", "INFO", f"Semantic search query='{req.query[:30]}' -> {len(results)} match(es)")
     return {"query": req.query, "results": results, "count": len(results)}
 
