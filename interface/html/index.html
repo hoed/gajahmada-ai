@@ -74,8 +74,94 @@
   <link
     href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="/ui/style.css?v=12.0">
+  <link rel="stylesheet" href="/ui/style.css?v=13.0">
   <style>
+    /* Interactive clickable cues & HUD Action Toast */
+    [data-interactive], .clickable-cfg, .ov-step, .pipe-card, .mcp-cell, .mcp-dot,
+    .skill-cell, .ring-lbl, .eb-row, .bt-nav-item, .net3d-cluster-btn {
+      cursor: pointer !important;
+      transition: all 0.18s ease !important;
+    }
+    .eb-row {
+      padding: 2px 4px !important;
+      border-radius: 2px !important;
+    }
+    .eb-row:hover {
+      background: rgba(45, 212, 191, 0.12) !important;
+      transform: translateX(2px);
+    }
+    .ov-row.clickable-cfg:hover, .ov-step:hover {
+      background: rgba(45, 212, 191, 0.14) !important;
+      color: #fff !important;
+      padding-left: 4px !important;
+    }
+    .ring-lbl {
+      pointer-events: auto !important;
+      padding: 1px 4px !important;
+      border-radius: 2px !important;
+    }
+    .ring-lbl:hover {
+      color: #fff !important;
+      background: rgba(45, 212, 191, 0.25) !important;
+    }
+    .mcp-dot {
+      cursor: pointer !important;
+      pointer-events: auto !important;
+    }
+    .mcp-dot:hover {
+      transform: translate(-50%, -50%) scale(1.5) !important;
+      background: #fff !important;
+      border-color: #f97316 !important;
+    }
+    .net3d-legend {
+      pointer-events: auto !important;
+    }
+    .net3d-cluster-btn {
+      pointer-events: auto !important;
+      padding: 1px 5px !important;
+      border-radius: 2px !important;
+      border: 1px solid transparent !important;
+    }
+    .net3d-cluster-btn:hover, .net3d-cluster-btn.active {
+      background: rgba(45, 212, 191, 0.18) !important;
+      border-color: rgba(45, 212, 191, 0.5) !important;
+      color: #fff !important;
+    }
+    .bt-nav-item:hover {
+      color: #2dd4bf !important;
+      text-decoration: underline !important;
+    }
+    .panel-flash-highlight {
+      box-shadow: 0 0 28px rgba(45, 212, 191, 0.65), inset 0 0 20px rgba(45, 212, 191, 0.2) !important;
+      border-color: #2dd4bf !important;
+    }
+    #hud-action-toast {
+      position: fixed;
+      top: 46px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-16px);
+      background: rgba(6, 14, 12, 0.96);
+      border: 1.5px solid #2dd4bf;
+      color: #e6f0ec;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px;
+      font-weight: 700;
+      padding: 6px 16px;
+      border-radius: 3px;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.8), 0 0 16px rgba(45, 212, 191, 0.35);
+      z-index: 2500;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      white-space: nowrap;
+      max-width: 94vw;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #hud-action-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
     .dashboard-viewport { grid-template-rows: 38px 0.88fr 1.68fr 0.78fr 18px; }
     .middle-row { grid-template-columns: 1.05fr 1.55fr 0.72fr; gap: 6px; }
     .top-arch-grid {
@@ -499,8 +585,9 @@
 
 <body>
 
-  <!-- Subtle CRT Scanline Overlay -->
+  <!-- Subtle CRT Scanline Overlay & Live Interactive Action Toast -->
   <div class="crt-overlay"></div>
+  <div id="hud-action-toast">⚡ SYSTEM READY</div>
 
   <!-- Main 100vh Locked Viewport Dashboard -->
   <div class="dashboard-viewport">
@@ -575,9 +662,9 @@
           <button class="tiny-btn" id="btn-sync-logs" title="Tarik log terbaru dari server (GET /node/logs)">SYNC LOGS</button>
           <button class="tiny-btn" id="btn-export-logs" title="Unduh file log sistem (.log)">EXPORT</button>
           <button class="tiny-btn" id="btn-clear-logs" title="Bersihkan buffer log (DELETE /node/logs)">CLEAR</button>
-          <span class="ph-meta">RAG DOCS <b id="graph-doc-count">0</b></span>
-          <span class="ph-meta">ENGINE <b id="graph-engine-name">L2-STORE</b></span>
-          <span class="ph-live"><span class="live-dot"></span><span id="hdr-uptime">ONLINE</span></span>
+          <span class="ph-meta" id="hdr-meta-rag" data-interactive="true" title="Klik untuk membuka Knowledge Expansion">RAG DOCS <b id="graph-doc-count">0</b></span>
+          <span class="ph-meta" id="hdr-meta-engine" data-interactive="true" title="Klik untuk uji benchmark Vector Engine 384-d">ENGINE <b id="graph-engine-name">L2-STORE</b></span>
+          <span class="ph-live" id="hdr-meta-uptime" data-interactive="true" title="Klik untuk cek kesehatan &amp; uptime server"><span class="live-dot"></span><span id="hdr-uptime">ONLINE</span></span>
         </div>
       </div>
 
@@ -598,8 +685,8 @@
           <div class="ov-row clickable-cfg" id="cfg-row-diff" title="Klik untuk ubah PoW difficulty 1..3 (POST /node/config)">
             <span class="ov-check">⚙</span><span>chain.pow_diff</span><span class="ov-val" id="cfg-val-diff">difficulty=2</span>
           </div>
-          <div class="ov-row">
-            <span class="ov-check">✓</span><span>ai.embedding</span><span class="ov-val">MiniLM-384d</span>
+          <div class="ov-row clickable-cfg" id="cfg-row-embed" title="Klik untuk uji benchmark 384-d Embedding Vector (POST /ai/embedding)">
+            <span class="ov-check">⚡</span><span>ai.embedding</span><span class="ov-val" id="cfg-val-embed">MiniLM-384d</span>
           </div>
         </div>
 
@@ -710,31 +797,32 @@
     <section class="middle-row">
 
       <!-- PANEL 02: 3D NETWORK & SYSTEM ARCHITECTURE GRAPH (Tall Unobstructed 3D Viewport) -->
-      <div class="panel panel-3d-network">
+      <div class="panel panel-3d-network" id="panel-02-3d">
         <div class="panel-header">
           <div class="ph-left">
             <span class="p-num teal">02</span>
             <span class="p-title">3D NETWORK &amp; ARCHITECTURE GRAPH</span>
             <span class="p-sep">//</span>
-            <span class="p-sub">Klik klaster 3D untuk inspeksi modul</span>
+            <span class="p-sub">Klik node 3D atau klaster di bawah</span>
           </div>
           <div class="ph-right">
-            <span class="ph-meta">VECTORS <b id="graph-node-count">384-DIM</b></span>
-            <span class="ph-live"><span class="live-dot"></span>3D LIVE</span>
+            <span class="ph-meta" id="btn-3d-vec-probe" data-interactive="true" title="Klik untuk uji vektor 384-d">VECTORS <b id="graph-node-count">384-DIM</b></span>
+            <span class="ph-live" id="btn-3d-rotate-step" data-interactive="true" title="Klik untuk pindah fokus klaster 3D berikutnya"><span class="live-dot"></span>NEXT 3D</span>
           </div>
         </div>
         <div class="network-3d-stage">
           <canvas id="universe-canvas" title="Klik klaster modul 3D untuk menginspeksi &amp; menguji modul"></canvas>
           <div class="net3d-legend">
             <div class="net3d-legend-dots">
-              <span><i style="background:#2dd4bf"></i>core</span>
-              <span><i style="background:#a78bfa"></i>rag</span>
-              <span><i style="background:#fb7185"></i>api</span>
-              <span><i style="background:#fbbf24"></i>web3</span>
-              <span><i style="background:#38bdf8"></i>crypto</span>
-              <span><i style="background:#f97316"></i>p2p</span>
+              <span class="net3d-cluster-btn active" data-cluster="0" title="Fokus &amp; uji gajahmada_ai.core"><i style="background:#2dd4bf"></i>core</span>
+              <span class="net3d-cluster-btn" data-cluster="1" title="Fokus &amp; buka gajahmada_ai.knowledge"><i style="background:#a78bfa"></i>rag</span>
+              <span class="net3d-cluster-btn" data-cluster="2" title="Fokus &amp; uji gajahmada_ai.api"><i style="background:#fb7185"></i>api</span>
+              <span class="net3d-cluster-btn" data-cluster="3" title="Fokus &amp; buka gajahmada_ai.blockchain"><i style="background:#fbbf24"></i>web3</span>
+              <span class="net3d-cluster-btn" data-cluster="4" title="Fokus &amp; uji gajahmada_ai.security"><i style="background:#38bdf8"></i>crypto</span>
+              <span class="net3d-cluster-btn" data-cluster="5" title="Fokus &amp; buka gajahmada_ai.network"><i style="background:#f97316"></i>p2p</span>
+              <span class="net3d-cluster-btn" data-cluster="6" title="Fokus &amp; uji gajahmada_ai.cli"><i style="background:#4ade80"></i>cli</span>
             </div>
-            <span>7 CLUSTERS · 175 NODES</span>
+            <span class="net3d-cluster-btn" id="btn-3d-cycle-all" title="Klik untuk memutar fokus klaster">⟳ FOCUS</span>
           </div>
         </div>
       </div>
@@ -809,7 +897,7 @@
       </div>
 
       <!-- PANEL 04: MODULE DEPENDENCIES & WEB3 SERVER ARCHITECTURE (Connected to GET /node/dependencies) -->
-      <div class="panel panel-mcp">
+      <div class="panel panel-mcp" id="panel-04-deps">
         <div class="panel-header">
           <div class="ph-left">
             <span class="p-num coral">04</span>
@@ -818,7 +906,7 @@
             <span class="p-sub">Klik item untuk cek versi &amp; uji endpoint</span>
           </div>
           <div class="ph-right">
-            <span class="ph-meta coral-txt" id="mcp-active-label">PY 3.14</span>
+            <span class="ph-meta coral-txt" id="mcp-active-label" data-interactive="true" title="Klik untuk menampilkan laporan lengkap seluruh versi paket Python (GET /node/dependencies)">PY 3.14</span>
           </div>
         </div>
 
@@ -831,24 +919,24 @@
           <div class="mcp-matrix" id="mcp-matrix">
             <!-- Col 1: App Modules -->
             <div class="mcp-col">
-              <div class="mcp-cell active" data-mcp="0" data-type="mod" data-target="api.server">api.server</div>
-              <div class="mcp-cell" data-mcp="1" data-type="mod" data-target="core.engine">core.engine</div>
-              <div class="mcp-cell" data-mcp="2" data-type="mod" data-target="knowledge.rag">knowledge.rag</div>
-              <div class="mcp-cell" data-mcp="3" data-type="mod" data-target="blockchain.chain">blockchain.chain</div>
+              <div class="mcp-cell active" data-mcp="0" data-type="mod" data-target="api.server" title="Klik untuk inspeksi modul gajahmada_ai.api.server">api.server</div>
+              <div class="mcp-cell" data-mcp="1" data-type="mod" data-target="core.engine" title="Klik untuk inspeksi modul gajahmada_ai.core.engine">core.engine</div>
+              <div class="mcp-cell" data-mcp="2" data-type="mod" data-target="knowledge.rag" title="Klik untuk inspeksi modul gajahmada_ai.knowledge.rag">knowledge.rag</div>
+              <div class="mcp-cell" data-mcp="3" data-type="mod" data-target="blockchain.chain" title="Klik untuk inspeksi modul gajahmada_ai.blockchain.chain">blockchain.chain</div>
             </div>
             <!-- Col 2: Python Dependencies -->
             <div class="mcp-col">
-              <div class="mcp-cell active" data-mcp="4" data-type="pkg" data-target="fastapi">fastapi</div>
-              <div class="mcp-cell" data-mcp="5" data-type="pkg" data-target="cryptography">cryptography</div>
-              <div class="mcp-cell" data-mcp="6" data-type="pkg" data-target="httpx">httpx</div>
-              <div class="mcp-cell" data-mcp="7" data-type="pkg" data-target="psutil">psutil</div>
+              <div class="mcp-cell active" data-mcp="4" data-type="pkg" data-target="fastapi" title="Klik untuk cek versi runtime FastAPI">fastapi</div>
+              <div class="mcp-cell" data-mcp="5" data-type="pkg" data-target="cryptography" title="Klik untuk cek versi runtime Cryptography (Ed25519)">cryptography</div>
+              <div class="mcp-cell" data-mcp="6" data-type="pkg" data-target="httpx" title="Klik untuk cek versi runtime HTTPX (P2P Mesh)">httpx</div>
+              <div class="mcp-cell" data-mcp="7" data-type="pkg" data-target="psutil" title="Klik untuk cek versi runtime Psutil (Telemetry)">psutil</div>
             </div>
             <!-- Col 3: Web3 & Node Endpoints -->
             <div class="mcp-col">
-              <div class="mcp-cell active" data-mcp="8" data-type="api" data-target="/node/info">GET /node/info</div>
-              <div class="mcp-cell" data-mcp="9" data-type="api" data-target="/knowledge/stats">GET /knowledge</div>
-              <div class="mcp-cell" data-mcp="10" data-type="api" data-target="/node/chain">GET /node/chain</div>
-              <div class="mcp-cell" data-mcp="11" data-type="api" data-target="/node/dependencies">GET /node/deps</div>
+              <div class="mcp-cell active" data-mcp="8" data-type="api" data-target="/node/info" title="Klik untuk eksekusi live GET /node/info">GET /node/info</div>
+              <div class="mcp-cell" data-mcp="9" data-type="api" data-target="/knowledge/stats" title="Klik untuk eksekusi live GET /knowledge/stats">GET /knowledge</div>
+              <div class="mcp-cell" data-mcp="10" data-type="api" data-target="/node/chain" title="Klik untuk eksekusi live GET /node/chain">GET /node/chain</div>
+              <div class="mcp-cell" data-mcp="11" data-type="api" data-target="/node/dependencies" title="Klik untuk eksekusi live GET /node/dependencies">GET /node/deps</div>
             </div>
           </div>
 
@@ -856,12 +944,12 @@
           <div class="mcp-timeline-wrap">
             <div class="mcp-track-line">
               <div class="mcp-track-fill" id="mcp-track-fill"></div>
-              <span class="mcp-dot lit" style="left:0%"></span>
-              <span class="mcp-dot lit" style="left:20%"></span>
-              <span class="mcp-dot active" style="left:40%"></span>
-              <span class="mcp-dot" style="left:60%"></span>
-              <span class="mcp-dot" style="left:80%"></span>
-              <span class="mcp-dot" style="left:100%"></span>
+              <span class="mcp-dot lit" data-waypoint="0" style="left:0%" title="Klik untuk uji Waypoint 1: GET /health"></span>
+              <span class="mcp-dot lit" data-waypoint="1" style="left:20%" title="Klik untuk uji Waypoint 2: GET /node/info"></span>
+              <span class="mcp-dot active" data-waypoint="2" style="left:40%" title="Klik untuk uji Waypoint 3: GET /knowledge/stats"></span>
+              <span class="mcp-dot" data-waypoint="3" style="left:60%" title="Klik untuk uji Waypoint 4: POST /ai/embedding"></span>
+              <span class="mcp-dot" data-waypoint="4" style="left:80%" title="Klik untuk uji Waypoint 5: POST /security/sign-verify"></span>
+              <span class="mcp-dot" data-waypoint="5" style="left:100%" title="Klik untuk uji Waypoint 6: GET /node/chain"></span>
             </div>
             <div class="mcp-track-meta">
               <span id="mcp-trace-txt">flow: api.server → fastapi → GET /node/info</span>
@@ -879,7 +967,7 @@
     <section class="bottom-row">
 
       <!-- PANEL 05: WEB3 SERVER & INFERENCE WORKFLOW (Executes Real 6-Stage Pipeline Test) -->
-      <div class="panel panel-workflow">
+      <div class="panel panel-workflow" id="panel-05-workflow">
         <div class="panel-header">
           <div class="ph-left">
             <span class="p-num teal">05</span>
@@ -892,33 +980,33 @@
           </div>
         </div>
         <div class="workflow-body">
-          <div class="ring-gauge-wrap" id="stage-dial" title="Klik untuk menjalankan tahap berikutnya secara nyata">
+          <div class="ring-gauge-wrap" id="stage-dial" title="Klik segmen atau label tahap untuk mengeksekusi fungsinya">
             <svg class="ring-svg" viewBox="0 0 200 200">
               <circle cx="100" cy="100" r="84" fill="none" stroke="rgba(45,212,191,0.12)" stroke-width="1"
                 stroke-dasharray="2 6" />
               <g id="ring-segments-group"></g>
               <circle cx="100" cy="100" r="54" fill="none" stroke="rgba(45,212,191,0.18)" stroke-width="1" />
             </svg>
-            <div class="ring-center-label">
+            <div class="ring-center-label" style="pointer-events:auto;cursor:pointer" id="ring-center-trigger" title="Klik tengah cincin untuk menjalankan siklus 6 tahap penuh">
               <div class="ring-stage-word" id="current-stage-name">ingest</div>
               <div class="ring-stage-idx" id="current-stage-idx">PHASE 1/6</div>
             </div>
-            <span class="ring-lbl pos-0">ingest</span>
-            <span class="ring-lbl pos-1">embed</span>
-            <span class="ring-lbl pos-2">infer</span>
-            <span class="ring-lbl pos-3">sign</span>
-            <span class="ring-lbl pos-4">mine</span>
-            <span class="ring-lbl pos-5">gossip</span>
+            <span class="ring-lbl pos-0" data-phase="0" title="Klik untuk eksekusi Phase 1: Ingest &amp; RAG Stats">ingest</span>
+            <span class="ring-lbl pos-1" data-phase="1" title="Klik untuk eksekusi Phase 2: Generate 384-d Vector Embedding">embed</span>
+            <span class="ring-lbl pos-2" data-phase="2" title="Klik untuk eksekusi Phase 3: AIModelEngine Inference">infer</span>
+            <span class="ring-lbl pos-3" data-phase="3" title="Klik untuk eksekusi Phase 4: Ed25519 Digital Signature">sign</span>
+            <span class="ring-lbl pos-4" data-phase="4" title="Klik untuk eksekusi Phase 5: Mine SHA-256 PoW Block">mine</span>
+            <span class="ring-lbl pos-5" data-phase="5" title="Klik untuk eksekusi Phase 6: P2P Gossip Broadcast">gossip</span>
           </div>
           <div class="workflow-footer">
-            <span>POW <b class="teal-txt" id="wf-pow-lbl">DIFF=2</b></span>
-            <span>STATUS <b id="wf-cycle-status">IDLE · AUTO</b></span>
+            <span id="wf-pow-toggle" data-interactive="true" title="Klik untuk mengubah tingkat kesulitan Proof-of-Work (1..3)">POW <b class="teal-txt" id="wf-pow-lbl">DIFF=2</b></span>
+            <span id="wf-status-toggle" data-interactive="true" title="Klik untuk menjalankan siklus verifikasi 6 tahap">STATUS <b id="wf-cycle-status">IDLE · AUTO</b></span>
           </div>
         </div>
       </div>
 
       <!-- PANEL 06: MODULAR ARCHITECTURE (Each of the 16 Cells Runs a Real Diagnostic Probe) -->
-      <div class="panel panel-skills">
+      <div class="panel panel-skills" id="panel-06-modular">
         <div class="panel-header">
           <div class="ph-left">
             <span class="p-num sky">06</span>
@@ -927,27 +1015,27 @@
             <span class="p-sub">Klik komponen untuk uji diagnostik nyata</span>
           </div>
           <div class="ph-right">
-            <span class="ph-meta sky-txt" id="mod-probe-badge">LIVE PROBE</span>
+            <span class="ph-meta sky-txt" id="mod-probe-badge" data-interactive="true" title="Klik untuk menguji komponen yang sedang aktif">⚡ PROBE NOW</span>
           </div>
         </div>
         <div class="skills-body">
           <div class="skills-grid-16" id="skills-grid">
-            <div class="skill-cell active" data-skill="AIModelEngine">AIModelEngine</div>
-            <div class="skill-cell" data-skill="LocalKnowledge">LocalKnowledge</div>
-            <div class="skill-cell" data-skill="AIBlockchain">AIBlockchain</div>
-            <div class="skill-cell" data-skill="P2PNetwork">P2PNetwork</div>
-            <div class="skill-cell" data-skill="NodeIdentity">NodeIdentity</div>
-            <div class="skill-cell" data-skill="FastAPI-Server">FastAPI-Server</div>
-            <div class="skill-cell" data-skill="FAISS-IndexL2">FAISS-IndexL2</div>
-            <div class="skill-cell" data-skill="Llama-GGUF">Llama-GGUF</div>
-            <div class="skill-cell" data-skill="MiniLM-L6-v2">MiniLM-L6-v2</div>
-            <div class="skill-cell" data-skill="Ed25519-Crypto">Ed25519-Crypto</div>
-            <div class="skill-cell" data-skill="SHA256-PoW">SHA256-PoW</div>
-            <div class="skill-cell" data-skill="CLI-Click">CLI-Click</div>
-            <div class="skill-cell" data-skill="POST /ai/chat">POST /ai/chat</div>
-            <div class="skill-cell" data-skill="POST /ai/ingest">POST /ai/ingest</div>
-            <div class="skill-cell" data-skill="GET /node/chain">GET /node/chain</div>
-            <div class="skill-cell" data-skill="POST /node/sync">POST /node/sync</div>
+            <div class="skill-cell active" data-skill="AIModelEngine" title="Klik untuk uji AIModelEngine">AIModelEngine</div>
+            <div class="skill-cell" data-skill="LocalKnowledge" title="Klik untuk uji LocalKnowledge RAG">LocalKnowledge</div>
+            <div class="skill-cell" data-skill="AIBlockchain" title="Klik untuk uji AIBlockchain PoW">AIBlockchain</div>
+            <div class="skill-cell" data-skill="P2PNetwork" title="Klik untuk uji P2PNetwork Mesh">P2PNetwork</div>
+            <div class="skill-cell" data-skill="NodeIdentity" title="Klik untuk uji NodeIdentity Ed25519">NodeIdentity</div>
+            <div class="skill-cell" data-skill="FastAPI-Server" title="Klik untuk uji FastAPI-Server">FastAPI-Server</div>
+            <div class="skill-cell" data-skill="FAISS-IndexL2" title="Klik untuk uji FAISS-IndexL2 384-d">FAISS-IndexL2</div>
+            <div class="skill-cell" data-skill="Llama-GGUF" title="Klik untuk uji Llama-GGUF / Neural Engine">Llama-GGUF</div>
+            <div class="skill-cell" data-skill="MiniLM-L6-v2" title="Klik untuk uji MiniLM-L6-v2 384-d Embedder">MiniLM-L6-v2</div>
+            <div class="skill-cell" data-skill="Ed25519-Crypto" title="Klik untuk uji tanda tangan Ed25519">Ed25519-Crypto</div>
+            <div class="skill-cell" data-skill="SHA256-PoW" title="Klik untuk uji hash SHA256-PoW">SHA256-PoW</div>
+            <div class="skill-cell" data-skill="CLI-Click" title="Klik untuk uji konfigurasi CLI">CLI-Click</div>
+            <div class="skill-cell" data-skill="POST /ai/chat" title="Klik untuk buka Command Center Dialog">POST /ai/chat</div>
+            <div class="skill-cell" data-skill="POST /ai/ingest" title="Klik untuk buka Knowledge Expansion Modal">POST /ai/ingest</div>
+            <div class="skill-cell" data-skill="GET /node/chain" title="Klik untuk buka Web3 Blockchain Ledger">GET /node/chain</div>
+            <div class="skill-cell" data-skill="POST /node/sync" title="Klik untuk buka P2P Network Peer Modal">POST /node/sync</div>
             <div class="virtual-cursor" id="skills-cursor">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="#38bdf8" stroke="#050807" stroke-width="2">
                 <polygon points="3 3 10 21 13 13 21 10 3 3" />
@@ -955,7 +1043,7 @@
             </div>
           </div>
 
-          <div class="skill-detail-box">
+          <div class="skill-detail-box" id="skill-detail-trigger" data-interactive="true" title="Klik untuk jalankan ulang diagnostik komponen ini">
             <div class="sd-top">
               <span class="sd-name" id="sd-name">AIModelEngine</span>
               <span class="sd-status" id="sd-status">● MODULE ACTIVE</span>
@@ -967,7 +1055,7 @@
       </div>
 
       <!-- PANEL 07: NETWORK STATUS & P2P TOPOLOGY (Real Broadcast & Peer Management) -->
-      <div class="panel panel-swarm">
+      <div class="panel panel-swarm" id="panel-07-network">
         <div class="panel-header">
           <div class="ph-left">
             <span class="p-num pink">07</span>
@@ -982,7 +1070,7 @@
         </div>
         <div class="swarm-body">
           <div class="swarm-canvas-wrap" id="swarm-click-zone" style="cursor:pointer"
-            title="Klik untuk mengirim ping broadcast P2P">
+            title="Klik node sudut (peer, faiss-rag, pow-ledger, llama-core) atau hub tengah untuk mengeksekusi fungsi modulnya">
             <canvas id="swarm-canvas"></canvas>
             <div class="swarm-big-count">
               <span class="sbc-num" id="swarm-node-num">4</span>
@@ -990,14 +1078,14 @@
             </div>
           </div>
           <div class="swarm-footer">
-            <span>HOST <b>0.0.0.0:8000</b></span>
-            <span>PEERS <b id="txt-peers-count" class="pink-txt">1</b></span>
+            <span id="swarm-host-trigger" data-interactive="true" title="Klik untuk cek info host &amp; port">HOST <b>0.0.0.0:8000</b></span>
+            <span id="swarm-peers-trigger" data-interactive="true" title="Klik untuk kelola daftar peer P2P">PEERS <b id="txt-peers-count" class="pink-txt">1</b></span>
           </div>
         </div>
       </div>
 
       <!-- PANEL 08: SYSTEM PERFORMANCE & WEB3 LEDGER METRICS (Real Metrics + Live Block Mining) -->
-      <div class="panel panel-metrics">
+      <div class="panel panel-metrics" id="panel-08-metrics">
         <div class="panel-header">
           <div class="ph-left">
             <span class="p-num green">08</span>
@@ -1014,37 +1102,37 @@
 
         <div class="metrics-body">
           <div class="eval-bars-list" id="eval-bars-list">
-            <div class="eb-row"><span class="eb-lbl">CPU USAGE</span>
+            <div class="eb-row" data-metric-action="hw" title="Klik untuk refresh &amp; cetak laporan CPU Usage (GET /node/metrics)"><span class="eb-lbl">CPU USAGE</span>
               <div class="eb-track">
                 <div class="eb-fill c-green" id="bar-cpu" style="width:28%"></div>
               </div><span class="eb-val" id="txt-cpu-val">28%</span>
             </div>
-            <div class="eb-row"><span class="eb-lbl">RAM ALLOC</span>
+            <div class="eb-row" data-metric-action="hw" title="Klik untuk refresh &amp; cetak laporan RAM Allocation (GET /node/metrics)"><span class="eb-lbl">RAM ALLOC</span>
               <div class="eb-track">
                 <div class="eb-fill c-teal" id="bar-ram" style="width:52%"></div>
               </div><span class="eb-val" id="txt-ram-val">52%</span>
             </div>
-            <div class="eb-row"><span class="eb-lbl">DISK I/O READ</span>
+            <div class="eb-row" data-metric-action="hw" title="Klik untuk refresh &amp; cetak laporan Disk I/O Read (GET /node/metrics)"><span class="eb-lbl">DISK I/O READ</span>
               <div class="eb-track">
                 <div class="eb-fill c-amber" id="bar-disk" style="width:64%"></div>
               </div><span class="eb-val" id="txt-disk-val">0 MB</span>
             </div>
-            <div class="eb-row"><span class="eb-lbl">RAG VECTORS</span>
+            <div class="eb-row" data-metric-action="rag" title="Klik untuk membuka manajer dokumen RAG Vector Store (GET /knowledge/stats)"><span class="eb-lbl">RAG VECTORS</span>
               <div class="eb-track">
                 <div class="eb-fill c-green" id="bar-rag-docs" style="width:20%"></div>
               </div><span class="eb-val" id="txt-rag-docs">0 doc</span>
             </div>
-            <div class="eb-row"><span class="eb-lbl">ED25519 KEY</span>
+            <div class="eb-row" data-metric-action="crypto" title="Klik untuk menjalankan self-test tanda tangan Ed25519 (POST /security/sign-verify)"><span class="eb-lbl">ED25519 KEY</span>
               <div class="eb-track">
                 <div class="eb-fill c-teal" id="bar-m5" style="width:100%"></div>
               </div><span class="eb-val">VALID</span>
             </div>
-            <div class="eb-row"><span class="eb-lbl">POW DIFFICULTY</span>
+            <div class="eb-row" data-metric-action="pow" title="Klik untuk mengubah tingkat kesulitan PoW 1..3 (POST /node/config)"><span class="eb-lbl">POW DIFFICULTY</span>
               <div class="eb-track">
                 <div class="eb-fill c-purple" id="bar-pow-diff" style="width:50%"></div>
               </div><span class="eb-val" id="txt-pow-diff">DIFF 2</span>
             </div>
-            <div class="eb-row"><span class="eb-lbl">WEB3 LEDGER</span>
+            <div class="eb-row" data-metric-action="chain" title="Klik untuk membuka &amp; menginspeksi Web3 Blockchain Ledger (GET /node/chain)"><span class="eb-lbl">WEB3 LEDGER</span>
               <div class="eb-track">
                 <div class="eb-fill c-green" id="bar-m7" style="width:100%"></div>
               </div><span class="eb-val" id="txt-chain-height">1 blk</span>
@@ -1053,10 +1141,10 @@
 
           <div class="metrics-bottom-row">
             <div class="mb-info">
-              <span>MODE: <b id="txt-node-mode" class="green-txt">FULL</b></span>
-              <span>ID: <b id="txt-ident-short">ED25519</b></span>
+              <span id="mb-mode-trigger" data-interactive="true" title="Klik untuk cek status mode server">MODE: <b id="txt-node-mode" class="green-txt">FULL</b></span>
+              <span id="mb-id-trigger" data-interactive="true" title="Klik untuk verifikasi identitas Ed25519">ID: <b id="txt-ident-short">ED25519</b></span>
             </div>
-            <div class="mb-big-counter" id="metrics-counter">7/7</div>
+            <div class="mb-big-counter" id="metrics-counter" data-interactive="true" title="Klik untuk refresh seluruh 7 indikator performa">7/7</div>
           </div>
         </div>
       </div>
@@ -1064,24 +1152,24 @@
     </section>
 
     <!-- ═══════════════════════════════════════════════════════════════════
-         BOTTOM SYSTEM STATUS & ARCHITECTURE FOOTER STRIP
+         BOTTOM SYSTEM STATUS & INTERACTIVE ARCHITECTURE FOOTER STRIP
          ═══════════════════════════════════════════════════════════════════ -->
     <footer class="bottom-ticker">
       <div class="bt-left">
         <span class="bt-dot"></span>
-        <b>GAJAHMADA v2.0 — SOVEREIGN DECENTRALIZED INTELLIGENCE</b>
+        <b id="bt-brand-trigger" data-interactive="true" title="Klik untuk cek status sistem penuh">GAJAHMADA v2.0 — SOVEREIGN DECENTRALIZED INTELLIGENCE</b>
         <span class="bt-sep">·</span>
-        <span>01. System Architecture</span>
-        <span>02. System Logs</span>
-        <span>03. Command Interface</span>
-        <span>04. Module Dependencies</span>
-        <span>05. Web3 Server Arch</span>
-        <span>06. Modular Architecture</span>
-        <span>07. Network Status</span>
-        <span>08. System Performance</span>
+        <span class="bt-nav-item" data-jump="panel-system-logs">01. System Logs &amp; Config</span>
+        <span class="bt-nav-item" data-jump="panel-02-3d">02. 3D Network Graph</span>
+        <span class="bt-nav-item" data-jump="panel-command-hero">03. Command Interface</span>
+        <span class="bt-nav-item" data-jump="panel-04-deps">04. Module Dependencies</span>
+        <span class="bt-nav-item" data-jump="panel-05-workflow">05. Web3 Server Arch</span>
+        <span class="bt-nav-item" data-jump="panel-06-modular">06. Modular Architecture</span>
+        <span class="bt-nav-item" data-jump="panel-07-network">07. Network Status</span>
+        <span class="bt-nav-item" data-jump="panel-08-metrics">08. System Performance</span>
       </div>
       <div class="bt-right">
-        <span id="hud-clock">00:00:00</span>
+        <span id="hud-clock" data-interactive="true" title="Klik untuk menampilkan sinkronisasi waktu sistem sekarang (/time)">00:00:00</span>
       </div>
     </footer>
 
@@ -1228,8 +1316,8 @@
     </div>
   </div>
 
-  <script type="module" src="/ui/analytics.js?v=12.0"></script>
-  <script src="/ui/app.js?v=12.0"></script>
+  <script type="module" src="/ui/analytics.js?v=13.0"></script>
+  <script src="/ui/app.js?v=13.0"></script>
 </body>
 
 </html>

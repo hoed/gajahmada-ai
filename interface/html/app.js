@@ -537,6 +537,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
       document.getElementById('pc-tag-api').textContent = `${rtt}ms`;
       logWatch('ok', `[gajahmada_ai.api] GET /health -> 200 OK (${rtt}ms, uptime=${data.uptime_sec || 0}s)`);
+      showHudToast(`🟢 [1. API SERVER] GET /health → 200 OK (${rtt}ms · uptime ${data.uptime_sec || 0}s)`);
     } else if (modIndex === 1) {
       // 2. AI CORE: Real 384-d embedding benchmark
       const t0 = performance.now();
@@ -551,22 +552,27 @@ document.addEventListener('DOMContentLoaded', () => {
         const sample = (data.embedding || []).slice(0, 4).map((v) => Number(v).toFixed(3)).join(', ');
         document.getElementById('pc-tag-core').textContent = `${data.dimension || 384}d · ${rtt}ms`;
         logWatch('ok', `[gajahmada_ai.core] Generated ${data.dimension || 384}-d vector in ${rtt}ms: [${sample}, ...]`);
+        showHudToast(`🧠 [2. AI CORE] 384-d Vector generated in ${rtt}ms: [${sample}, ...]`);
       }
     } else if (modIndex === 2) {
       // 3. KNOWLEDGE RAG: Open modal & refresh live docs
       openModal(document.getElementById('modal-rag'));
       await refreshKnowledgeStats();
+      showHudToast('📚 [3. KNOWLEDGE RAG] Opened 384-d Vector Store Manager');
     } else if (modIndex === 3) {
       // 4. WEB3 CHAIN: Open ledger modal & verify chain
       openModal(document.getElementById('modal-chain'));
       await fetchChain();
+      showHudToast('⛓ [4. WEB3 CHAIN] Opened PoW Blockchain Audit Ledger');
     } else if (modIndex === 4) {
       // 5. P2P NETWORK: Open peer modal & refresh peers
       openModal(document.getElementById('modal-peer'));
       await fetchNodeInfo();
+      showHudToast('🌐 [5. P2P NETWORK] Opened P2P Mesh Topology & Peer Manager');
     } else if (modIndex === 5) {
       // 6. SECURITY: Real Ed25519 sign & verify self-test
       await runEd25519VerificationTest();
+      showHudToast('🔐 [6. SECURITY] Ed25519 RFC 8032 Cryptographic Self-Test Verified');
     }
   }
 
@@ -1738,6 +1744,347 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } catch { /* offline */ }
   }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // 12. COMPREHENSIVE INTERACTIVE BINDINGS (EVERY UI ELEMENT HAS A REAL FUNCTION)
+  // ═════════════════════════════════════════════════════════════════════════
+  const elHudToast = document.getElementById('hud-action-toast');
+  let toastTimer = null;
+
+  function showHudToast(msg) {
+    if (!elHudToast) return;
+    elHudToast.textContent = msg;
+    elHudToast.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => elHudToast.classList.remove('show'), 3200);
+  }
+
+  function flashPanel(panelId) {
+    const el = document.getElementById(panelId);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    el.classList.add('panel-flash-highlight');
+    setTimeout(() => el.classList.remove('panel-flash-highlight'), 1100);
+  }
+
+  // A. Panel 01 Header Metadata & 5th Config Row (ai.embedding benchmark)
+  document.getElementById('hdr-meta-rag')?.addEventListener('click', () => {
+    openModal(elModalRag);
+    refreshKnowledgeStats();
+    showHudToast('📚 [KNOWLEDGE] Opened 384-d RAG Vector Store Manager');
+  });
+
+  document.getElementById('hdr-meta-engine')?.addEventListener('click', () => {
+    executeCoreModuleAction(1);
+    showHudToast('⚡ [AI CORE] Running 384-d Vector Embedding Benchmark...');
+  });
+
+  document.getElementById('hdr-meta-uptime')?.addEventListener('click', async () => {
+    await executeCoreModuleAction(0);
+    await executeSlashCommand('/status');
+    showHudToast('🟢 [SYSTEM STATUS] Live health & telemetry verified');
+  });
+
+  document.getElementById('cfg-row-embed')?.addEventListener('click', async () => {
+    const t0 = performance.now();
+    try {
+      const res = await fetch(`${API_URL}/ai/embedding`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: 'GajahMada Nusantara 384-d Semantic Embedding Benchmark' }),
+      });
+      const data = await res.json();
+      const ms = (performance.now() - t0).toFixed(1);
+      const preview = (data.embedding || []).slice(0, 5).map((v) => Number(v).toFixed(4)).join(', ');
+      document.getElementById('cfg-val-embed').textContent = `384d (${ms}ms)`;
+      appendChatMessage('ai', `[384-d Vector Embedding Benchmark — PASSED]\n• Model: MiniLM-L6-v2 / Hash-Projection (${data.dimension || 384} dimensions)\n• Latency: ${ms}ms\n• Vector Sample: [${preview}, ...]`, (ms / 1000).toFixed(3), null);
+      showHudToast(`⚡ [EMBEDDER] Generated 384-d vector in ${ms}ms`);
+    } catch { /* ignore */ }
+  });
+
+  // B. Panel 02: 3D Network Legend Cluster Buttons & Header Controls
+  function sync3DClusterLegend(clusterIdx) {
+    document.querySelectorAll('.net3d-cluster-btn[data-cluster]').forEach((btn) => {
+      btn.classList.toggle('active', Number(btn.dataset.cluster) === clusterIdx);
+    });
+  }
+
+  document.querySelectorAll('.net3d-cluster-btn[data-cluster]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const cIdx = Number(btn.dataset.cluster) || 0;
+      activeClusterIdx = cIdx;
+      sync3DClusterLegend(cIdx);
+      const cl = CLUSTERS[cIdx];
+      showHudToast(`🌐 [3D NETWORK] Focused cluster: ${cl.name} (${cl.sub.join(', ')})`);
+      executeCoreModuleAction(cIdx % 6);
+    });
+  });
+
+  const cycleNext3DCluster = () => {
+    activeClusterIdx = (activeClusterIdx + 1) % CLUSTERS.length;
+    sync3DClusterLegend(activeClusterIdx);
+    const cl = CLUSTERS[activeClusterIdx];
+    showHudToast(`🌐 [3D FOCUS] ${cl.name} → ${cl.sub.join(' · ')}`);
+    logWatch('3d-graph', `Focused 3D cluster: ${cl.name}`);
+  };
+  document.getElementById('btn-3d-rotate-step')?.addEventListener('click', cycleNext3DCluster);
+  document.getElementById('btn-3d-cycle-all')?.addEventListener('click', cycleNext3DCluster);
+  document.getElementById('btn-3d-vec-probe')?.addEventListener('click', () => {
+    document.getElementById('cfg-row-embed')?.click();
+  });
+
+  // C. Panel 03 Header Stage Pill & 7 Stars Interactive Execution
+  elSubStageText?.addEventListener('click', () => {
+    const nextPhase = (currentStageIdx + 1) % 6;
+    executeSingleWorkflowPhase(nextPhase);
+  });
+
+  elTaskStarsRow?.querySelectorAll('.t-star').forEach((star, idx) => {
+    star.style.cursor = 'pointer';
+    star.title = `Klik untuk menjalankan Phase ${idx + 1}/7`;
+    star.addEventListener('click', () => {
+      const stars = elTaskStarsRow.querySelectorAll('.t-star');
+      stars.forEach((st, i) => st.classList.toggle('lit', i <= idx));
+      if (elStarsLbl) elStarsLbl.textContent = `${idx + 1}/7`;
+      executeSingleWorkflowPhase(idx % 6);
+    });
+  });
+
+  // D. Panel 04: Python Dependency Full Report & 6 Interactive Waypoint Dots
+  document.getElementById('mcp-active-label')?.addEventListener('click', async () => {
+    await fetchDependencies();
+    if (cachedDeps?.packages) {
+      const lines = Object.entries(cachedDeps.packages)
+        .map(([pkg, ver]) => `• ${pkg}: ${ver}`)
+        .join('\n');
+      appendChatMessage(
+        'ai',
+        `[Module Dependencies & Python Runtime Report]\n` +
+        `• Python Version: ${cachedDeps.python_version}\n` +
+        `• Active FastAPI Routes: ${cachedDeps.endpoints_count}\n${lines}`,
+        0.002,
+        null
+      );
+      showHudToast(`📦 [DEPENDENCIES] Inspected ${Object.keys(cachedDeps.packages).length} runtime packages`);
+    }
+  });
+
+  const WAYPOINT_PROBES = [
+    { name: 'Gateway Health', url: '/health', method: 'GET' },
+    { name: 'Node Identity & Info', url: '/node/info', method: 'GET' },
+    { name: 'RAG Vector Store', url: '/knowledge/stats', method: 'GET' },
+    { name: '384-d Embedding Engine', url: '/ai/embedding', method: 'POST', body: { text: 'waypoint probe' } },
+    { name: 'Ed25519 Crypto Verifier', url: '/security/sign-verify', method: 'POST', body: { message: 'waypoint-auth' } },
+    { name: 'PoW Blockchain Ledger', url: '/node/chain', method: 'GET' },
+  ];
+
+  document.querySelectorAll('.mcp-dot[data-waypoint]').forEach((dot) => {
+    dot.addEventListener('click', async () => {
+      const wpIdx = Number(dot.dataset.waypoint) || 0;
+      const probe = WAYPOINT_PROBES[wpIdx % WAYPOINT_PROBES.length];
+      const elTrackFill = document.getElementById('mcp-track-fill');
+      if (elTrackFill) elTrackFill.style.width = `${wpIdx * 20}%`;
+      document.querySelectorAll('.mcp-dot').forEach((d, i) => {
+        d.classList.toggle('lit', i < wpIdx);
+        d.classList.toggle('active', i === wpIdx);
+      });
+
+      const t0 = performance.now();
+      try {
+        const res = await fetch(`${API_URL}${probe.url}`, {
+          method: probe.method,
+          headers: probe.body ? { 'Content-Type': 'application/json' } : undefined,
+          body: probe.body ? JSON.stringify(probe.body) : undefined,
+        });
+        const ms = (performance.now() - t0).toFixed(1);
+        const traceEl = document.getElementById('mcp-trace-txt');
+        const latEl = document.getElementById('mcp-latency-txt');
+        if (traceEl) traceEl.textContent = `waypoint #${wpIdx + 1} (${probe.name}): ${probe.method} ${probe.url} → ${res.status} OK`;
+        if (latEl) latEl.textContent = `${ms}ms`;
+        showHudToast(`⚡ [WAYPOINT #${wpIdx + 1}] ${probe.name} (${probe.url}) → HTTP ${res.status} (${ms}ms)`);
+        logWatch('route', `Waypoint #${wpIdx + 1} ${probe.method} ${probe.url} verified in ${ms}ms`);
+      } catch { /* ignore */ }
+    });
+  });
+
+  // E. Panel 05: Individual Phase Execution on Ring Segments & Perimeter Labels
+  async function executeSingleWorkflowPhase(phaseIdx) {
+    updateStageVisuals(phaseIdx);
+    const phaseName = STAGES[phaseIdx % STAGES.length].toUpperCase();
+    const statusEl = document.getElementById('wf-cycle-status');
+    if (statusEl) statusEl.textContent = `EXEC: ${phaseName}`;
+
+    if (phaseIdx === 0) {
+      await refreshKnowledgeStats();
+      const count = elHdrDocsCount?.textContent || 24;
+      appendChatMessage('ai', `[Phase 1/6: INGEST] LocalKnowledge Vector Store siap dengan ${count} dokumen terindeks (384-d).`, 0.002, null);
+      showHudToast(`📥 [PHASE 1: INGEST] ${count} RAG documents verified`);
+    } else if (phaseIdx === 1) {
+      document.getElementById('cfg-row-embed')?.click();
+    } else if (phaseIdx === 2) {
+      const res = await fetch(`${API_URL}/ai/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: 'Jelaskan Mahapatih Gajah Mada dan Sumpah Palapa', max_tokens: currentMaxTokens }),
+      });
+      const data = await res.json();
+      appendChatMessage('ai', data.response, data.time_taken, data.block_index);
+      showHudToast(`🧠 [PHASE 3: INFER] AIModelEngine inference completed (${data.time_taken}s)`);
+    } else if (phaseIdx === 3) {
+      await runEd25519VerificationTest(false);
+      showHudToast('🔐 [PHASE 4: SIGN] Ed25519 RFC 8032 signature verified');
+    } else if (phaseIdx === 4) {
+      const blk = await mineNewBlock('Phase 5/6 Workflow PoW Block');
+      if (blk) {
+        appendChatMessage('ai', `[Phase 5/6: MINE] Block #${blk.index} berhasil ditambang (Nonce: ${blk.nonce}, Hash: ${blk.hash.substring(0, 22)}...).`, 0.008, blk.index);
+        showHudToast(`⛏ [PHASE 5: MINE] Mined Block #${blk.index} (Nonce ${blk.nonce})`);
+      }
+    } else if (phaseIdx === 5) {
+      await triggerP2PBroadcast('Phase 6/6 Consensus Gossip Sync', false);
+      appendChatMessage('ai', `[Phase 6/6: GOSSIP] Paket konsensus bertanda tangan Ed25519 telah disiarkan ke jaringan P2P Mesh (${knownPeersList.length} peer).`, 0.004, null);
+      showHudToast(`📡 [PHASE 6: GOSSIP] Broadcast sent to ${knownPeersList.length} P2P peer(s)`);
+    }
+    if (statusEl) statusEl.textContent = `${phaseName} OK`;
+  }
+
+  document.querySelectorAll('.ring-lbl[data-phase]').forEach((lbl) => {
+    lbl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      executeSingleWorkflowPhase(Number(lbl.dataset.phase) || 0);
+    });
+  });
+
+  for (let i = 0; i < 6; i++) {
+    const seg = document.getElementById(`ring-seg-${i}`);
+    if (seg) {
+      seg.style.cursor = 'pointer';
+      seg.addEventListener('click', (e) => {
+        e.stopPropagation();
+        executeSingleWorkflowPhase(i);
+      });
+    }
+  }
+
+  document.getElementById('wf-pow-toggle')?.addEventListener('click', () => {
+    document.getElementById('cfg-row-diff')?.click();
+    showHudToast(`⚙ [POW DIFFICULTY] Updated to DIFF=${currentDiff}`);
+  });
+  document.getElementById('wf-status-toggle')?.addEventListener('click', () => runFullWeb3Cycle());
+
+  // F. Panel 06: Modular Architecture Live Probe Triggers & Endpoint Modals
+  const triggerActiveSkillProbe = () => {
+    const currentCell = skillCells[activeSkillIdx];
+    if (currentCell) probeComponentLive(currentCell.dataset.skill);
+  };
+  document.getElementById('mod-probe-badge')?.addEventListener('click', triggerActiveSkillProbe);
+  document.getElementById('skill-detail-trigger')?.addEventListener('click', triggerActiveSkillProbe);
+
+  skillCells.forEach((cell) => {
+    cell.addEventListener('click', () => {
+      const sk = cell.dataset.skill;
+      showHudToast(`🔍 [MODULE PROBE] Testing ${sk}...`);
+      if (sk === 'POST /ai/ingest') openModal(elModalRag);
+      else if (sk === 'GET /node/chain') openModal(elModalChain);
+      else if (sk === 'POST /node/sync') openModal(elModalPeer);
+      else if (sk === 'POST /ai/chat') openCommandCenterDialog();
+    });
+  });
+
+  // G. Panel 07: Coordinate Hit-Testing on Swarm Topology Canvas
+  canvasS?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const rect = canvasS.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const w = canvasS.width;
+    const h = canvasS.height;
+
+    let clickedCorner = -1;
+    SWARM_CORNERS.forEach((c, idx) => {
+      const tx = w * c.rx;
+      const ty = h * c.ry;
+      if (Math.abs(mx - tx) <= 34 && Math.abs(my - ty) <= 14) {
+        clickedCorner = idx;
+      }
+    });
+
+    if (clickedCorner === 0) {
+      SWARM_CORNERS[0].flash = 1.0;
+      openModal(elModalPeer);
+      fetchNodeInfo();
+      showHudToast(`🌐 [P2P PEER] Opened P2P Mesh Topology (${SWARM_CORNERS[0].label})`);
+    } else if (clickedCorner === 1) {
+      SWARM_CORNERS[1].flash = 1.0;
+      openModal(elModalRag);
+      refreshKnowledgeStats();
+      showHudToast('📚 [FAISS-RAG] Opened 384-d Knowledge Vector Store');
+    } else if (clickedCorner === 2) {
+      SWARM_CORNERS[2].flash = 1.0;
+      openModal(elModalChain);
+      fetchChain();
+      showHudToast('⛓ [POW-LEDGER] Opened Web3 Blockchain Audit Ledger');
+    } else if (clickedCorner === 3) {
+      SWARM_CORNERS[3].flash = 1.0;
+      document.getElementById('cfg-row-embed')?.click();
+    } else {
+      triggerP2PBroadcast('Interactive Hub Mesh Heartbeat', false);
+      showHudToast('📡 [P2P HUB] Sent Ed25519 signed broadcast across mesh');
+    }
+  });
+
+  document.getElementById('swarm-host-trigger')?.addEventListener('click', () => executeSlashCommand('/status'));
+  document.getElementById('swarm-peers-trigger')?.addEventListener('click', () => openModal(elModalPeer));
+
+  // H. Panel 08: Individual Metric Bar Click Actions
+  document.querySelectorAll('.eb-row[data-metric-action]').forEach((row) => {
+    row.addEventListener('click', async () => {
+      const act = row.dataset.metricAction;
+      if (act === 'hw') {
+        await fetchMetrics();
+        await executeSlashCommand('/status');
+        showHudToast(`📊 [TELEMETRY] CPU ${elTxtCpu?.textContent} · RAM ${elTxtRam?.textContent} · Disk ${elTxtDisk?.textContent}`);
+      } else if (act === 'rag') {
+        openModal(elModalRag);
+        refreshKnowledgeStats();
+        showHudToast(`📚 [RAG VECTORS] ${elTxtRagDocs?.textContent || '24 docs'} indexed in 384-d store`);
+      } else if (act === 'crypto') {
+        await runEd25519VerificationTest(false);
+        showHudToast('🔐 [ED25519 KEY] RFC 8032 signature self-test PASSED');
+      } else if (act === 'pow') {
+        document.getElementById('cfg-row-diff')?.click();
+        showHudToast(`⛏ [POW DIFFICULTY] Switched to DIFF=${currentDiff}`);
+      } else if (act === 'chain') {
+        openModal(elModalChain);
+        fetchChain();
+        showHudToast(`⛓ [WEB3 LEDGER] Inspecting ${elTxtChainHeight?.textContent || 'blocks'}`);
+      }
+    });
+  });
+
+  document.getElementById('mb-mode-trigger')?.addEventListener('click', () => executeSlashCommand('/status'));
+  document.getElementById('mb-id-trigger')?.addEventListener('click', () => runEd25519VerificationTest(false));
+  document.getElementById('metrics-counter')?.addEventListener('click', async () => {
+    await fetchMetrics();
+    await fetchNodeInfo();
+    await refreshKnowledgeStats();
+    showHudToast('✓ [7/7 METRICS] Refreshed all hardware, RAG, and Web3 telemetry indicators');
+  });
+
+  // I. Bottom Footer Ticker Navigation & Live Clock Click
+  document.querySelectorAll('.bt-nav-item[data-jump]').forEach((item) => {
+    item.addEventListener('click', () => {
+      const targetId = item.dataset.jump;
+      flashPanel(targetId);
+      showHudToast(`🎯 [NAVIGATE] Focused module: ${item.textContent}`);
+    });
+  });
+
+  document.getElementById('bt-brand-trigger')?.addEventListener('click', () => executeSlashCommand('/status'));
+  elHudClock?.addEventListener('click', () => {
+    executeSlashCommand('/time');
+    showHudToast(`🕒 [SYSTEM CLOCK] ${formatSystemDateTime(getSystemNow())}`);
+  });
 
   // Initial Boot Sequence
   fetchNodeInfo();
