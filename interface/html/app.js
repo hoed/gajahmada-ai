@@ -193,26 +193,41 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-clear-logs')?.addEventListener('click', clearLogsAction);
   document.getElementById('btn-clear-logs-inline')?.addEventListener('click', clearLogsAction);
 
-  // ─── MOBILE DEVICE LAYOUT SWAP: SYSTEM LOGS <-> SYSTEM PERFORMANCE ───────
-  const elTopArchGrid   = document.querySelector('.top-arch-grid');
-  const elTopWeb3Box    = document.querySelector('.top-web3-box');
-  const elBottomRow     = document.querySelector('.bottom-row');
-  const elSystemLogsBox = document.getElementById('panel-system-logs') || document.querySelector('.top-logs-box');
-  const elPanelMetrics  = document.querySelector('.panel-metrics');
+  // ─── MOBILE DEVICE LAYOUT SWAP: SYSTEM LOGS <-> SYSTEM PERFORMANCE & 3D NETWORK AFTER PERFORMANCE ───
+  const elTopArchGrid    = document.querySelector('.top-arch-grid');
+  const elTopWeb3Box     = document.querySelector('.top-web3-box');
+  const elMiddleRow      = document.querySelector('.middle-row');
+  const elBottomRow      = document.querySelector('.bottom-row');
+  const elSystemLogsBox  = document.getElementById('panel-system-logs') || document.querySelector('.top-logs-box');
+  const elPanelMetrics   = document.querySelector('.panel-metrics');
+  const elPanel3DNetwork = document.getElementById('panel-02-3d') || document.querySelector('.panel-3d-network');
+  const elPanelSubagents = document.getElementById('panel-command-center') || document.querySelector('.panel-subagents');
   const mobileMediaQuery = window.matchMedia('(max-width: 1024px)');
 
   function syncMobileLogsPerformancePosition() {
     if (!elTopArchGrid || !elBottomRow || !elSystemLogsBox || !elPanelMetrics) return;
     if (mobileMediaQuery.matches) {
-      // Mobile/Tablet: Place SYSTEM PERFORMANCE in top section & SYSTEM LOGS in bottom section
+      // Mobile/Tablet:
+      // 1. Place SYSTEM PERFORMANCE inside top-arch-grid & SYSTEM LOGS inside bottom-row
       if (elPanelMetrics.parentElement !== elTopArchGrid) {
         elTopArchGrid.insertBefore(elPanelMetrics, elTopWeb3Box || null);
       }
       if (elSystemLogsBox.parentElement !== elBottomRow) {
         elBottomRow.appendChild(elSystemLogsBox);
       }
+      // 2. Place 3D NETWORK immediately after SYSTEM PERFORMANCE inside top-arch-grid
+      if (elPanel3DNetwork && elPanel3DNetwork.parentElement !== elTopArchGrid) {
+        elTopArchGrid.insertBefore(elPanel3DNetwork, elPanelMetrics.nextSibling);
+        if (typeof resizeUniverse === 'function') requestAnimationFrame(resizeUniverse);
+      }
     } else {
-      // Desktop: Restore SYSTEM LOGS to center of top-arch-grid & SYSTEM PERFORMANCE to bottom-row
+      // Desktop:
+      // 1. Restore 3D NETWORK back to the first slot of middle-row
+      if (elPanel3DNetwork && elMiddleRow && elPanel3DNetwork.parentElement !== elMiddleRow) {
+        elMiddleRow.insertBefore(elPanel3DNetwork, elPanelSubagents || elMiddleRow.firstChild);
+        if (typeof resizeUniverse === 'function') requestAnimationFrame(resizeUniverse);
+      }
+      // 2. Restore SYSTEM LOGS to center of top-arch-grid & SYSTEM PERFORMANCE to bottom-row
       if (elSystemLogsBox.parentElement !== elTopArchGrid) {
         elTopArchGrid.insertBefore(elSystemLogsBox, elTopWeb3Box || null);
       }

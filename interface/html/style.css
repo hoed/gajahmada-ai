@@ -1729,8 +1729,13 @@ body {
   }
   .top-arch-grid > .panel-metrics {
     grid-column: 1 / -1 !important;
-    order: -1 !important;
+    order: -2 !important;
     min-height: 205px !important;
+  }
+  .top-arch-grid > .panel-3d-network {
+    grid-column: 1 / -1 !important;
+    order: -1 !important;
+    min-height: 270px !important;
   }
   .bottom-row > .top-logs-box {
     min-height: 210px !important;

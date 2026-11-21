@@ -74,7 +74,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="/ui/style.css?v=13.0">
+  <link rel="stylesheet" href="/ui/style.css?v=14.0">
   <style>
     /* Interactive clickable cues & HUD Action Toast */
     [data-interactive], .clickable-cfg, .ov-step, .pipe-card, .mcp-cell, .mcp-dot,
@@ -418,8 +418,13 @@
       }
       .top-arch-grid > .panel-metrics {
         grid-column: 1 / -1 !important;
-        order: -1 !important;
+        order: -2 !important;
         min-height: 205px !important;
+      }
+      .top-arch-grid > .panel-3d-network {
+        grid-column: 1 / -1 !important;
+        order: -1 !important;
+        min-height: 270px !important;
       }
       .bottom-row > .top-logs-box {
         min-height: 210px !important;
@@ -1316,8 +1321,8 @@
     </div>
   </div>
 
-  <script type="module" src="/ui/analytics.js?v=13.0"></script>
-  <script src="/ui/app.js?v=13.0"></script>
+  <script type="module" src="/ui/analytics.js?v=14.0"></script>
+  <script src="/ui/app.js?v=14.0"></script>
 </body>
 
 </html>
