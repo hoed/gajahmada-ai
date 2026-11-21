@@ -1727,11 +1727,14 @@ body {
     grid-template-columns: 1fr 1fr !important;
     height: auto !important;
   }
-  .top-logs-box {
+  .top-arch-grid > .panel-metrics {
     grid-column: 1 / -1 !important;
     order: -1 !important;
-    min-height: 150px !important;
-    max-height: 200px !important;
+    min-height: 205px !important;
+  }
+  .bottom-row > .top-logs-box {
+    min-height: 210px !important;
+    max-height: 260px !important;
   }
   .pipeline-strip {
     height: auto !important;

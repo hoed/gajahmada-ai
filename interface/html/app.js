@@ -163,29 +163,71 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch { /* ignore if old backend */ }
   }
 
-  document.getElementById('btn-sync-logs')?.addEventListener('click', () => {
+  const syncLogsAction = () => {
     syncServerLogs();
     logWatch('sys', 'Synchronized telemetry log buffer from GET /node/logs');
-  });
+  };
+  document.getElementById('btn-sync-logs')?.addEventListener('click', syncLogsAction);
+  document.getElementById('btn-sync-logs-inline')?.addEventListener('click', syncLogsAction);
 
-  document.getElementById('btn-export-logs')?.addEventListener('click', () => {
+  const exportLogsAction = () => {
     const lines = Array.from(elWatchTerminal?.querySelectorAll('.t-line') || []).map((el) => el.textContent).join('\n');
     const blob = new Blob([lines], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `gajahmada-ai-telemetry-${Date.now()}.log`;
+    a.download = `gajahmada-telemetry-${Date.now()}.log`;
     a.click();
     URL.revokeObjectURL(url);
     logWatch('ok', 'Exported system telemetry log file.');
-  });
+  };
+  document.getElementById('btn-export-logs')?.addEventListener('click', exportLogsAction);
+  document.getElementById('btn-export-logs-inline')?.addEventListener('click', exportLogsAction);
 
-  document.getElementById('btn-clear-logs')?.addEventListener('click', async () => {
+  const clearLogsAction = async () => {
     if (elWatchTerminal) elWatchTerminal.innerHTML = '';
     seenLogIds.clear();
     try { await fetch(`${API_URL}/node/logs`, { method: 'DELETE' }); } catch { /* ignore */ }
     logWatch('sys', 'System logs cleared.');
-  });
+  };
+  document.getElementById('btn-clear-logs')?.addEventListener('click', clearLogsAction);
+  document.getElementById('btn-clear-logs-inline')?.addEventListener('click', clearLogsAction);
+
+  // ─── MOBILE DEVICE LAYOUT SWAP: SYSTEM LOGS <-> SYSTEM PERFORMANCE ───────
+  const elTopArchGrid   = document.querySelector('.top-arch-grid');
+  const elTopWeb3Box    = document.querySelector('.top-web3-box');
+  const elBottomRow     = document.querySelector('.bottom-row');
+  const elSystemLogsBox = document.getElementById('panel-system-logs') || document.querySelector('.top-logs-box');
+  const elPanelMetrics  = document.querySelector('.panel-metrics');
+  const mobileMediaQuery = window.matchMedia('(max-width: 1024px)');
+
+  function syncMobileLogsPerformancePosition() {
+    if (!elTopArchGrid || !elBottomRow || !elSystemLogsBox || !elPanelMetrics) return;
+    if (mobileMediaQuery.matches) {
+      // Mobile/Tablet: Place SYSTEM PERFORMANCE in top section & SYSTEM LOGS in bottom section
+      if (elPanelMetrics.parentElement !== elTopArchGrid) {
+        elTopArchGrid.insertBefore(elPanelMetrics, elTopWeb3Box || null);
+      }
+      if (elSystemLogsBox.parentElement !== elBottomRow) {
+        elBottomRow.appendChild(elSystemLogsBox);
+      }
+    } else {
+      // Desktop: Restore SYSTEM LOGS to center of top-arch-grid & SYSTEM PERFORMANCE to bottom-row
+      if (elSystemLogsBox.parentElement !== elTopArchGrid) {
+        elTopArchGrid.insertBefore(elSystemLogsBox, elTopWeb3Box || null);
+      }
+      if (elPanelMetrics.parentElement !== elBottomRow) {
+        elBottomRow.appendChild(elPanelMetrics);
+      }
+    }
+  }
+
+  syncMobileLogsPerformancePosition();
+  if (typeof mobileMediaQuery.addEventListener === 'function') {
+    mobileMediaQuery.addEventListener('change', syncMobileLogsPerformancePosition);
+  } else {
+    window.addEventListener('resize', syncMobileLogsPerformancePosition);
+  }
 
   // ═════════════════════════════════════════════════════════════════════════
   // 2. PANEL 01: 3D SYSTEM ARCHITECTURE GRAPH (WITH CLICK-TO-PROBE CLUSTERS)

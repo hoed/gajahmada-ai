@@ -74,7 +74,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="/ui/style.css?v=11.0">
+  <link rel="stylesheet" href="/ui/style.css?v=12.0">
   <style>
     .dashboard-viewport { grid-template-rows: 38px 0.88fr 1.68fr 0.78fr 18px; }
     .middle-row { grid-template-columns: 1.05fr 1.55fr 0.72fr; gap: 6px; }
@@ -330,11 +330,14 @@
         grid-template-columns: 1fr 1fr !important;
         height: auto !important;
       }
-      .top-logs-box {
+      .top-arch-grid > .panel-metrics {
         grid-column: 1 / -1 !important;
         order: -1 !important;
-        min-height: 150px !important;
-        max-height: 200px !important;
+        min-height: 205px !important;
+      }
+      .bottom-row > .top-logs-box {
+        min-height: 210px !important;
+        max-height: 260px !important;
       }
       .pipeline-strip {
         height: auto !important;
@@ -600,11 +603,16 @@
           </div>
         </div>
 
-        <!-- Center Wide Box: SYSTEM LOGS (Swapped here so logs stream cleanly in wide view) -->
-        <div class="top-logs-box">
+        <!-- Center Wide Box: SYSTEM LOGS (Swapped with System Performance on Mobile) -->
+        <div class="top-logs-box" id="panel-system-logs">
           <div class="top-logs-hdr">
-            <span>SYSTEM LOGS // LIVE TELEMETRY STREAM (GET /node/logs)</span>
-            <span style="color:#4ade80">● STREAMING</span>
+            <span><span class="p-num amber" style="margin-right:5px">LOG</span>SYSTEM LOGS // LIVE TELEMETRY (GET /node/logs)</span>
+            <div style="display:flex;align-items:center;gap:4px">
+              <button class="tiny-btn" id="btn-sync-logs-inline" title="Tarik log terbaru">SYNC</button>
+              <button class="tiny-btn" id="btn-export-logs-inline" title="Unduh file log">EXPORT</button>
+              <button class="tiny-btn" id="btn-clear-logs-inline" title="Bersihkan log">CLEAR</button>
+              <span style="color:#4ade80;margin-left:3px">● LIVE</span>
+            </div>
           </div>
           <div class="terminal-screen" id="watch-terminal">
             <!-- Real server logs + live telemetry -->
@@ -1220,8 +1228,8 @@
     </div>
   </div>
 
-  <script type="module" src="/ui/analytics.js?v=11.0"></script>
-  <script src="/ui/app.js?v=11.0"></script>
+  <script type="module" src="/ui/analytics.js?v=12.0"></script>
+  <script src="/ui/app.js?v=12.0"></script>
 </body>
 
 </html>
