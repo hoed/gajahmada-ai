@@ -1,3 +1,4 @@
+from datetime import datetime
 import hashlib
 import importlib
 import math
@@ -56,13 +57,48 @@ class AIModelEngine:
     def _synthesize_response(self, prompt: str, context: str = "") -> str:
         q = prompt.strip()
         ql = q.lower()
-        ctx_prefix = f"[RAG Knowledge Context]: {context[:280]}\n\n" if context else ""
+        now = datetime.now().astimezone()
+        now_str = now.strftime("%Y-%m-%d %H:%M:%S %Z (UTC%z)")
+        current_year = now.year
+        years_merdeka = max(1, current_year - 1945)
+        ctx_prefix = f"[System Time: {now_str}]\n[RAG Knowledge Context (384-d Vector Match)]:\n{context[:1100]}\n\n" if context else f"[System Time: {now_str}]\n\n"
+
+        if any(k in ql for k in ["waktu", "jam", "tanggal", "hari ini", "time", "date", "now", "sekarang jam"]):
+            return (
+                f"{ctx_prefix}[Sinkronisasi Waktu Sistem GajahMada — LIVE]\n"
+                f"• Waktu Sistem Sekarang (Now): {now_str}\n"
+                f"• ISO-8601 Timestamp: {now.isoformat()}\n"
+                f"• Tahun Berjalan: {current_year} ({years_merdeka} Tahun Kemerdekaan Republik Indonesia sejak 17 Agustus 1945)."
+            )
+
+        if any(k in ql for k in [
+            "indonesia", "nusantara", "sejarah", "majapahit", "sriwijaya", "gajah mada",
+            "sumpah palapa", "kerajaan", "kesultanan", "kemerdekaan", "proklamasi",
+            "pancasila", "soekarno", "presiden", "provinsi", "ikn", "budaya", "ekonomi"
+        ]):
+            return (
+                f"{ctx_prefix}[Kronologi & Detail Nusantara hingga Indonesia Sekarang ({now_str})]\n"
+                f"1. Peradaban Awal & Kerajaan Maritim (Abad ke-4 – ke-13): Dimulai dari Kutai (Mulawarman) & Tarumanagara "
+                f"(Purnawarman), berlanjut ke kejayaan maritim Sriwijaya di Sumatera, pembangunan Borobudur & Prambanan "
+                f"oleh Mataram Kuno, hingga gagasan Cakrawala Mandala Dwipantara oleh Kertanagara (Singasari).\n"
+                f"2. Kemaharajaan Majapahit & Mahapatih Gajah Mada (1293 – Abad ke-16): Di bawah Hayam Wuruk dan Sumpah Palapa "
+                f"Gajah Mada (1336 M), Nusantara dipersatukan serta melahirkan semboyan 'Bhinneka Tunggal Ika' (Mpu Tantular).\n"
+                f"3. Era Kesultanan & Perjuangan Kemerdekaan (Abad ke-13 – 1945): Berkembangnya kesultanan jalur rempah "
+                f"(Samudera Pasai, Aceh, Demak, Banten, Mataram, Gowa-Tallo, Ternate, Tidore), perlawanan pahlawan Nusantara, "
+                f"Kebangkitan Nasional (1908), Sumpah Pemuda (28 Oktober 1928), perumusan Pancasila (1 Juni 1945), hingga "
+                f"Proklamasi Kemerdekaan RI (17 Agustus 1945).\n"
+                f"4. NKRI Modern Sekarang (Tahun {current_year} — {years_merdeka} Tahun Merdeka): Dipersatukan secara maritim melalui "
+                f"Deklarasi Djuanda (1957), peluncuran Satelit Palapa (1976), dan era Reformasi demokrasi (Presiden ke-1 "
+                f"Ir. Soekarno hingga Presiden ke-8 Prabowo Subianto). Saat ini ({current_year}) Indonesia memiliki 38 Provinsi, "
+                f"~282+ juta jiwa, 17.504+ pulau, anggota G20 (PDB > USD 1,4 triliun), membangun Ibu Kota Nusantara (IKN), "
+                f"menuju Indonesia Emas 2045."
+            )
 
         if any(k in ql for k in ["halo", "hai", "hello", "hi", "test", "tes", "ping"]):
             return (
                 f"{ctx_prefix}Halo Operator! GajahMada Core Engine aktif dan siap merespons.\n"
-                f"• Status Modul: 8/8 aktif (API, Core Engine, FAISS RAG, PoW Blockchain, P2P Mesh, Ed25519 Crypto)\n"
-                f"• Silakan ajukan pertanyaan teknis, minta analisa arsitektur, tulis kode, atau ekspansi knowledge RAG."
+                f"• Status Modul: 8/8 aktif (API, Core Engine, 21+ Dokumen RAG Nusantara & Arsitektur, PoW Blockchain, P2P Mesh, Ed25519 Crypto)\n"
+                f"• Silakan tanyakan sejarah Nusantara hingga Indonesia sekarang, analisa arsitektur, atau perintah Web3."
             )
 
         if any(k in ql for k in ["arsitektur", "architecture", "modul", "module", "struktur"]):

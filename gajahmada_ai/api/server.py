@@ -1,3 +1,4 @@
+from datetime import datetime
 import hashlib
 import importlib.metadata
 import os
@@ -14,6 +15,7 @@ from pydantic import BaseModel
 
 from gajahmada_ai.blockchain.chain import AIBlockchain, Block
 from gajahmada_ai.core.engine import AIModelEngine
+from gajahmada_ai.knowledge.indonesia_corpus import get_indonesia_knowledge_corpus
 from gajahmada_ai.knowledge.rag import LocalKnowledge
 from gajahmada_ai.network.p2p import P2PNetwork
 from gajahmada_ai.security.crypto import NodeIdentity
@@ -32,14 +34,27 @@ _ROOT = os.path.normpath(os.path.join(_HERE, "..", ".."))
 UI_PATH = os.path.join(_ROOT, "interface", "html")
 CONFIG_PATH = os.path.join(_ROOT, "config.yaml")
 
+def get_system_time_info() -> Dict[str, Any]:
+    now = datetime.now().astimezone()
+    return {
+        "iso": now.isoformat(),
+        "formatted": now.strftime("%Y-%m-%d %H:%M:%S %Z"),
+        "date": now.strftime("%Y-%m-%d"),
+        "time": now.strftime("%H:%M:%S"),
+        "timezone": now.strftime("%Z (UTC%z)"),
+        "year": now.year,
+        "epoch": round(now.timestamp(), 3),
+    }
+
+
 DEFAULT_KNOWLEDGE_DOCS = [
-    "GajahMada AI System Architecture: Decentralized AI inference & Web3 node terdiri dari 8 modul inti (api.server, core.engine, knowledge.rag, blockchain.chain, network.p2p, security.crypto, cli.main, interface.html).",
+    "GajahMada System Architecture: Decentralized AI inference & Web3 node terdiri dari 8 modul inti (api.server, core.engine, knowledge.rag, blockchain.chain, network.p2p, security.crypto, cli.main, interface.html).",
     "Module core.engine (AIModelEngine): Menjalankan inferensi LLM lokal (LLaMA GGUF / Neural Synthesis) dan menghasilkan vektor embedding semantik 384-dimensi (MiniLM-L6-v2 / Hash-Projection).",
     "Module knowledge.rag (LocalKnowledge): Menyimpan dokumen dalam indeks vektor 384-dimensi (FAISS IndexFlatL2 & L2-VectorStore) untuk Retrieval-Augmented Generation (RAG) berlatensi rendah.",
     "Module blockchain.chain (AIBlockchain): Mencatat setiap task_hash SHA-256 (prompt + response) ke dalam rantai blok Proof-of-Work (difficulty=2) yang ditandatangani secara kriptografis.",
     "Module security.crypto (NodeIdentity): Menggunakan pasangan kunci asimetris Ed25519 (RFC 8032) untuk identitas node unik (node_id) dan verifikasi tanda tangan digital setiap blok.",
     "Module network.p2p (P2PNetwork): Mengelola topologi mesh peer-to-peer asinkron via httpx, sinkronisasi bootstrap peers (/node/sync), dan siaran gossip bertanda tangan (/node/broadcast).",
-]
+] + get_indonesia_knowledge_corpus()
 
 app = FastAPI(
     title="GajahMada AI Network Node",
@@ -76,10 +91,12 @@ runtime_config: Dict[str, Any] = {
 
 
 def record_log(module: str, level: str, message: str):
+    now = datetime.now().astimezone()
     entry = {
         "id": len(system_logs) + 1,
-        "timestamp": time.time(),
-        "time_str": time.strftime("%H:%M:%S"),
+        "timestamp": now.timestamp(),
+        "time_str": now.strftime("%Y-%m-%d %H:%M:%S %Z"),
+        "iso_time": now.isoformat(),
         "module": module,
         "level": level,
         "message": message,
@@ -142,13 +159,18 @@ def ensure_initialized():
     if rag is None:
         storage_dir = "/tmp/knowledge_store" if IS_VERCEL else os.path.join(_ROOT, "knowledge_store")
         rag = LocalKnowledge(storage_path=storage_dir)
-        # Seed initial architectural knowledge if empty
-        if len(rag.doc_store) == 0 and engine is not None:
+        # Ensure all default architecture & Nusantara-Indonesia corpus documents are indexed
+        if engine is not None:
+            existing_set = set(rag.doc_store)
+            added_default = False
             for doc in DEFAULT_KNOWLEDGE_DOCS:
-                emb = engine.create_embedding(doc)
-                if emb:
-                    rag.ingest(doc, emb)
-            rag.flush()
+                if doc not in existing_set:
+                    emb = engine.create_embedding(doc)
+                    if emb:
+                        rag.ingest(doc, emb)
+                        added_default = True
+            if added_default:
+                rag.flush()
         record_log("knowledge.rag", "OK", f"LocalKnowledge mounted ({len(rag.doc_store)} docs indexed)")
 
 
@@ -228,6 +250,7 @@ def api_status():
         "mode": "serverless" if IS_VERCEL else "full",
         "ml_available": engine is not None,
         "uptime_sec": round(time.time() - START_TIME, 1),
+        "system_time": get_system_time_info(),
         "ui_url": "/ui",
     }
 
@@ -245,17 +268,18 @@ def robots_txt():
 
 @app.get("/sitemap.xml", include_in_schema=False)
 def sitemap_xml():
-    xml = """<?xml version="1.0" encoding="UTF-8"?>
+    today = datetime.now().astimezone().strftime("%Y-%m-%d")
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://gajahmada.vercel.app/</loc>
-    <lastmod>2026-11-21</lastmod>
+    <lastmod>{today}</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://gajahmada.vercel.app/ui</loc>
-    <lastmod>2026-11-21</lastmod>
+    <lastmod>{today}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
@@ -430,6 +454,7 @@ def node_info():
         "mode": "serverless" if IS_VERCEL else "full",
         "ml_ready": engine is not None,
         "uptime_sec": round(time.time() - START_TIME, 1),
+        "system_time": get_system_time_info(),
     }
 
 

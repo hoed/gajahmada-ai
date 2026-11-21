@@ -84,9 +84,36 @@ document.addEventListener('DOMContentLoaded', () => {
       .replace(/'/g, '&#039;');
   };
 
-  // ─── CLOCK ───────────────────────────────────────────────────────────────
+  // ─── SYSTEM TIME SYNCHRONIZATION (FOLLOWS SYSTEM CLOCK NOW) ─────────────
+  let serverTimeOffsetMs = 0;
+
+  const getSystemNow = () => new Date(Date.now() + serverTimeOffsetMs);
+
+  const formatSystemDateTime = (dateObj = getSystemNow()) => {
+    const pad = (n) => String(n).padStart(2, '0');
+    const days = ['MIN', 'SEN', 'SEL', 'RAB', 'KAM', 'JUM', 'SAB'];
+    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MEI', 'JUN', 'JUL', 'AGU', 'SEP', 'OKT', 'NOV', 'DES'];
+    const dName = days[dateObj.getDay()];
+    const d = pad(dateObj.getDate());
+    const mName = months[dateObj.getMonth()];
+    const y = dateObj.getFullYear();
+    const hh = pad(dateObj.getHours());
+    const mm = pad(dateObj.getMinutes());
+    const ss = pad(dateObj.getSeconds());
+    const tzOffsetMin = -dateObj.getTimezoneOffset();
+    const tzSign = tzOffsetMin >= 0 ? '+' : '-';
+    const tzH = pad(Math.floor(Math.abs(tzOffsetMin) / 60));
+    const tzLabel = tzOffsetMin === 420 ? 'WIB' : tzOffsetMin === 480 ? 'WITA' : tzOffsetMin === 540 ? 'WIT' : `UTC${tzSign}${tzH}`;
+    return `${dName}, ${d} ${mName} ${y} · ${hh}:${mm}:${ss} ${tzLabel}`;
+  };
+
+  const formatShortTimestamp = (dateObj = getSystemNow()) => {
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${dateObj.getFullYear()}-${pad(dateObj.getMonth() + 1)}-${pad(dateObj.getDate())} ${pad(dateObj.getHours())}:${pad(dateObj.getMinutes())}:${pad(dateObj.getSeconds())}`;
+  };
+
   const updateClock = () => {
-    if (elHudClock) elHudClock.textContent = new Date().toTimeString().split(' ')[0];
+    if (elHudClock) elHudClock.textContent = formatSystemDateTime(getSystemNow());
   };
   setInterval(updateClock, 1000);
   updateClock();
@@ -107,7 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function logWatch(category, text) {
-    const tStr = new Date().toTimeString().split(' ')[0];
+    const tStr = formatShortTimestamp(getSystemNow());
     const colorClass = category === 'err' ? 't-prompt' : category === 'crypto' ? 't-purple' : category === 'ok' ? 't-ok' : 't-info';
     appendTermHTML(`<span class="t-dim">[${tStr}] [${escapeHTML(category.toUpperCase())}]</span> <span class="${colorClass}">${escapeHTML(text)}</span>`);
   }
@@ -1083,6 +1110,15 @@ document.addEventListener('DOMContentLoaded', () => {
       ? `[RAG Knowledge Context]: "${localKnowledgeMemory[localKnowledgeMemory.length - 1].substring(0, 140)}"\n`
       : '';
 
+    if (/indonesia|nusantara|sejarah|majapahit|sriwijaya|gajah mada|sumpah palapa|kerajaan|kesultanan|kemerdekaan|proklamasi|pancasila|presiden|provinsi|ikn/.test(ql)) {
+      return (
+        `${ragCtx}[Kronologi Nusantara hingga Indonesia Modern]\n` +
+        `1. Era Kerajaan Awal & Maritim: Kutai (abad ke-4 M), Tarumanagara, Sriwijaya, Mataram Kuno (Borobudur & Prambanan), hingga Singasari (Ekspedisi Pamalayu).\n` +
+        `2. Majapahit & Mahapatih Gajah Mada (1293–Abad 16): Sumpah Palapa (1336 M) menyatukan kepulauan Nusantara dan melahirkan semboyan 'Bhinneka Tunggal Ika'.\n` +
+        `3. Kesultanan, Pergerakan & Proklamasi: Kejayaan jalur rempah (Samudera Pasai, Aceh, Demak, Banten, Mataram, Gowa-Tallo, Ternate-Tidore), Kebangkitan Nasional (1908), Sumpah Pemuda (1928), Pancasila (1 Juni 1945), & Proklamasi Kemerdekaan RI (17 Agustus 1945).\n` +
+        `4. Indonesia Sekarang: 17.504+ pulau (Deklarasi Djuanda 1957), ~282 juta jiwa, 38 Provinsi, anggota G20 (PDB > USD 1,4T), Presiden ke-1 Ir. Soekarno s/d Presiden ke-8 Prabowo Subianto, pembangunan Ibu Kota Nusantara (IKN), menuju Indonesia Emas 2045.`
+      );
+    }
     if (/halo|hai|hello|hi|test|tes|ping/.test(ql)) {
       return (
         `${ragCtx}Halo Operator! GajahMada AI LLM Engine (Node: ${nodeId}) aktif.\n` +
@@ -1106,7 +1142,8 @@ document.addEventListener('DOMContentLoaded', () => {
     item.className = `chat-item ${isUser ? 'chat-user' : isErr ? 'chat-error' : 'chat-ai'}`;
 
     const who = isUser ? 'OPERATOR // COMMAND' : isErr ? 'SYSTEM ALERT' : 'GAJAHMADA // CORE ENGINE';
-    let sig = isUser ? 'POST /ai/chat' : 'ED25519 · VERIFIED';
+    const nowStamp = formatShortTimestamp(getSystemNow());
+    let sig = isUser ? `${nowStamp} · POST /ai/chat` : `${nowStamp} · ED25519 VERIFIED`;
     if (timeTaken !== null) sig += ` · ${parseFloat(timeTaken).toFixed(2)}s`;
     if (blockIndex !== null) sig += ` · BLOCK #${blockIndex}`;
 
@@ -1127,6 +1164,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const cmd = parts[0].toLowerCase();
     const arg = cmdText.trim().slice(cmd.length).trim();
 
+    if (cmd === '/time' || cmd === '/now' || cmd === '/waktu') {
+      await fetchNodeInfo();
+      const nowObj = getSystemNow();
+      appendChatMessage(
+        'ai',
+        `[System Clock Synchronization — NOW]\n` +
+        `• Waktu Sistem: ${formatSystemDateTime(nowObj)}\n` +
+        `• Timestamp: ${formatShortTimestamp(nowObj)} (ISO: ${nowObj.toISOString()})\n` +
+        `• Epoch: ${Math.floor(nowObj.getTime() / 1000)}s`,
+        0.001,
+        null
+      );
+      return true;
+    }
     if (cmd === '/status') {
       await fetchNodeInfo();
       await fetchMetrics();
@@ -1455,6 +1506,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch(`${API_URL}/node/info`);
       if (!res.ok) return;
       const data = await res.json();
+      if (data.system_time?.epoch) {
+        serverTimeOffsetMs = data.system_time.epoch * 1000 - Date.now();
+        updateClock();
+      }
       if (data.node_id) {
         const shortId = data.node_id.substring(0, 10);
         if (elHdrNodeId) elHdrNodeId.textContent = shortId;
@@ -1543,14 +1598,18 @@ document.addEventListener('DOMContentLoaded', () => {
       if (elBadgeValid) elBadgeValid.textContent = data.valid ? '✓ CHAIN VALID' : '✗ INVALID';
       const elChainList = document.getElementById('chain-inspector-list');
       if (elChainList && data.chain?.length) {
-        elChainList.innerHTML = [...data.chain].reverse().map((b) => `
+        elChainList.innerHTML = [...data.chain].reverse().map((b) => {
+          const bTime = b.timestamp ? formatShortTimestamp(new Date(b.timestamp * 1000)) : formatShortTimestamp();
+          return `
           <div class="chain-block-hud">
             <b style="color:var(--teal)">BLOCK #${escapeHTML(b.index)}</b>
+            <span style="color:var(--gold);font-size:8.5px">${escapeHTML(bTime)}</span>
             <span style="color:var(--txt-2);font-size:9px;flex:1;overflow:hidden;text-overflow:ellipsis">HASH: ${escapeHTML(b.hash)}</span>
             <span style="color:var(--purple);font-size:8.5px">SIG: ${escapeHTML((b.signature || 'GENESIS').substring(0, 10))}...</span>
             <span style="color:var(--green);font-size:8.5px">NONCE ${escapeHTML(b.nonce)}</span>
           </div>
-        `).join('');
+        `;
+        }).join('');
       }
     } catch { /* offline */ }
   }
