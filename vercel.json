@@ -8,6 +8,7 @@
         "maxLambdaSize": "50mb",
         "includeFiles": [
           "interface/html/**",
+          "google911ef45bbcb1db67.html",
           "config.yaml",
           "gajahmada_ai/**"
         ]
@@ -18,6 +19,10 @@
     {
       "src": "/_vercel/(.*)",
       "dest": "/_vercel/$1"
+    },
+    {
+      "src": "/google911ef45bbcb1db67.html",
+      "dest": "main.py"
     },
     {
       "src": "/robots.txt",

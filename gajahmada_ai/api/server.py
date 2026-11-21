@@ -257,6 +257,16 @@ def api_status():
     }
 
 
+@app.get("/google911ef45bbcb1db67.html", include_in_schema=False)
+@app.get("/ui/google911ef45bbcb1db67.html", include_in_schema=False)
+def google_site_verification():
+    return Response(
+        content="google-site-verification: google911ef45bbcb1db67.html",
+        media_type="text/html; charset=utf-8",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
 @app.get("/robots.txt", include_in_schema=False)
 def robots_txt():
     content = (
