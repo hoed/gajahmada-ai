@@ -408,6 +408,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   window.addEventListener('resize', resizeUniverse);
+  window.addEventListener('orientationchange', () => setTimeout(resizeUniverse, 150));
   resizeUniverse();
   initKnowledgeGraph();
   renderKnowledgeGraph();
