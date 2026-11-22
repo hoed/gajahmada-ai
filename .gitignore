@@ -23,6 +23,11 @@ wheels/
 venv/
 .venv/
 
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+
 # AI Models & Knowledge
 models/*.gguf
 knowledge_store/

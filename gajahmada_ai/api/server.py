@@ -35,6 +35,7 @@ from gajahmada_ai.security.crypto import NodeIdentity
 from gajahmada_ai.security.policies import GovernancePolicy
 from gajahmada_ai.security.rate_limit import SlidingWindowRateLimiter
 from gajahmada_ai.security.ssrf import validate_peer_url
+from gajahmada_ai.storage.supabase_store import SupabaseKnowledgeStore
 
 try:
     import yaml
@@ -103,6 +104,7 @@ gip_validator: Optional[GIPProtocolValidator] = None
 peer_discovery: Optional[PeerDiscoveryRegistry] = None
 knowledge_sync: Optional[KnowledgeSynchronizer] = None
 learning_manager: Optional[LearningExperimentManager] = None
+supabase_store: Optional[SupabaseKnowledgeStore] = None
 
 system_logs: List[Dict[str, Any]] = []
 runtime_config: Dict[str, Any] = {
@@ -138,7 +140,7 @@ def ensure_initialized():
     global blockchain, identity, engine, rag, p2p, runtime_config
     global memory_manager, cognitive_pipeline, agent_scheduler
     global audit_logger, auth_manager, governance_policy, rate_limiter
-    global gip_validator, peer_discovery, knowledge_sync, learning_manager
+    global gip_validator, peer_discovery, knowledge_sync, learning_manager, supabase_store
 
     if yaml is not None and os.path.exists(CONFIG_PATH):
         try:
@@ -271,6 +273,13 @@ def ensure_initialized():
     if learning_manager is None:
         learning_manager = LearningExperimentManager()
 
+    if supabase_store is None:
+        supabase_store = SupabaseKnowledgeStore()
+        if supabase_store.configured:
+            record_log("storage.supabase", "OK", f"Supabase pgvector remote knowledge store configured ({supabase_store.url})")
+        else:
+            record_log("storage.supabase", "INFO", "Supabase not configured; running in local-first SQLite mode")
+
 
 def get_runtime_context() -> Dict[str, Any]:
     ensure_initialized()
@@ -290,6 +299,7 @@ def get_runtime_context() -> Dict[str, Any]:
         "discovery": peer_discovery,
         "synchronizer": knowledge_sync,
         "learning": learning_manager,
+        "supabase": supabase_store,
     }
 
 
@@ -456,6 +466,7 @@ def health():
         "mode": "serverless" if IS_VERCEL else "full",
         "neural_inference_active": cap.get("neural_inference_active", False),
         "symbolic_reasoning_active": True,
+        "supabase": supabase_store.health() if supabase_store else {"configured": False},
         "uptime_sec": round(time.time() - START_TIME, 1),
     }
 
@@ -486,6 +497,20 @@ async def ai_chat(req: ChatRequest):
                         }
                         for i, doc in enumerate(results)
                     ]
+                if supabase_store and supabase_store.configured:
+                    sb_hits = supabase_store.search_knowledge(query_emb, k=2)
+                    seen_txt = {m["content"] for m in memory_records}
+                    for j, hit in enumerate(sb_hits):
+                        txt = (hit.get("content") or "").strip()
+                        if txt and txt not in seen_txt:
+                            seen_txt.add(txt)
+                            memory_records.append({
+                                "id": f"sb-{hit.get('content_hash', j)[:10]}",
+                                "content": txt,
+                                "source": hit.get("source_url") or "supabase_pgvector",
+                                "verification_status": hit.get("verification_status", "UNVERIFIED"),
+                            })
+                            matched_docs += 1
         except Exception as e:
             record_log("knowledge.rag", "WARN", f"RAG lookup warning: {e}")
 
@@ -545,6 +570,21 @@ async def ai_chat(req: ChatRequest):
                 "confidence": reasoning_res.confidence,
                 "timestamp": start,
             })
+        # 3. Sync collective knowledge to Supabase pgvector when configured
+        if supabase_store and supabase_store.configured and not is_generic_fallback:
+            k_emb_sb = engine.create_embedding(knowledge_entry) if engine else None
+            sig_sb = identity.sign_message(knowledge_entry.encode("utf-8")) if identity else ""
+            supabase_store.upsert_knowledge(
+                content=knowledge_entry,
+                embedding=k_emb_sb,
+                source_type=src_type,
+                source_url=(crawled_info.get("source_url", "") if crawled_info else ""),
+                origin_node_id=identity.node_id if identity else "local",
+                signature=sig_sb,
+                confidence=reasoning_res.confidence,
+                verification_status=reasoning_res.verification_status,
+                visibility="COLLECTIVE",
+            )
         record_log("memory.brain", "OK", f"Brain knowledge updated from question '{req.prompt[:32]}' (id={brain_record_id}, docs={len(rag.doc_store) if rag else 0})")
     except Exception as e:
         record_log("memory.brain", "WARN", f"Brain knowledge update warning: {e}")
@@ -568,6 +608,8 @@ async def ai_chat(req: ChatRequest):
             )
             blockchain.add_block(block)
             block_idx = block.index
+            if supabase_store and supabase_store.configured:
+                supabase_store.upsert_block(block.to_dict())
         except Exception as e:
             record_log("blockchain.chain", "WARN", f"Block mining error: {e}")
 
@@ -619,6 +661,20 @@ async def ai_ingest(req: EmbeddingRequest):
         visibility_policy=VisibilityPolicy.LOCAL,
     )
 
+    supabase_hash = None
+    if supabase_store and supabase_store.configured:
+        sig_sb = identity.sign_message(text.encode("utf-8")) if identity else ""
+        supabase_hash = supabase_store.upsert_knowledge(
+            content=text,
+            embedding=emb,
+            source_type="operator_ingested",
+            origin_node_id=identity.node_id if identity else "local",
+            signature=sig_sb,
+            confidence=0.80,
+            verification_status="VERIFIED",
+            visibility="COLLECTIVE",
+        )
+
     tokens = len(text.split())
     record_log("knowledge.rag", "OK", f"Assimilated document ({tokens} tokens, total_docs={len(rag.doc_store)})")
     return {
@@ -628,6 +684,7 @@ async def ai_ingest(req: EmbeddingRequest):
         "dimension": rag.dimension,
         "record_id": mem_rec["record_id"],
         "integrity_hash": mem_rec["integrity_hash"],
+        "supabase_content_hash": supabase_hash,
     }
 
 
@@ -648,6 +705,7 @@ def knowledge_stats():
         "dimension": rag.dimension if rag else 384,
         "engine": "FAISS-IndexFlatL2" if (rag and getattr(rag, "_has_faiss", False)) else "L2-VectorStore",
         "memory_tiers": memory_manager.stats()["tiers"] if memory_manager else {},
+        "supabase": supabase_store.health() if supabase_store else {"configured": False},
         "docs": [
             {"index": idx, "preview": doc[:120], "tokens": len(doc.split())}
             for idx, doc in enumerate(rag.doc_store if rag else [])
