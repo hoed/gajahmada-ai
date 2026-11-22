@@ -162,8 +162,43 @@
       opacity: 1;
       transform: translateX(-50%) translateY(0);
     }
-    .dashboard-viewport { grid-template-rows: 38px 0.88fr 1.68fr 0.78fr 18px; }
+    .dashboard-viewport { grid-template-rows: 38px 0.88fr 1.68fr 0.78fr 18px 22px; }
     .middle-row { grid-template-columns: 1.05fr 1.55fr 0.72fr; gap: 6px; }
+    .github-bottom-bar {
+      background: linear-gradient(90deg, #070d0b 0%, #0d1a15 50%, #070d0b 100%);
+      border: 1px solid rgba(45, 212, 191, 0.35);
+      border-radius: 2px;
+      padding: 0 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      font-size: 9px;
+      color: #e6f0ec;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .github-bottom-bar a {
+      color: #2dd4bf;
+      font-weight: 700;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: color 0.18s ease, text-shadow 0.18s ease;
+    }
+    .github-bottom-bar a:hover {
+      color: #f59e0b;
+      text-decoration: underline;
+      text-shadow: 0 0 8px rgba(245, 158, 11, 0.45);
+    }
+    .github-logo-icon {
+      width: 13px;
+      height: 13px;
+      fill: currentColor;
+      flex-shrink: 0;
+      vertical-align: middle;
+    }
     .top-arch-grid {
       flex: 1;
       min-height: 0;
@@ -269,7 +304,7 @@
       filter: drop-shadow(0 0 6px rgba(249, 115, 22, 0.65));
     }
     .brand-mobile-suffix {
-      display: none;
+      display: inline;
     }
     .panel-subagents {
       border: 1.5px solid rgba(129, 140, 248, 0.75);
@@ -547,6 +582,14 @@
         flex-wrap: wrap !important;
         gap: 6px !important;
       }
+      .github-bottom-bar {
+        height: auto !important;
+        min-height: 28px !important;
+        flex-wrap: wrap !important;
+        white-space: normal !important;
+        padding: 6px 8px !important;
+        text-align: center !important;
+      }
       /* Mobile Modal Dialogs */
       .hud-modal {
         padding: 8px !important;
@@ -611,10 +654,10 @@
         <div class="gold-banner" id="btn-brand-status" style="cursor:pointer"
           title="Klik untuk menjalankan diagnostik penuh GajahMada">
           <img src="/ui/logo.png?v=7.0" alt="GajahMada Logo" class="gm-logo-img" />
-          <span id="brand-title-text">GajahMada<span class="brand-mobile-suffix"> AI Nusantara</span></span>
+          <span id="brand-title-text">GajahMada AI Nusantara</span>
         </div>
         <div class="top-bar-title">
-          SOVEREIGN DECENTRALIZED NODE <span class="title-sub">// SYSTEM STATUS &amp; WEB3 ARCHITECTURE</span>
+          SOVEREIGN DECENTRALIZED NODE
         </div>
       </div>
 
@@ -1183,6 +1226,19 @@
         <span id="hud-clock" data-interactive="true" title="Klik untuk menampilkan sinkronisasi waktu sistem sekarang (/time)">00:00:00</span>
       </div>
     </footer>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         VERY BOTTOM INTERFACE BAR: GITHUB REPOSITORY SUPPORT & DOWNLOAD
+         ═══════════════════════════════════════════════════════════════════ -->
+    <div class="github-bottom-bar">
+      <span>support and download this repo on Github</span>
+      <a href="https://github.com/hoed/gajahmada-ai" target="_blank" rel="noopener noreferrer" title="Support and download GajahMada AI on GitHub">
+        <svg class="github-logo-icon" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+        </svg>
+        <span>: https://github.com/hoed/gajahmada-ai</span>
+      </a>
+    </div>
 
   </div>
 

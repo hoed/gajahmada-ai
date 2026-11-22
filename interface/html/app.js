@@ -11,11 +11,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.title = 'GajahMada — Sovereign Decentralized Node';
   const elBrandBanner = document.getElementById('btn-brand-status') || document.querySelector('.gold-banner');
   if (elBrandBanner) {
-    elBrandBanner.innerHTML = '<img src="/ui/logo.png?v=9.0" alt="GajahMada Logo" class="gm-logo-img" /><span id="brand-title-text">GajahMada<span class="brand-mobile-suffix"> AI Nusantara</span></span>';
+    elBrandBanner.innerHTML = '<img src="/ui/logo.png?v=9.0" alt="GajahMada Logo" class="gm-logo-img" /><span id="brand-title-text">GajahMada AI Nusantara</span>';
   }
   const elTopTitle = document.querySelector('.top-bar-title');
   if (elTopTitle) {
-    elTopTitle.innerHTML = 'SOVEREIGN DECENTRALIZED NODE <span class="title-sub">// SYSTEM STATUS &amp; WEB3 ARCHITECTURE</span>';
+    elTopTitle.textContent = 'SOVEREIGN DECENTRALIZED NODE';
   }
 
   // Vercel Web Analytics helper (@vercel/analytics)
@@ -218,9 +218,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function syncMobileLogsPerformancePosition() {
     const isMob = isMobileDeviceViewport();
     if (elBrandSuffix) {
-      elBrandSuffix.style.display = isMob ? 'inline' : 'none';
+      elBrandSuffix.style.display = 'inline';
     } else if (elBrandTitleText) {
-      elBrandTitleText.textContent = isMob ? 'GajahMada AI Nusantara' : 'GajahMada';
+      elBrandTitleText.textContent = 'GajahMada AI Nusantara';
     }
     if (!elTopArchGrid || !elBottomRow || !elSystemLogsBox || !elPanelMetrics) return;
     if (isMob) {

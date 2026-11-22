@@ -73,7 +73,7 @@ body {
    ═══════════════════════════════════════════════════════════════════ */
 .dashboard-viewport {
   display: grid;
-  grid-template-rows: 36px 1.10fr 1.18fr 0.98fr 18px;
+  grid-template-rows: 36px 1.10fr 1.18fr 0.98fr 18px 22px;
   gap: 5px;
   padding: 5px;
   width: 100vw;
@@ -332,7 +332,7 @@ body {
 }
 
 .brand-mobile-suffix {
-  display: none;
+  display: inline;
 }
 
 .gm-logo-img {
@@ -1499,6 +1499,45 @@ body {
   font-weight: 600;
 }
 
+.github-bottom-bar {
+  background: linear-gradient(90deg, #070d0b 0%, #0d1a15 50%, #070d0b 100%);
+  border: 1px solid rgba(45, 212, 191, 0.35);
+  border-radius: 2px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 9px;
+  color: var(--txt-1);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.github-bottom-bar a {
+  color: var(--teal);
+  font-weight: 700;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: color 0.18s ease, text-shadow 0.18s ease;
+}
+
+.github-bottom-bar a:hover {
+  color: var(--amber);
+  text-decoration: underline;
+  text-shadow: 0 0 8px rgba(245, 158, 11, 0.45);
+}
+
+.github-logo-icon {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    MODALS
    ═══════════════════════════════════════════════════════════════════ */
@@ -1854,6 +1893,14 @@ body {
     white-space: normal !important;
     flex-wrap: wrap !important;
     gap: 6px !important;
+  }
+  .github-bottom-bar {
+    height: auto !important;
+    min-height: 28px !important;
+    flex-wrap: wrap !important;
+    white-space: normal !important;
+    padding: 6px 8px !important;
+    text-align: center !important;
   }
   .hud-modal {
     padding: 8px !important;
