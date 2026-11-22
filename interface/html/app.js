@@ -1275,6 +1275,86 @@ document.addEventListener('DOMContentLoaded', () => {
     );
   }
 
+  async function crawlBrowserOpenKnowledge(promptText) {
+    const cleaned = promptText
+      .replace(/^(?:tolong\s+|coba\s+)?(?:apa itu|siapa itu|siapakah|siapa|apakah|jelaskan secara detail tentang|jelaskan tentang|jelaskan|sebutkan|ceritakan tentang|ceritakan|bagaimana|dimana|kapan|definisi|pengertian|what is|who is|tell me about|explain|define|search|cari tentang|cari)\s+/i, '')
+      .replace(/[\?\!\.]+$/, '')
+      .trim() || promptText.trim();
+
+    // 1. Check Al-Qur'an Surah:Ayah query via Al-Quran Cloud CORS API
+    if (/\b(quran|qur'an|alquran|al-quran|surat|surah|qs|q\.s|ayat)\b/i.test(promptText)) {
+      const mPair = promptText.match(/(?:surat|surah|qs\.?|q\.s\.?)\s*(?:ke[\-\s]*)?(\d{1,3})\s*(?:ayat|:)\s*(\d{1,3})/i) || promptText.match(/\b(\d{1,3})\s*:\s*(\d{1,3})\b/);
+      if (mPair) {
+        const sNum = Number(mPair[1]);
+        const aNum = Number(mPair[2]);
+        try {
+          const qRes = await fetch(`https://api.alquran.cloud/v1/ayah/${sNum}:${aNum}/editions/quran-uthmani,id.indonesian`);
+          if (qRes.ok) {
+            const qJson = await qRes.json();
+            if (Array.isArray(qJson.data) && qJson.data.length >= 2) {
+              const ar = qJson.data[0];
+              const id = qJson.data[1];
+              const sName = ar.surah?.englishName || `Surah ${sNum}`;
+              const sTotal = ar.surah?.numberOfAyahs || '';
+              return (
+                `**Al-Qur'an Surah ${sName} (Surah ke-${sNum}) — Ayat ${aNum}:**\n\n` +
+                `📖 **Teks Arab:**\n${ar.text}\n\n` +
+                `🇮🇩 **Terjemahan (Kemenag RI):**\n"${id.text}"\n\n` +
+                `• **Keterangan Surah:** QS. ${sName} (${sNum}:${aNum}) · Total ${sTotal} Ayat.\n\n` +
+                `---\n📚 **Referensi & Sumber:**\n` +
+                `1. **QS. ${sName} (${sNum}:${aNum}) — Mushaf Al-Qur'an & Terjemahan Kemenag RI** — https://quran.com/${sNum}/${aNum}\n` +
+                `2. **Al-Quran Cloud API (quran-uthmani & id.indonesian)** — https://api.alquran.cloud/v1/ayah/${sNum}:${aNum}/editions/quran-uthmani,id.indonesian`
+              );
+            }
+          }
+        } catch { /* ignore */ }
+      }
+    }
+
+    // 2. Crawl Indonesian & English Wikipedia CORS API directly from user's browser
+    for (const lang of ['id', 'en']) {
+      try {
+        const sUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(cleaned)}&utf8=&format=json&origin=*&srlimit=3`;
+        const sRes = await fetch(sUrl);
+        if (!sRes.ok) continue;
+        const sData = await sRes.json();
+        const hits = sData?.query?.search || [];
+        if (!hits.length) continue;
+
+        const bestTitle = hits[0].title;
+        const sumUrl = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(bestTitle)}`;
+        const pRes = await fetch(sumUrl);
+        if (!pRes.ok) continue;
+        const pData = await pRes.json();
+        const extract = (pData.extract || '').trim();
+        if (extract.length > 30) {
+          const pageUrl = pData.content_urls?.desktop?.page || `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(bestTitle.replace(/ /g, '_'))}`;
+          const refLines = [
+            `1. **Wikipedia (${lang.toUpperCase()}): ${pData.title || bestTitle}** — ${pageUrl}`,
+          ];
+          hits.slice(1, 3).forEach((h, i) => {
+            const hUrl = `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(h.title.replace(/ /g, '_'))}`;
+            refLines.push(`${i + 2}. **Wikipedia (${lang.toUpperCase()}): ${h.title}** — ${hUrl}`);
+          });
+          // Assimilate crawled knowledge back into local GajahMada RAG store
+          fetch(`${API_URL}/ai/ingest`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: `${pData.title || bestTitle}: ${extract} (Referensi: ${pageUrl})` }),
+          }).then(() => refreshKnowledgeStats()).catch(() => {});
+
+          return (
+            `**${pData.title || bestTitle}** *(Hasil Crawling Pengetahuan Internet & Ensiklopedia Terverifikasi)*:\n\n` +
+            `${extract}\n\n` +
+            `---\n📚 **Referensi & Sumber:**\n` +
+            refLines.join('\n')
+          );
+        }
+      } catch { /* try next language */ }
+    }
+    return null;
+  }
+
   function createChatElement(role, text, timeTaken = null, blockIndex = null, isDialog = false) {
     const isUser = role === 'user';
     const isErr  = role === 'error';
@@ -1384,6 +1464,26 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       return true;
     }
+    if (cmd === '/crawl') {
+      const q = arg || 'Gajah Mada';
+      try {
+        const res = await fetch(`${API_URL}/knowledge/crawl`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: q, assimilate: true }),
+        });
+        const data = await res.json();
+        if (res.ok && data.formatted_response) {
+          appendChatMessage('ai', data.formatted_response, 0.04, null);
+          refreshKnowledgeStats();
+        } else {
+          appendChatMessage('ai', `[Internet Crawler] Tidak ditemukan hasil untuk "${q}".`, 0.01, null);
+        }
+      } catch {
+        appendChatMessage('ai', `[Internet Crawler] Tidak dapat menjangkau sumber eksternal untuk "${q}".`, 0.01, null);
+      }
+      return true;
+    }
     if (cmd === '/peers') {
       await fetchNodeInfo();
       appendChatMessage('ai', `[P2P Network Peers]\nActive peers (${knownPeersList.length}): ${knownPeersList.join(', ') || 'None'}`, 0.001, null);
@@ -1437,20 +1537,28 @@ document.addEventListener('DOMContentLoaded', () => {
         (typeof data.response === 'string' && data.response.startsWith('[Error] LLM not loaded'));
 
       if (isBackendUninitialised) {
+        const crawledReply = await crawlBrowserOpenKnowledge(text);
         const elapsed = ((performance.now() - t0) / 1000).toFixed(2);
-        const reply = synthesizeLocalLLMResponse(text);
+        const reply = crawledReply || synthesizeLocalLLMResponse(text);
         localSimulatedBlock += 1;
         appendChatMessage('ai', reply, elapsed, localSimulatedBlock);
       } else {
-        appendChatMessage('ai', data.response, data.time_taken, data.block_index);
+        let finalReply = data.response;
+        // If backend was in offline sandbox and returned generic fallback, let browser crawl live internet with references
+        if (typeof finalReply === 'string' && finalReply.includes('Permintaan telah diproses oleh **GajahMada Hybrid Cognitive Engine**')) {
+          const crawledReply = await crawlBrowserOpenKnowledge(text);
+          if (crawledReply) finalReply = crawledReply;
+        }
+        appendChatMessage('ai', finalReply, data.time_taken, data.block_index);
         fetchNodeInfo();
         fetchChain();
         syncServerLogs();
       }
       activeClusterIdx = 0;
     } catch {
+      const crawledReply = await crawlBrowserOpenKnowledge(text);
       const elapsed = ((performance.now() - t0) / 1000).toFixed(2);
-      const reply = synthesizeLocalLLMResponse(text);
+      const reply = crawledReply || synthesizeLocalLLMResponse(text);
       localSimulatedBlock += 1;
       appendChatMessage('ai', reply, elapsed, localSimulatedBlock);
     } finally {

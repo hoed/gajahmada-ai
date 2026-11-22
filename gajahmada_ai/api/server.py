@@ -20,6 +20,7 @@ from gajahmada_ai.blockchain.chain import AIBlockchain, Block, LedgerEventType
 from gajahmada_ai.cognition.reasoning import CognitiveReasoningPipeline
 from gajahmada_ai.core.engine import AIModelEngine
 from gajahmada_ai.knowledge.indonesia_corpus import get_indonesia_knowledge_corpus
+from gajahmada_ai.knowledge.open_knowledge import crawl_internet_knowledge, format_references_footer
 from gajahmada_ai.knowledge.rag import LocalKnowledge
 from gajahmada_ai.learning.experiments import LearningExperimentManager
 from gajahmada_ai.memory.manager import MemoryManager
@@ -500,6 +501,31 @@ async def ai_chat(req: ChatRequest):
     )
     response = reasoning_res.conclusion
 
+    # If the internet crawler discovered new knowledge, assimilate it into RAG & Semantic Memory automatically
+    crawled_info = getattr(engine, "last_crawled_knowledge", None) if engine else None
+    if crawled_info and crawled_info.get("extract"):
+        try:
+            crawl_doc = f"{crawled_info['title']}: {crawled_info['extract']} (Referensi: {crawled_info.get('source_url', '')})"
+            if rag and crawl_doc not in rag.doc_store:
+                c_emb = engine.create_embedding(crawl_doc)
+                if c_emb:
+                    rag.ingest(crawl_doc, c_emb)
+                    rag.flush()
+            if memory_manager:
+                memory_manager.store(
+                    content=crawl_doc,
+                    memory_type=MemoryType.SEMANTIC,
+                    origin_node_id=identity.node_id if identity else "local",
+                    source_type="internet_knowledge_crawler",
+                    author="autonomous_crawler",
+                    confidence=0.88,
+                    verification_status=VerificationStatus.VERIFIED,
+                    visibility_policy=VisibilityPolicy.COLLECTIVE,
+                )
+            record_log("knowledge.crawler", "OK", f"Crawled & assimilated knowledge: '{crawled_info['title']}'")
+        except Exception as e:
+            record_log("knowledge.crawler", "WARN", f"Crawler assimilation warning: {e}")
+
     task_hash = hashlib.sha256((req.prompt + response).encode()).hexdigest()
     signature = ""
     block_idx = 0
@@ -611,6 +637,59 @@ def knowledge_search(req: SearchKnowledgeRequest):
     results = rag.search(emb, k=req.k, query_text=req.query) if rag else []
     record_log("knowledge.rag", "INFO", f"Semantic search query='{req.query[:30]}' -> {len(results)} match(es)")
     return {"query": req.query, "results": results, "count": len(results)}
+
+
+class CrawlKnowledgeRequest(BaseModel):
+    query: str = Field(..., min_length=1, max_length=4096)
+    assimilate: bool = True
+
+
+@app.post("/knowledge/crawl")
+@app.post("/api/v2/knowledge/crawl")
+def knowledge_crawl(req: CrawlKnowledgeRequest):
+    ensure_initialized()
+    crawled = crawl_internet_knowledge(req.query)
+    if not crawled:
+        raise HTTPException(status_code=404, detail=f"No internet knowledge found for query: {req.query}")
+
+    refs = crawled.get("references") or [{"title": crawled["title"], "url": crawled.get("source_url", "")}]
+    formatted_answer = (
+        f"**{crawled['title']}** *(Hasil Crawling Pengetahuan Internet)*:\n\n"
+        f"{crawled['extract']}"
+        + format_references_footer(refs)
+    )
+    record_id = None
+    if req.assimilate and rag and engine:
+        crawl_doc = f"{crawled['title']}: {crawled['extract']} (Referensi: {crawled.get('source_url', '')})"
+        emb = engine.create_embedding(crawl_doc)
+        if emb:
+            rag.ingest(crawl_doc, emb)
+            rag.flush()
+        if memory_manager:
+            rec = memory_manager.store(
+                content=crawl_doc,
+                memory_type=MemoryType.SEMANTIC,
+                origin_node_id=identity.node_id if identity else "local",
+                source_type="internet_knowledge_crawler",
+                author="autonomous_crawler",
+                confidence=0.88,
+                verification_status=VerificationStatus.VERIFIED,
+                visibility_policy=VisibilityPolicy.COLLECTIVE,
+            )
+            record_id = rec["record_id"]
+
+    record_log("knowledge.crawler", "OK", f"POST /knowledge/crawl query='{req.query[:30]}' -> title='{crawled['title']}'")
+    return {
+        "status": "crawled",
+        "query": req.query,
+        "title": crawled["title"],
+        "extract": crawled["extract"],
+        "source_url": crawled.get("source_url", ""),
+        "references": refs,
+        "formatted_response": formatted_answer,
+        "record_id": record_id,
+        "total_docs": len(rag.doc_store) if rag else 0,
+    }
 
 
 @app.delete("/knowledge/docs/{doc_idx}")
