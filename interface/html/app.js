@@ -1706,7 +1706,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (swarmNum) swarmNum.textContent = Math.max(4, peersCount + 3);
 
       const modeStr = (data.mode || 'FULL').toUpperCase();
-      if (elTxtNodeMode) elTxtNodeMode.textContent = modeStr;
+      const neuralTag = data.neural_inference_active ? `${modeStr}·NEURAL` : `${modeStr}·SYM+EV`;
+      if (elTxtNodeMode) elTxtNodeMode.textContent = neuralTag;
       if (elHdrSysMode) elHdrSysMode.textContent = modeStr;
 
       const elPeersList = document.getElementById('modal-peers-list');

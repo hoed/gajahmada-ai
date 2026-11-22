@@ -1,6 +1,6 @@
 """
 GajahMada — Korpus Pengetahuan Nusantara & Indonesia Modern
-Dinamis mengikuti waktu sistem saat ini (datetime.now().astimezone()).
+Deterministic per calendar year to prevent duplicate timestamp pollution in vector stores.
 """
 
 from datetime import datetime
@@ -9,7 +9,6 @@ from datetime import datetime
 def get_indonesia_knowledge_corpus():
     now = datetime.now().astimezone()
     current_year = now.year
-    current_date_str = now.strftime("%Y-%m-%d %H:%M:%S %Z")
     years_independent = max(1, current_year - 1945)
 
     return [
@@ -126,8 +125,8 @@ def get_indonesia_knowledge_corpus():
             f"di tahun {current_year}, didampingi Wakil Presiden Gibran Rakabuming Raka)."
         ),
         (
-            f"Geografi, Demografi, 38 Provinsi & Ibu Kota Nusantara (IKN) Tahun {current_year}: Indonesia sekarang (waktu sistem: "
-            f"{current_date_str}) adalah negara kepulauan terbesar di dunia yang terletak di garis khatulistiwa (6° LU – 11° LS "
+            f"Geografi, Demografi, 38 Provinsi & Ibu Kota Nusantara (IKN) Tahun {current_year}: Indonesia sekarang "
+            f"adalah negara kepulauan terbesar di dunia yang terletak di garis khatulistiwa (6° LU – 11° LS "
             f"dan 95° BT – 141° BT), memiliki lebih dari 17.504 pulau (5 pulau besar: Sumatera, Jawa, Kalimantan, Sulawesi, dan "
             f"Papua), luas daratan sekitar 1,91 juta km², dan luas perairan/ZEE sekitar 6,4 juta km². Jumlah penduduk Indonesia "
             f"mencapai sekitar 282+ juta jiwa (terbesar ke-4 di dunia), terdiri atas lebih dari 1.340 suku bangsa dan 718 bahasa "

@@ -48,14 +48,17 @@ class LocalKnowledge:
             except OSError:
                 pass
 
+        self.load()
+
+    def _rebuild_faiss_index(self):
         if self._has_faiss and self._faiss is not None:
-            if os.path.exists(os.path.join(self.storage_path, "index.faiss")):
-                self.load()
-            else:
-                self.index = self._faiss.IndexFlatL2(dimension)
-                self.load()
-        else:
-            self.load()
+            try:
+                self.index = self._faiss.IndexFlatL2(self.dimension)
+                if self.vectors and self._np is not None:
+                    arr = self._np.array(self.vectors, dtype=self._np.float32)
+                    self.index.add(arr)
+            except Exception:
+                pass
 
     def save(self):
         try:
@@ -76,28 +79,37 @@ class LocalKnowledge:
             try:
                 with open(docs_json_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    self.doc_store = data.get("docs", [])
-                    self.vectors = data.get("vectors", [])
+                    raw_docs = data.get("docs", [])
+                    raw_vecs = data.get("vectors", [])
+                    # Deduplicate preserving order (including cleaning legacy timestamped duplicates)
+                    seen_keys = set()
+                    clean_docs = []
+                    clean_vecs = []
+                    for i, doc in enumerate(raw_docs):
+                        norm_key = re.sub(r"\(waktu sistem:\s*[^)]+\)", "", doc).strip()
+                        if norm_key not in seen_keys:
+                            seen_keys.add(norm_key)
+                            clean_docs.append(doc)
+                            if i < len(raw_vecs):
+                                clean_vecs.append(raw_vecs[i])
+                    self.doc_store = clean_docs
+                    self.vectors = clean_vecs
+                    if len(clean_docs) != len(raw_docs):
+                        self._dirty = True
             except Exception:
                 self.doc_store = []
                 self.vectors = []
 
-        if self._has_faiss and self._faiss is not None:
-            try:
-                index_path = os.path.join(self.storage_path, "index.faiss")
-                if os.path.exists(index_path):
-                    self.index = self._faiss.read_index(index_path)
-                else:
-                    self.index = self._faiss.IndexFlatL2(self.dimension)
-                    if self.vectors and self._np is not None:
-                        arr = self._np.array(self.vectors, dtype=self._np.float32)
-                        self.index.add(arr)
-            except Exception:
-                pass
+        self._rebuild_faiss_index()
+        if self._dirty:
+            self.save()
 
     def ingest(self, text_chunk: str, embedding: List[float]):
         if len(embedding) != self.dimension:
             raise ValueError(f"Embedding must be {self.dimension} dimensions, got {len(embedding)}.")
+
+        if text_chunk in self.doc_store:
+            return
 
         self.doc_store.append(text_chunk)
         self.vectors.append(embedding)
@@ -110,6 +122,17 @@ class LocalKnowledge:
                 pass
 
         self._dirty = True
+
+    def remove_at(self, doc_idx: int) -> str:
+        if doc_idx < 0 or doc_idx >= len(self.doc_store):
+            raise IndexError("Document index out of range")
+        removed = self.doc_store.pop(doc_idx)
+        if doc_idx < len(self.vectors):
+            self.vectors.pop(doc_idx)
+        self._rebuild_faiss_index()
+        self._dirty = True
+        self.flush()
+        return removed
 
     def flush(self):
         if self._dirty:
@@ -124,13 +147,11 @@ class LocalKnowledge:
 
         q_terms = _extract_query_terms(query_text) if query_text else []
 
-        # Hybrid Semantic L2 + Lexical Keyword Overlap Ranking
         scored = []
         for idx, doc in enumerate(self.doc_store):
             doc_lower = doc.lower()
             lexical_hits = sum(1 for t in q_terms if t in doc_lower)
 
-            # When query_text is provided (e.g. from /ai/chat), skip completely unrelated documents
             if query_text and q_terms and lexical_hits == 0:
                 continue
 
@@ -138,7 +159,6 @@ class LocalKnowledge:
             if idx < len(self.vectors) and len(self.vectors[idx]) == len(query_embedding):
                 vec_dist = sum((a - b) ** 2 for a, b in zip(query_embedding, self.vectors[idx]))
 
-            # Lower combined score is better (each lexical hit reduces distance significantly)
             combined_score = vec_dist - (lexical_hits * 1.25)
             scored.append((combined_score, idx))
 

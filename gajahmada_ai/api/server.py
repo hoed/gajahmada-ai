@@ -5,7 +5,6 @@ import os
 import sys
 import time
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse
 
 WIB_TZ = timezone(timedelta(hours=7), name="WIB")
 
@@ -13,21 +12,34 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from gajahmada_ai.blockchain.chain import AIBlockchain, Block
+from gajahmada_ai.agents.scheduler import AutonomousTaskScheduler
+from gajahmada_ai.api.v2_routes import create_v2_router
+from gajahmada_ai.blockchain.chain import AIBlockchain, Block, LedgerEventType
+from gajahmada_ai.cognition.reasoning import CognitiveReasoningPipeline
 from gajahmada_ai.core.engine import AIModelEngine
 from gajahmada_ai.knowledge.indonesia_corpus import get_indonesia_knowledge_corpus
 from gajahmada_ai.knowledge.rag import LocalKnowledge
+from gajahmada_ai.learning.experiments import LearningExperimentManager
+from gajahmada_ai.memory.manager import MemoryManager
+from gajahmada_ai.memory.models import MemoryType, VerificationStatus, VisibilityPolicy
+from gajahmada_ai.network.discovery import PeerDiscoveryRegistry
 from gajahmada_ai.network.p2p import P2PNetwork
+from gajahmada_ai.network.protocol import GIPMessage, GIPMessageType, GIPProtocolValidator
+from gajahmada_ai.network.synchronization import KnowledgeSynchronizer
+from gajahmada_ai.security.audit import SecurityAuditLogger
+from gajahmada_ai.security.auth import AuthManager
 from gajahmada_ai.security.crypto import NodeIdentity
+from gajahmada_ai.security.policies import GovernancePolicy
+from gajahmada_ai.security.rate_limit import SlidingWindowRateLimiter
+from gajahmada_ai.security.ssrf import validate_peer_url
 
 try:
     import yaml
 except ImportError:
     yaml = None
 
-ML_AVAILABLE = True
 IS_VERCEL = os.environ.get("VERCEL") == "1"
 START_TIME = time.time()
 
@@ -35,6 +47,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.normpath(os.path.join(_HERE, "..", ".."))
 UI_PATH = os.path.join(_ROOT, "interface", "html")
 CONFIG_PATH = os.path.join(_ROOT, "config.yaml")
+
 
 def get_system_time_info() -> Dict[str, Any]:
     now = datetime.now(WIB_TZ)
@@ -59,8 +72,8 @@ DEFAULT_KNOWLEDGE_DOCS = [
 ] + get_indonesia_knowledge_corpus()
 
 app = FastAPI(
-    title="GajahMada AI Network Node",
-    description="Sovereign Decentralized AI & Web3 Node (Local & Vercel Serverless Ready)",
+    title="GajahMada 2.0 — Sovereign Hybrid Distributed Intelligence Node",
+    description="Sovereign, Independent, Hybrid, Distributed Intelligence Architecture (Local & Serverless Ready)",
     version="2.0.0",
 )
 
@@ -78,6 +91,18 @@ p2p: Optional[P2PNetwork] = None
 blockchain: Optional[AIBlockchain] = None
 rag: Optional[LocalKnowledge] = None
 identity: Optional[NodeIdentity] = None
+memory_manager: Optional[MemoryManager] = None
+cognitive_pipeline: Optional[CognitiveReasoningPipeline] = None
+agent_scheduler: Optional[AutonomousTaskScheduler] = None
+audit_logger: Optional[SecurityAuditLogger] = None
+auth_manager: Optional[AuthManager] = None
+governance_policy: Optional[GovernancePolicy] = None
+rate_limiter: Optional[SlidingWindowRateLimiter] = None
+gip_validator: Optional[GIPProtocolValidator] = None
+peer_discovery: Optional[PeerDiscoveryRegistry] = None
+knowledge_sync: Optional[KnowledgeSynchronizer] = None
+learning_manager: Optional[LearningExperimentManager] = None
+
 system_logs: List[Dict[str, Any]] = []
 runtime_config: Dict[str, Any] = {
     "node": {"host": "0.0.0.0", "port": 8000, "name": "gajahmada-alpha"},
@@ -110,6 +135,10 @@ def record_log(module: str, level: str, message: str):
 
 def ensure_initialized():
     global blockchain, identity, engine, rag, p2p, runtime_config
+    global memory_manager, cognitive_pipeline, agent_scheduler
+    global audit_logger, auth_manager, governance_policy, rate_limiter
+    global gip_validator, peer_discovery, knowledge_sync, learning_manager
+
     if yaml is not None and os.path.exists(CONFIG_PATH):
         try:
             with open(CONFIG_PATH, "r", encoding="utf-8") as f:
@@ -122,23 +151,34 @@ def ensure_initialized():
         except Exception:
             pass
 
+    storage_dir = "/tmp/knowledge_store" if IS_VERCEL else os.path.join(_ROOT, "knowledge_store")
+    os.makedirs(storage_dir, exist_ok=True)
+
     if identity is None:
         key_path = "/tmp/node_key.pem" if IS_VERCEL else os.path.join(_ROOT, "node_key.pem")
         identity = NodeIdentity(key_path=key_path)
         record_log("security.crypto", "OK", f"Ed25519 NodeIdentity loaded: {identity.node_id[:14]}...")
 
+    if audit_logger is None:
+        audit_logger = SecurityAuditLogger(storage_path=os.path.join(storage_dir, "security_audit.json"))
+
+    if governance_policy is None:
+        governance_policy = GovernancePolicy()
+
+    if auth_manager is None:
+        auth_manager = AuthManager(identity=identity, audit_logger=audit_logger)
+
+    if rate_limiter is None:
+        rate_limiter = SlidingWindowRateLimiter(max_requests=240, window_seconds=60.0)
+
     if blockchain is None:
-        chain_path = (
-            "/tmp/knowledge_store/chain.json"
-            if IS_VERCEL
-            else os.path.join(_ROOT, "knowledge_store", "chain.json")
-        )
+        chain_path = os.path.join(storage_dir, "chain.json")
         blockchain = AIBlockchain(storage_path=chain_path)
         blockchain.difficulty = int(runtime_config.get("blockchain", {}).get("difficulty", 2))
         record_log(
             "blockchain.chain",
             "OK",
-            f"PoW Ledger mounted (height={len(blockchain.chain)}, diff={blockchain.difficulty})",
+            f"PoW Signed Event Ledger mounted (height={len(blockchain.chain)}, diff={blockchain.difficulty})",
         )
 
     if p2p is None:
@@ -156,12 +196,15 @@ def ensure_initialized():
         )
         if not IS_VERCEL:
             engine.load_models()
-        record_log("core.engine", "OK", "AIModelEngine initialized (384-d embeddings & inference ready)")
+        cap = engine.capability_status()
+        record_log(
+            "core.engine",
+            "OK",
+            f"AIModelEngine initialized (neural_active={cap['neural_inference_active']}, symbolic_active=True)",
+        )
 
     if rag is None:
-        storage_dir = "/tmp/knowledge_store" if IS_VERCEL else os.path.join(_ROOT, "knowledge_store")
         rag = LocalKnowledge(storage_path=storage_dir)
-        # Ensure all default architecture & Nusantara-Indonesia corpus documents are indexed
         if engine is not None:
             existing_set = set(rag.doc_store)
             added_default = False
@@ -175,21 +218,97 @@ def ensure_initialized():
                 rag.flush()
         record_log("knowledge.rag", "OK", f"LocalKnowledge mounted ({len(rag.doc_store)} docs indexed)")
 
+    if memory_manager is None:
+        sqlite_path = os.path.join(storage_dir, "gajahmada_v2.db")
+        backup_dir = os.path.join(storage_dir, "objects")
+        memory_manager = MemoryManager(
+            embed_fn=engine.create_embedding if engine else None,
+            sqlite_path=sqlite_path,
+            backup_dir=backup_dir,
+        )
+        # Seed initial semantic memory from LocalKnowledge if empty
+        if memory_manager.storage.health()["active_records"] == 0 and rag is not None:
+            for doc in rag.doc_store:
+                memory_manager.store(
+                    content=doc,
+                    memory_type=MemoryType.SEMANTIC,
+                    origin_node_id=identity.node_id if identity else "local",
+                    source_type="sovereign_core_corpus",
+                    author="system_bootstrap",
+                    confidence=0.92,
+                    verification_status=VerificationStatus.VERIFIED,
+                    visibility_policy=VisibilityPolicy.COLLECTIVE,
+                )
+        record_log("memory.manager", "OK", f"5-Tier MemoryManager mounted ({memory_manager.storage.health()['active_records']} records)")
 
-# ─── Request models ───────────────────────────────────────────────────────
+    if cognitive_pipeline is None:
+        cognitive_pipeline = CognitiveReasoningPipeline(
+            model_router=engine.router if engine else None,
+            symbolic_reasoner=engine.symbolic if engine else None,
+            fallback_synthesizer=engine._synthesize_response if engine else None,
+        )
+        record_log("cognition.reasoning", "OK", "14-Stage Hybrid CognitiveReasoningPipeline active")
+
+    if agent_scheduler is None:
+        agent_scheduler = AutonomousTaskScheduler(
+            memory_manager=memory_manager,
+            cognitive_pipeline=cognitive_pipeline,
+            policy=governance_policy,
+            audit_logger=audit_logger,
+        )
+        record_log("agents.scheduler", "OK", f"AutonomousTaskScheduler ready ({len(agent_scheduler.list_agents())} specialist agents)")
+
+    if gip_validator is None:
+        gip_validator = GIPProtocolValidator(local_identity=identity)
+
+    if peer_discovery is None:
+        peer_discovery = PeerDiscoveryRegistry()
+
+    if knowledge_sync is None:
+        knowledge_sync = KnowledgeSynchronizer(memory=memory_manager, identity=identity)
+
+    if learning_manager is None:
+        learning_manager = LearningExperimentManager()
+
+
+def get_runtime_context() -> Dict[str, Any]:
+    ensure_initialized()
+    return {
+        "engine": engine,
+        "p2p": p2p,
+        "blockchain": blockchain,
+        "rag": rag,
+        "identity": identity,
+        "memory": memory_manager,
+        "cognition": cognitive_pipeline,
+        "scheduler": agent_scheduler,
+        "audit_logger": audit_logger,
+        "auth": auth_manager,
+        "policy": governance_policy,
+        "gip_validator": gip_validator,
+        "discovery": peer_discovery,
+        "synchronizer": knowledge_sync,
+        "learning": learning_manager,
+    }
+
+
+app.include_router(create_v2_router(get_runtime_context))
+
+
+# ─── Request models (v1 Backward Compatible with Input Bounds) ────────────
 class ChatRequest(BaseModel):
-    prompt: str
-    max_tokens: int = 256
+    prompt: str = Field(..., min_length=1, max_length=16384)
+    max_tokens: int = Field(default=256, ge=16, le=4096)
     distribute: bool = False
 
 
 class EmbeddingRequest(BaseModel):
-    text: str
+    text: str = Field(..., min_length=1, max_length=32768)
 
 
 class SearchKnowledgeRequest(BaseModel):
-    query: str
-    k: int = 3
+    query: str = Field(..., min_length=1, max_length=4096)
+    k: int = Field(default=3, ge=1, le=50)
 
 
 class SyncPeersRequest(BaseModel):
@@ -197,15 +316,15 @@ class SyncPeersRequest(BaseModel):
 
 
 class BroadcastRequest(BaseModel):
-    message: str
+    message: str = Field(..., min_length=1, max_length=4096)
 
 
 class MineBlockRequest(BaseModel):
-    note: str = "Manual operator audit block"
+    note: str = Field(default="Manual operator audit block", max_length=1024)
 
 
 class SignVerifyRequest(BaseModel):
-    message: str
+    message: str = Field(..., min_length=1, max_length=8192)
 
 
 class ConfigUpdateRequest(BaseModel):
@@ -226,18 +345,21 @@ async def startup_event():
 def root(request: Request, format: Optional[str] = None):
     ensure_initialized()
     accept = request.headers.get("accept", "")
-    # Serve the HTML Dashboard directly at root '/' for browsers & SEO crawlers
     if format != "json" and ("text/html" in accept or "*/*" in accept) and os.path.exists(os.path.join(UI_PATH, "index.html")):
         if "application/json" not in accept:
             return FileResponse(
                 os.path.join(UI_PATH, "index.html"),
                 headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
             )
+    cap = engine.capability_status() if engine else {}
     return {
         "status": "online",
         "message": "GajahMada Network Node is running.",
         "mode": "serverless" if IS_VERCEL else "full",
         "ml_available": engine is not None,
+        "neural_inference_active": cap.get("neural_inference_active", False),
+        "symbolic_reasoning_active": cap.get("symbolic_reasoning_active", True),
+        "capabilities": cap,
         "uptime_sec": round(time.time() - START_TIME, 1),
         "ui_url": "/ui",
     }
@@ -246,11 +368,15 @@ def root(request: Request, format: Optional[str] = None):
 @app.get("/api/status")
 def api_status():
     ensure_initialized()
+    cap = engine.capability_status() if engine else {}
     return {
         "status": "online",
         "message": "GajahMada Network Node is running.",
         "mode": "serverless" if IS_VERCEL else "full",
         "ml_available": engine is not None,
+        "neural_inference_active": cap.get("neural_inference_active", False),
+        "symbolic_reasoning_active": cap.get("symbolic_reasoning_active", True),
+        "capabilities": cap,
         "uptime_sec": round(time.time() - START_TIME, 1),
         "system_time": get_system_time_info(),
         "ui_url": "/ui",
@@ -323,7 +449,14 @@ def web_manifest():
 @app.get("/health")
 def health():
     ensure_initialized()
-    return {"ok": True, "mode": "serverless" if IS_VERCEL else "full", "uptime_sec": round(time.time() - START_TIME, 1)}
+    cap = engine.capability_status() if engine else {}
+    return {
+        "ok": True,
+        "mode": "serverless" if IS_VERCEL else "full",
+        "neural_inference_active": cap.get("neural_inference_active", False),
+        "symbolic_reasoning_active": True,
+        "uptime_sec": round(time.time() - START_TIME, 1),
+    }
 
 
 # ─── AI & Command Interface Endpoints ─────────────────────────────────────
@@ -333,6 +466,7 @@ async def ai_chat(req: ChatRequest):
     start = time.time()
     context = ""
     matched_docs = 0
+    memory_records = []
 
     if rag and engine:
         try:
@@ -342,10 +476,29 @@ async def ai_chat(req: ChatRequest):
                 if results:
                     matched_docs = len(results)
                     context = "\n".join(results)
+                    memory_records = [
+                        {
+                            "id": f"rag-doc-{i}",
+                            "content": doc,
+                            "source": "sovereign_core_corpus",
+                            "verification_status": "VERIFIED",
+                        }
+                        for i, doc in enumerate(results)
+                    ]
         except Exception as e:
             record_log("knowledge.rag", "WARN", f"RAG lookup warning: {e}")
 
-    response = engine.generate(req.prompt, context=context, max_tokens=req.max_tokens)
+    cfg_temp = float(runtime_config.get("ai", {}).get("temperature", 0.7))
+    cfg_tokens = int(req.max_tokens or runtime_config.get("ai", {}).get("max_tokens", 256))
+
+    # Execute through the 14-Stage Cognitive Reasoning Pipeline
+    reasoning_res = cognitive_pipeline.execute(
+        objective=req.prompt,
+        memory_records=memory_records,
+        max_tokens=cfg_tokens,
+        temperature=cfg_temp,
+    )
+    response = reasoning_res.conclusion
 
     task_hash = hashlib.sha256((req.prompt + response).encode()).hexdigest()
     signature = ""
@@ -361,6 +514,8 @@ async def ai_chat(req: ChatRequest):
                 node_id=identity.node_id,
                 previous_hash=blockchain.get_latest_block().hash,
                 signature=signature,
+                event_type=LedgerEventType.TASK_COMPLETED.value,
+                event_ref=reasoning_res.reasoning_id,
             )
             blockchain.add_block(block)
             block_idx = block.index
@@ -371,7 +526,7 @@ async def ai_chat(req: ChatRequest):
     record_log(
         "core.engine",
         "INFO",
-        f"POST /ai/chat processed in {elapsed}s (rag_matches={matched_docs}, block=#{block_idx})",
+        f"POST /ai/chat processed in {elapsed}s (rag_matches={matched_docs}, block=#{block_idx}, status={reasoning_res.verification_status})",
     )
 
     return {
@@ -381,6 +536,11 @@ async def ai_chat(req: ChatRequest):
         "task_hash": task_hash,
         "signature": signature[:24] if signature else None,
         "rag_matches": matched_docs,
+        "reasoning_id": reasoning_res.reasoning_id,
+        "verification_status": reasoning_res.verification_status,
+        "confidence": reasoning_res.confidence,
+        "uncertainty": reasoning_res.uncertainty,
+        "capabilities_used": reasoning_res.capabilities_used,
     }
 
 
@@ -395,6 +555,19 @@ async def ai_ingest(req: EmbeddingRequest):
         raise HTTPException(status_code=500, detail="Failed to create 384-d embedding.")
     rag.ingest(text, emb)
     rag.flush()
+
+    # Also persist into Layer 4 Semantic Memory with provenance
+    mem_rec = memory_manager.store(
+        content=text,
+        memory_type=MemoryType.SEMANTIC,
+        origin_node_id=identity.node_id if identity else "local",
+        source_type="operator_ingested",
+        author="local_operator",
+        confidence=0.80,
+        verification_status=VerificationStatus.VERIFIED,
+        visibility_policy=VisibilityPolicy.LOCAL,
+    )
+
     tokens = len(text.split())
     record_log("knowledge.rag", "OK", f"Assimilated document ({tokens} tokens, total_docs={len(rag.doc_store)})")
     return {
@@ -402,6 +575,8 @@ async def ai_ingest(req: EmbeddingRequest):
         "tokens": tokens,
         "total_docs": len(rag.doc_store),
         "dimension": rag.dimension,
+        "record_id": mem_rec["record_id"],
+        "integrity_hash": mem_rec["integrity_hash"],
     }
 
 
@@ -421,6 +596,7 @@ def knowledge_stats():
         "total_docs": len(rag.doc_store) if rag else 0,
         "dimension": rag.dimension if rag else 384,
         "engine": "FAISS-IndexFlatL2" if (rag and getattr(rag, "_has_faiss", False)) else "L2-VectorStore",
+        "memory_tiers": memory_manager.stats()["tiers"] if memory_manager else {},
         "docs": [
             {"index": idx, "preview": doc[:120], "tokens": len(doc.split())}
             for idx, doc in enumerate(rag.doc_store if rag else [])
@@ -438,15 +614,13 @@ def knowledge_search(req: SearchKnowledgeRequest):
 
 
 @app.delete("/knowledge/docs/{doc_idx}")
-def delete_knowledge_doc(doc_idx: int):
+def delete_knowledge_doc(doc_idx: int, request: Request):
     ensure_initialized()
+    if os.environ.get("GAJAHMADA_REQUIRE_AUTH") == "1":
+        auth_manager.authenticate_request(request, required_capability="memory:delete")
     if not rag or doc_idx < 0 or doc_idx >= len(rag.doc_store):
         raise HTTPException(status_code=404, detail="Document index not found.")
-    removed = rag.doc_store.pop(doc_idx)
-    if doc_idx < len(rag.vectors):
-        rag.vectors.pop(doc_idx)
-    rag._dirty = True
-    rag.flush()
+    removed = rag.remove_at(doc_idx)
     record_log("knowledge.rag", "WARN", f"Removed document #{doc_idx} ({removed[:30]}...)")
     return {"status": "deleted", "total_docs": len(rag.doc_store)}
 
@@ -455,6 +629,7 @@ def delete_knowledge_doc(doc_idx: int):
 @app.get("/node/info")
 def node_info():
     ensure_initialized()
+    cap = engine.capability_status() if engine else {}
     return {
         "node_id": identity.node_id if identity else "uninitialized",
         "node_name": runtime_config.get("node", {}).get("name", "gajahmada-alpha"),
@@ -465,6 +640,10 @@ def node_info():
         "knowledge_docs": len(rag.doc_store) if rag else 0,
         "mode": "serverless" if IS_VERCEL else "full",
         "ml_ready": engine is not None,
+        "neural_inference_active": cap.get("neural_inference_active", False),
+        "symbolic_reasoning_active": True,
+        "active_neural_backend": cap.get("active_neural_backend"),
+        "memory_tiers": memory_manager.stats()["tiers"] if memory_manager else {},
         "uptime_sec": round(time.time() - START_TIME, 1),
         "system_time": get_system_time_info(),
     }
@@ -477,23 +656,35 @@ def get_peers():
 
 
 @app.post("/node/sync")
-def sync_node(req: SyncPeersRequest):
+def sync_node(req: SyncPeersRequest, request: Request):
     ensure_initialized()
+    if os.environ.get("GAJAHMADA_REQUIRE_AUTH") == "1":
+        auth_manager.authenticate_request(request, required_capability="network:manage")
     added = []
     for peer_url in req.peers:
         clean = peer_url.strip()
-        parsed = urlparse(clean)
-        if parsed.scheme not in ("http", "https") or not parsed.netloc:
-            raise HTTPException(status_code=400, detail=f"Invalid peer URL (use http:// or https://): {clean}")
-        p2p.add_peer(clean)
-        added.append(clean)
+        ok, reason_or_clean = validate_peer_url(clean, allow_local=governance_policy.allow_local_peers)
+        if not ok:
+            audit_logger.record(
+                event_type="SSRF_PEER_BLOCKED",
+                severity="HIGH",
+                actor="api:/node/sync",
+                action=f"register_peer:{clean}",
+                outcome="BLOCKED",
+                details={"reason": reason_or_clean},
+            )
+            raise HTTPException(status_code=400, detail=f"Invalid or blocked peer URL: {reason_or_clean}")
+        p2p.add_peer(reason_or_clean)
+        added.append(reason_or_clean)
     record_log("network.p2p", "OK", f"Synced peer(s): {', '.join(added)} (total={len(p2p.peers)})")
     return {"status": "ok", "added": added, "peers_known": list(p2p.peers)}
 
 
 @app.delete("/node/peers")
-def remove_peer(peer: str):
+def remove_peer(peer: str, request: Request):
     ensure_initialized()
+    if os.environ.get("GAJAHMADA_REQUIRE_AUTH") == "1":
+        auth_manager.authenticate_request(request, required_capability="network:manage")
     p2p.remove_peer(peer.strip())
     record_log("network.p2p", "WARN", f"Unlinked peer: {peer}")
     return {"status": "removed", "peers_known": list(p2p.peers)}
@@ -502,16 +693,26 @@ def remove_peer(peer: str):
 @app.post("/node/broadcast")
 async def broadcast_to_peers(req: BroadcastRequest):
     ensure_initialized()
-    sig = identity.sign_message(req.message.encode())
-    payload = {"node_id": identity.node_id, "message": req.message, "signature": sig, "timestamp": time.time()}
-    results = await p2p.broadcast("/health", payload)
+    gip_msg = GIPMessage(
+        message_type=GIPMessageType.GIP_DISCOVERY,
+        sender_node_id=identity.node_id,
+        recipient_node_id="*",
+        payload={
+            "message": req.message,
+            "node_name": runtime_config.get("node", {}).get("name", "gajahmada-alpha"),
+        },
+    ).sign(identity)
+
+    results = await p2p.broadcast("/api/v2/network/gip", gip_msg.model_dump())
     reachable = sum(1 for r in results if not isinstance(r, Exception))
-    record_log("network.p2p", "INFO", f"Broadcast '{req.message[:30]}' to {len(p2p.peers)} peer(s) ({reachable} reachable)")
+    record_log("network.p2p", "INFO", f"GIP/2.0 Broadcast '{req.message[:30]}' to {len(p2p.peers)} peer(s) ({reachable} reachable)")
     return {
         "status": "broadcast_sent",
+        "protocol": "GIP/2.0",
+        "message_id": gip_msg.message_id,
         "peers_targeted": len(p2p.peers),
         "peers_reachable": reachable,
-        "signature": sig[:24],
+        "signature": gip_msg.signature[:24],
     }
 
 
@@ -535,6 +736,7 @@ def node_metrics():
         "chain_height": len(blockchain.chain) if blockchain else 1,
         "pow_difficulty": blockchain.difficulty if blockchain else 2,
         "peers_count": len(p2p.peers) if p2p else 0,
+        "neural_inference_active": engine.is_neural_active() if engine else False,
         "time": time.time(),
     }
 
@@ -555,17 +757,11 @@ def get_chain():
 def mine_manual_block(req: MineBlockRequest):
     ensure_initialized()
     t0 = time.time()
-    task_hash = hashlib.sha256(f"{req.note}|{t0}".encode()).hexdigest()
-    signature = identity.sign_message(task_hash.encode())
-    block = Block(
-        index=len(blockchain.chain),
-        timestamp=t0,
-        task_hash=task_hash,
-        node_id=identity.node_id,
-        previous_hash=blockchain.get_latest_block().hash,
-        signature=signature,
+    block = blockchain.record_event(
+        event_type=LedgerEventType.AUDIT_BLOCK,
+        content_reference=req.note,
+        identity=identity,
     )
-    blockchain.add_block(block)
     elapsed = round(time.time() - t0, 4)
     record_log("blockchain.chain", "OK", f"Mined manual Block #{block.index} (nonce={block.nonce}, {elapsed}s)")
     return {"status": "mined", "block": block.to_dict(), "time_taken": elapsed}
@@ -574,7 +770,7 @@ def mine_manual_block(req: MineBlockRequest):
 @app.post("/node/chain/verify")
 def verify_full_chain():
     ensure_initialized()
-    is_valid = blockchain.is_chain_valid()
+    is_valid = blockchain.is_chain_valid(verify_signatures=True)
     sig_verified = 0
     for b in blockchain.chain[1:]:
         if b.signature and identity.verify_message(b.task_hash.encode(), b.signature, b.node_id):
@@ -615,8 +811,10 @@ def get_node_config():
 
 
 @app.post("/node/config")
-def update_node_config(req: ConfigUpdateRequest):
+def update_node_config(req: ConfigUpdateRequest, request: Request):
     ensure_initialized()
+    if os.environ.get("GAJAHMADA_REQUIRE_AUTH") == "1":
+        auth_manager.authenticate_request(request, required_capability="config:write")
     if req.node_name:
         runtime_config["node"]["name"] = req.node_name.strip()
     if req.pow_difficulty is not None and 1 <= req.pow_difficulty <= 4:
@@ -641,14 +839,15 @@ def get_dependencies():
     pkgs = [
         "fastapi", "uvicorn", "pydantic", "cryptography",
         "httpx", "psutil", "PyYAML", "click",
-        "numpy", "faiss-cpu", "llama-cpp-python", "sentence-transformers",
+        "numpy", "sqlalchemy", "psycopg",
+        "faiss-cpu", "llama-cpp-python", "sentence-transformers", "onnxruntime",
     ]
     installed = {}
     for p in pkgs:
         try:
             installed[p] = importlib.metadata.version(p)
         except importlib.metadata.PackageNotFoundError:
-            installed[p] = "builtin-engine"
+            installed[p] = "not-installed (optional)"
     return {
         "python_version": sys.version.split()[0],
         "packages": installed,
@@ -663,8 +862,10 @@ def get_system_logs():
 
 
 @app.delete("/node/logs")
-def clear_system_logs():
+def clear_system_logs(request: Request):
     ensure_initialized()
+    if os.environ.get("GAJAHMADA_REQUIRE_AUTH") == "1":
+        auth_manager.authenticate_request(request, required_capability="logs:clear")
     system_logs.clear()
     record_log("api.server", "INFO", "System telemetry log buffer cleared by operator.")
     return {"status": "cleared", "logs": system_logs}

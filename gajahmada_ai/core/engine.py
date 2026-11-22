@@ -1,12 +1,14 @@
 from datetime import datetime, timedelta, timezone
-import ast
 import hashlib
 import importlib
 import math
-import operator
 import os
 import re
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
+
+from gajahmada_ai.neural.llama_backend import deterministic_hash_embed
+from gajahmada_ai.neural.router import ModelRouter
+from gajahmada_ai.reasoning.symbolic import SymbolicReasoner
 
 WIB_TZ = timezone(timedelta(hours=7), name="WIB")
 
@@ -30,40 +32,9 @@ def extract_keywords(text: str) -> List[str]:
 
 
 def _safe_eval_math(expr: str) -> Optional[float]:
-    allowed_ops = {
-        ast.Add: operator.add,
-        ast.Sub: operator.sub,
-        ast.Mult: operator.mul,
-        ast.Div: operator.truediv,
-        ast.FloorDiv: operator.floordiv,
-        ast.Mod: operator.mod,
-        ast.Pow: operator.pow,
-        ast.USub: operator.neg,
-        ast.UAdd: operator.pos,
-    }
-
-    def _eval(node):
-        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
-            return node.value
-        if isinstance(node, ast.BinOp) and type(node.op) in allowed_ops:
-            left = _eval(node.left)
-            right = _eval(node.right)
-            if isinstance(node.op, ast.Pow) and abs(right) > 1000:
-                raise ValueError("Exponent too large")
-            return allowed_ops[type(node.op)](left, right)
-        if isinstance(node, ast.UnaryOp) and type(node.op) in allowed_ops:
-            return allowed_ops[type(node.op)](_eval(node.operand))
-        raise ValueError("Unsupported expression")
-
-    try:
-        cleaned = expr.replace("x", "*").replace("×", "*").replace("÷", "/").replace("^", "**")
-        m = re.search(r"([0-9]+(?:\.[0-9]+)?(?:\s*[\+\-\*\/\%]\s*[0-9]+(?:\.[0-9]+)?)+)", cleaned)
-        if not m:
-            return None
-        tree = ast.parse(m.group(1), mode="eval")
-        return _eval(tree.body)
-    except Exception:
-        return None
+    reasoner = SymbolicReasoner()
+    _, val = reasoner.evaluate_math(expr)
+    return val
 
 
 def _try_import(module_name: str) -> Optional[Any]:
@@ -85,6 +56,14 @@ def _has_word(text_lower: str, words: List[str]) -> bool:
 
 
 class AIModelEngine:
+    """
+    GajahMada Core Engine (v1 + v2 Bridge).
+    Delegates neural model loading and inference to `ModelRouter` (`gajahmada_ai.neural.router`)
+    and symbolic math evaluation to `SymbolicReasoner` (`gajahmada_ai.reasoning.symbolic`).
+    Explicitly tracks whether real neural inference is active (`is_neural_active()`)
+    without pretending rule/evidence synthesis is a neural LLM.
+    """
+
     def __init__(
         self,
         model_path: str = "./models/llama-2-7b-chat.Q4_K_M.gguf",
@@ -92,37 +71,46 @@ class AIModelEngine:
     ):
         self.model_path = model_path
         self.embedding_model_name = embedding_model_name
+        self.router = ModelRouter(gguf_model_path=model_path)
+        self.symbolic = SymbolicReasoner()
         self._llm = None
         self._embedder = None
 
-    def load_models(self):
-        llama_mod = _try_import("llama_cpp")
-        if llama_mod is not None and hasattr(llama_mod, "Llama"):
-            if os.path.exists(self.model_path):
-                if not self._llm:
-                    self._llm = llama_mod.Llama(model_path=self.model_path, n_ctx=2048)
-            else:
-                print(f"[Info] GGUF model not found at {self.model_path}. Using GajahMada built-in Neural Synthesis Engine.")
-        else:
-            print("[Info] llama-cpp-python not installed. Using GajahMada built-in Neural Synthesis Engine.")
+    def load_models(self) -> Dict[str, bool]:
+        load_res = self.router.load_available_models()
+        self._llm = self.router.llama_backend._llm if self.router.llama_backend.metadata.is_loaded else None
 
         st_mod = _try_import("sentence_transformers")
         if st_mod is not None and hasattr(st_mod, "SentenceTransformer"):
             try:
                 if not self._embedder:
                     self._embedder = st_mod.SentenceTransformer(self.embedding_model_name)
+                    self.router.llama_backend._embedder = self._embedder
             except Exception:
-                print("[Info] sentence-transformers model load skipped. Using deterministic 384-d hash-projection embedder.")
-        else:
-            print("[Info] sentence-transformers not available. Using deterministic 384-d hash-projection embedder.")
+                pass
+        return load_res
 
-    def generate(self, prompt: str, context: str = "", max_tokens: int = 256) -> str:
-        if self._llm:
-            full_prompt = prompt
-            if context:
-                full_prompt = f"Context:\n{context}\n\nQuestion: {prompt}\n\nAnswer:"
-            response = self._llm(full_prompt, max_tokens=max_tokens)
-            return response["choices"][0]["text"].strip()
+    def is_neural_active(self) -> bool:
+        return self.router.get_active_neural_backend() is not None
+
+    def capability_status(self) -> Dict[str, Any]:
+        return self.router.capability_report()
+
+    def generate(
+        self,
+        prompt: str,
+        context: str = "",
+        max_tokens: int = 256,
+        temperature: float = 0.7,
+    ) -> str:
+        gen_res = self.router.route_generation(
+            prompt=prompt,
+            context=context,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        if gen_res.neural_used and gen_res.text:
+            return gen_res.text
 
         return self._synthesize_response(prompt, context=context)
 
@@ -141,14 +129,14 @@ class AIModelEngine:
             "apa itu gajahmada", "tentang kamu", "identitas kamu",
         ]):
             return (
-                "Saya adalah **GajahMada**, asisten kecerdasan buatan (AI) terdesentralisasi dan pusat kendali "
-                "node Web3 berdaulat (*Sovereign Decentralized AI & Web3 Node*).\n\n"
+                "Saya adalah **GajahMada**, arsitektur kecerdasan hibrida berdaulat dan terdistribusi "
+                "(*Sovereign Hybrid Distributed Intelligence & Web3 Node*).\n\n"
                 "• **Asal Nama:** Terinspirasi dari **Mahapatih Gajah Mada**, tokoh pemersatu Nusantara melalui *Sumpah Palapa* (1336 M).\n"
                 "• **Kemampuan Utama Saya:**\n"
-                "  1. Menjawab pertanyaan sejarah lengkap **Nusantara hingga Indonesia sekarang** (tahun " + str(current_year) + ").\n"
-                "  2. Menjalankan pencarian pengetahuan semantik **384-d Vector RAG** (`/search` & `/ingest`).\n"
-                "  3. Mengaudit & menambang blok **Web3 Blockchain SHA-256 Proof-of-Work** (`/mine` & `/verify`).\n"
-                "  4. Memverifikasi tanda tangan kriptografis **Ed25519 (RFC 8032)** dan memantau jaringan **P2P Mesh** (`/status`, `/peers`)."
+                "  1. Menjalankan penalaran hibrida (**Symbolic + Evidence + Local Neural Inference**) serta menjawab sejarah **Nusantara hingga Indonesia sekarang** (tahun " + str(current_year) + ").\n"
+                "  2. Mengelola **5-Tier Persistent Memory** & pencarian semantik **384-d Vector RAG** (`/search` & `/ingest`).\n"
+                "  3. Mengaudit & menambang blok **Web3 Signed Event Ledger SHA-256 Proof-of-Work** (`/mine` & `/verify`).\n"
+                "  4. Memverifikasi tanda tangan kriptografis **Ed25519 (RFC 8032)** dan protokol **GIP v2.0 P2P Mesh** (`/status`, `/peers`)."
             )
 
         # 2. Greetings & Small Talk
@@ -156,9 +144,9 @@ class AIModelEngine:
             if not _has_word(ql, ["indonesia", "nusantara", "sejarah", "gajah mada", "majapahit", "presiden", "arsitektur", "blockchain"]):
                 return (
                     f"Halo! Saya **GajahMada** (Waktu Sistem: `{now_str}`).\n"
-                    f"Seluruh 8 modul sistem sedang aktif dan siap membantu Anda. Anda dapat bertanya tentang:\n"
+                    f"Seluruh 8 lapisan arsitektur sistem sedang aktif dan siap membantu Anda. Anda dapat bertanya tentang:\n"
                     f"• **Sejarah & Detail Indonesia:** *\"Siapa Mahapatih Gajah Mada?\"*, *\"Apa isi Sumpah Palapa?\"*, *\"Siapa Presiden Indonesia sekarang?\"*, *\"Jelaskan sejarah Nusantara sampai Indonesia sekarang\"*, atau *\"Apa itu IKN & 38 Provinsi?\"*\n"
-                    f"• **Arsitektur & Web3:** *\"Jelaskan arsitektur GajahMada\"*, *\"Bagaimana cara kerja blockchain PoW & Ed25519?\"*, atau perintah `/status`, `/verify`, `/mine`, `/time`."
+                    f"• **Arsitektur & Penalaran:** *\"Jelaskan arsitektur GajahMada\"*, *\"Bagaimana cara kerja blockchain PoW & Ed25519?\"*, atau perintah `/status`, `/verify`, `/mine`, `/time`."
                 )
 
         # 3. Thanks / Appreciation
@@ -171,7 +159,7 @@ class AIModelEngine:
         if _has_word(ql, ["help", "bantuan", "fitur", "bisa apa", "apa yang bisa", "daftar perintah"]):
             return (
                 "Berikut daftar fitur dan perintah yang dapat Anda gunakan di **Command Center GajahMada**:\n"
-                "1. **Tanya Jawab AI & Pengetahuan Indonesia:** Tanyakan sejarah Nusantara, Majapahit, Sumpah Palapa, Sriwijaya, Kesultanan, Proklamasi 1945, Pancasila, Daftar Presiden RI, 38 Provinsi, IKN, Ekonomi G20, atau Budaya UNESCO.\n"
+                "1. **Penalaran Hibrida & Pengetahuan Indonesia:** Tanyakan perhitungan matematika/logika simbolik, sejarah Nusantara, Majapahit, Sumpah Palapa, Sriwijaya, Kesultanan, Proklamasi 1945, Pancasila, Daftar Presiden RI, 38 Provinsi, IKN, Ekonomi G20, atau Budaya UNESCO.\n"
                 "2. **Perintah Sistem (Slash Commands):**\n"
                 "   • `/status` — Cek performa CPU, RAM, Disk, jumlah dokumen RAG, peer P2P, & blockchain.\n"
                 "   • `/time` atau `/now` — Cek sinkronisasi waktu sistem sekarang (WIB / ISO-8601).\n"
@@ -191,14 +179,15 @@ class AIModelEngine:
                 f"• **Konteks Nasional:** Tahun `{current_year}` ({years_merdeka} tahun sejak Proklamasi Kemerdekaan RI 17 Agustus 1945)."
             )
 
-        # 6. Math / Arithmetic Calculation
-        math_res = _safe_eval_math(q)
-        if math_res is not None and (_has_word(ql, ["berapa", "hitung", "hasil"]) or re.match(r"^[\d\s\+\-\*\/\%\(\)\.x×÷\^=]+$", ql)):
-            formatted_num = int(math_res) if isinstance(math_res, float) and math_res.is_integer() else round(math_res, 6)
-            return f"Hasil perhitungan untuk `{q}` adalah **`{formatted_num}`**."
+        # 6. Math / Arithmetic & Symbolic Calculation
+        sym_res = self.symbolic.reason(q)
+        if sym_res.applicable and sym_res.conclusion:
+            if sym_res.math_value is not None:
+                formatted_num = int(sym_res.math_value) if sym_res.math_value.is_integer() else round(sym_res.math_value, 6)
+                return f"Hasil perhitungan simbolik deterministik untuk `{q}` adalah **`{formatted_num}`**."
+            return f"Hasil deduksi simbolik deterministik: **{sym_res.conclusion}**"
 
         # 7. Specific Nusantara & Indonesia Topics
-        # 7A. Gajah Mada, Sumpah Palapa & Majapahit
         if _has_word(ql, ["gajah mada", "sumpah palapa", "amukti palapa", "majapahit", "hayam wuruk", "raden wijaya", "nagarakretagama", "sutasoma", "bhinneka tunggal ika", "trowulan"]):
             return (
                 "**Mahapatih Gajah Mada, Sumpah Palapa & Kemaharajaan Majapahit:**\n"
@@ -207,7 +196,6 @@ class AIModelEngine:
                 "• **Warisan bagi Indonesia Modern:** Kitab *Nagarakretagama* (1365 M, Mpu Prapanca) mencatat 98 wilayah Nusantara dari Sumatera hingga Papua Barat, sedangkan *Kakawin Sutasoma* (Mpu Tantular) melahirkan semboyan **\"Bhinneka Tunggal Ika, Tan Hana Dharma Mangrwa\"** yang menjadi semboyan resmi NKRI."
             )
 
-        # 7B. Sriwijaya, Mataram Kuno, Kutai, Tarumanagara, Singasari
         if _has_word(ql, ["sriwijaya", "mataram kuno", "borobudur", "prambanan", "syailendra", "sanjaya", "kutai", "mulawarman", "tarumanagara", "purnawarman", "kalingga", "singasari", "kertanagara", "ken arok", "kediri", "airlangga", "pamalayu"]):
             return (
                 "**Kerajaan Klasik & Kemaharajaan Maritim Awal Nusantara:**\n"
@@ -217,7 +205,6 @@ class AIModelEngine:
                 "• **Singasari (1222–1292 M):** Didirikan oleh Ken Arok; di bawah **Raja Kertanagara**, Singasari melancarkan **Ekspedisi Pamalayu (1275)** sebagai cikal-bakal penyatuan geopolitik Nusantara (*Cakrawala Mandala Dwipantara*)."
             )
 
-        # 7C. Kesultanan Islam & Jalur Rempah
         if _has_word(ql, ["kesultanan", "samudera pasai", "wali songo", "walisongo", "demak", "mataram islam", "sultan agung", "banten", "gowa", "tallo", "hasanuddin", "ternate", "tidore", "baabullah", "nuku", "iskandar muda", "jalur rempah"]):
             return (
                 "**Era Kesultanan Islam & Jaringan Niaga Rempah Nusantara (Abad ke-13 – ke-18):**\n"
@@ -226,7 +213,6 @@ class AIModelEngine:
                 "• **Kalimantan, Sulawesi & Maluku (Pusat Rempah Dunia):** **Kesultanan Banjar & Kutai** di Kalimantan, **Kesultanan Gowa-Tallo** di Makassar (**Sultan Hasanuddin** — *Ayam Jantan dari Timur*), serta **Kesultanan Ternate** (Sultan Baabullah) dan **Tidore** (Sultan Nuku) di Maluku sebagai pusat cengkeh dan pala dunia."
             )
 
-        # 7D. Pahlawan, Kolonialisme, Kebangkitan Nasional & Sumpah Pemuda
         if _has_word(ql, ["pahlawan", "kolonial", "voc", "belanda", "diponegoro", "pattimura", "imam bonjol", "cut nyak dhien", "teuku umar", "antasari", "sisingamangaraja", "kartini", "budi utomo", "kebangkitan nasional", "sumpah pemuda", "28 oktober 1928"]):
             return (
                 "**Perlawanan Pahlawan Nusantara, Kebangkitan Nasional (1908) & Sumpah Pemuda (1928):**\n"
@@ -235,7 +221,6 @@ class AIModelEngine:
                 "• **Sumpah Pemuda (28 Oktober 1928):** Kongres Pemuda II di Jakarta mengikrarkan: **Satu Tanah Air (Indonesia), Satu Bangsa (Bangsa Indonesia), dan Menjunjung Bahasa Persatuan (Bahasa Indonesia)**, diiringi lagu *Indonesia Raya* karya W.R. Supratman."
             )
 
-        # 7E. Proklamasi, Pancasila, BPUPKI, PPKI, Deklarasi Djuanda
         if _has_word(ql, ["proklamasi", "kemerdekaan", "17 agustus", "pancasila", "bpupki", "ppki", "piagam jakarta", "uud 1945", "djuanda", "deklarasi djuanda", "kaa", "konferensi asia afrika", "sudirman"]):
             return (
                 f"**Kelahiran Pancasila, Proklamasi Kemerdekaan RI (17 Agustus 1945) & Kedaulatan NKRI:**\n"
@@ -244,7 +229,6 @@ class AIModelEngine:
                 f"• **Revolusi Fisik & Deklarasi Djuanda:** Kemerdekaan dipertahankan melalui Pertempuran 10 November 1945 (Surabaya), gerilya Jenderal Sudirman, Serangan Umum 1 Maret 1949, hingga KMB (27 Desember 1949). Pada **13 Desember 1957**, **Deklarasi Djuanda** menyatukan seluruh laut antarpulau sebagai wilayah kedaulatan utuh NKRI (*Wawasan Nusantara*, diakui dalam UNCLOS 1982)."
             )
 
-        # 7F. Presiden Indonesia, Orde Baru, Reformasi
         if _has_word(ql, ["presiden", "wakil presiden", "soekarno", "soeharto", "habibie", "gus dur", "abdurrahman wahid", "megawati", "sby", "yudhoyono", "jokowi", "joko widodo", "prabowo", "gibran", "orde baru", "reformasi"]):
             return (
                 f"**Daftar Presiden Republik Indonesia (1945 – Sekarang Tahun {current_year}):**\n"
@@ -258,7 +242,6 @@ class AIModelEngine:
                 f"8. **Jenderal TNI (Purn.) Prabowo Subianto (20 Oktober 2024 – Sekarang, {current_year}):** Presiden ke-8 RI (didampingi Wakil Presiden Gibran Rakabuming Raka), berfokus pada kemandirian pangan, energi, hilirisasi industri, pertahanan, dan penguatan SDM menuju Indonesia Emas 2045."
             )
 
-        # 7G. Geografi, 38 Provinsi, IKN, Demografi, Budaya UNESCO, Ekonomi
         if _has_word(ql, ["provinsi", "38 provinsi", "ikn", "ibu kota nusantara", "geografi", "jumlah pulau", "penduduk", "populasi", "suku", "bahasa daerah", "unesco", "ekonomi", "g20", "hilirisasi", "indonesia emas"]):
             return (
                 f"**Profil Indonesia Modern Sekarang (Tahun {current_year}):**\n"
@@ -267,7 +250,6 @@ class AIModelEngine:
                 f"• **Ekonomi & Warisan Dunia (UNESCO):** Ekonomi terbesar di Asia Tenggara (**Anggota G20**, PDB > USD 1,4 triliun) dengan fokus hilirisasi mineral kritis (nikel, tembaga, bauksit, ekosistem EV) & ekonomi digital. Warisan UNESCO meliputi **Borobudur, Prambanan, Sangiran, Subak Bali, Komodo, Lorentz, Wayang, Keris, Batik, Angklung, Pinisi, Pencak Silat, Gamelan, dan Jamu** menuju **Visi Indonesia Emas 2045**."
             )
 
-        # 7H. Full History Overview: Nusantara -> Indonesia Sekarang
         if _has_word(ql, ["indonesia", "nusantara", "sejarah"]):
             return (
                 f"**Perjalanan Sejarah Lengkap: Dari Nusantara hingga Indonesia Sekarang (Tahun {current_year}):**\n"
@@ -279,31 +261,32 @@ class AIModelEngine:
                 f"6. **Indonesia Sekarang ({current_year} — {years_merdeka} Tahun Merdeka):** Dipersatukan oleh **Deklarasi Djuanda (1957)** & **Satelit Palapa (1976)**, berkembang melalui Era Reformasi hingga kepemimpinan **Presiden ke-8 Prabowo Subianto**. Kini Indonesia berdiri dengan **38 Provinsi**, **~282+ juta jiwa**, anggota **G20**, membangun **Ibu Kota Nusantara (IKN)** menuju **Indonesia Emas 2045**."
             )
 
-        # 8. Technical Architecture, Blockchain, Security, RAG, P2P, Code
         if _has_word(ql, ["arsitektur", "architecture", "modul", "module", "struktur"]):
             return (
-                "**Arsitektur Sistem & 8 Modul Inti GajahMada:**\n"
-                "1. `gajahmada_ai.api` (`server.py`): FastAPI REST & Web3 Gateway (16+ endpoint aktif).\n"
-                "2. `gajahmada_ai.core` (`engine.py`): `AIModelEngine` (LLaMA GGUF + Neural Synthesis + 384-d Embeddings).\n"
-                "3. `gajahmada_ai.knowledge` (`rag.py` & `indonesia_corpus.py`): `LocalKnowledge` 384-d Vector Store (24+ dokumen arsitektur & sejarah Nusantara–Indonesia).\n"
-                "4. `gajahmada_ai.blockchain` (`chain.py`): `AIBlockchain` SHA-256 Proof-of-Work Audit Ledger (`difficulty=2`).\n"
-                "5. `gajahmada_ai.security` (`crypto.py`): `NodeIdentity` Ed25519 (RFC 8032) digital signature & verification.\n"
-                "6. `gajahmada_ai.network` (`p2p.py`): `P2PNetwork` asynchronous `httpx` mesh topology & gossip broadcast."
+                "**Arsitektur 8 Lapisan GajahMada 2.0:**\n"
+                "1. **Sovereign Foundation (`security`, `blockchain`, `storage`):** Ed25519 Identity, Key Rotation, Signed Event Ledger, PostgreSQL/SQLite Storage.\n"
+                "2. **Distributed Infrastructure (`network`):** Protokol GIP v2.0 (`GIP-IDENTITY`..`GIP-SYNC`), Replay Protection, SSRF Guard.\n"
+                "3. **Perception & Knowledge (`cognition.perception`):** Normalisasi input, ekstraksi entitas, & klasifikasi klaim.\n"
+                "4. **5-Tier Memory Engine (`memory`):** Working, Semantic, Episodic, Procedural, & Collective Memory + Knowledge Graph & Provenance.\n"
+                "5. **Hybrid Reasoning Engine (`neural`, `reasoning`, `cognition`):** Local Neural (`llama.cpp`/ONNX/PyTorch) + Symbolic + Evidence + Metacognitive Critic.\n"
+                "6. **Autonomous Agent Runtime (`agents`, `execution`):** Planner, Researcher, Analyst, Verifier, Scheduler & Sandboxed Execution.\n"
+                "7. **Collective Intelligence (`network.coordinator`, `consensus`):** Delegasi tugas multi-node & verifikasi independen.\n"
+                "8. **Intelligence Governance (`security.auth`, `policies`, `learning`):** RBAC, batas eksekusi, & eksperimen pembelajaran terkontrol."
             )
 
         if _has_word(ql, ["blockchain", "web3", "chain", "block", "ledger", "pow", "hash"]):
             return (
-                "**Arsitektur Web3 & Proof-of-Work Blockchain GajahMada:**\n"
-                "Setiap interaksi di Command Center menghasilkan `task_hash = SHA256(prompt + response)`, ditandatangani dengan "
-                "kunci privat **Ed25519** milik node, lalu ditambang dengan **Proof-of-Work (`difficulty=2`)** ke dalam rantai blok "
-                "persisten (`chain.json`). Anda dapat mengauditnya kapan saja dengan perintah `/verify` atau `/mine`."
+                "**Arsitektur Web3 & Signed Event Audit Ledger GajahMada:**\n"
+                "Setiap interaksi dan event (`NODE_REGISTERED`, `TASK_COMPLETED`, `EVIDENCE_SUBMITTED`, `RESULT_VERIFIED`, `KNOWLEDGE_ACCEPTED`) "
+                "menghasilkan hash SHA-256, ditandatangani dengan kunci privat **Ed25519** milik node, lalu ditambang dengan "
+                "**Proof-of-Work (`difficulty=2`)** ke dalam rantai blok persisten (`chain.json`)."
             )
 
         if _has_word(ql, ["security", "keamanan", "audit", "crypto", "ed25519"]):
             return (
                 "**Keamanan & Kriptografi Ed25519 (RFC 8032):**\n"
-                "• **Identitas Node:** Menggunakan kurva eliptik Ed25519 (`node_key.pem` dengan izin `0600`).\n"
-                "• **Verifikasi Blok:** Setiap blok menyimpan `signature` Ed25519 atas `task_hash` SHA-256 yang dapat diverifikasi publik melalui `POST /security/sign-verify` dan `POST /node/chain/verify`."
+                "• **Identitas Node:** Menggunakan pasangan kunci asimetris Ed25519 independen (`node_key.pem` dengan izin `0600`), mendukung rotasi kunci dan pencabutan peer.\n"
+                "• **Verifikasi Blok & Protokol GIP:** Setiap blok dan pesan GIP v2.0 menyimpan `signature` Ed25519 dan proteksi *replay*."
             )
 
         if _has_word(ql, ["code", "kode", "python", "buatkan", "fungsi", "script", "contoh"]):
@@ -320,34 +303,21 @@ class AIModelEngine:
                 f"```"
             )
 
-        # 9. If relevant RAG context was found for a custom question, present it cleanly
         if context:
             return (
-                f"Berdasarkan basis pengetahuan **GajahMada (384-d Vector RAG)** untuk pertanyaan **\"{q}\"**:\n\n"
+                f"Berdasarkan basis pengetahuan terverifikasi **GajahMada (384-d Vector & Provenance Memory)** untuk pertanyaan **\"{q}\"**:\n\n"
                 f"{context}\n\n"
                 f"*(Terverifikasi oleh Ed25519 pada `{now_str}`)*"
             )
 
-        # 10. Clean conversational fallback
         return (
             f"Menjawab pertanyaan Anda tentang **\"{q}\"**:\n"
-            f"• Permintaan telah diproses oleh **GajahMada Core Engine** pada `{now_str}`.\n"
+            f"• Permintaan telah diproses oleh **GajahMada Hybrid Cognitive Engine** pada `{now_str}`.\n"
             f"• Untuk jawaban mendalam mengenai **Sejarah Nusantara hingga Indonesia Sekarang**, **Sumpah Palapa Gajah Mada**, **38 Provinsi & IKN**, **Daftar Presiden RI**, atau **Arsitektur Web3**, silakan tanyakan topik terkait atau gunakan `/search <kata kunci>` dan `/ingest <pengetahuan baru>`."
         )
 
     def create_embedding(self, text: str) -> List[float]:
-        if self._embedder:
+        if self._embedder is not None:
             embedding = self._embedder.encode(text)
             return embedding.tolist()
-
-        dim = 384
-        vec = [0.0] * dim
-        tokens = extract_keywords(text) or re.findall(r"\w+", text.lower()) or ["empty"]
-        for tok in tokens:
-            h = hashlib.sha256(tok.encode("utf-8")).digest()
-            for i in range(0, len(h), 2):
-                idx = ((h[i] << 8) | h[i + 1]) % dim
-                sign = 1.0 if (h[i] & 1) == 0 else -1.0
-                vec[idx] += sign
-        norm = math.sqrt(sum(v * v for v in vec)) or 1.0
-        return [round(v / norm, 6) for v in vec]
+        return self.router.embed(text)
