@@ -2,16 +2,16 @@
 
 <img src="interface/html/logo.png" alt="GajahMada Logo" width="130" />
 
-# GajahMada 2.0
+# GajahMada AI Nusantara (v2.0)
 
 ### **Sovereign, Independent, Hybrid, Distributed Intelligence Architecture**
 
-*14-Stage Hybrid Cognitive Pipeline · Provider-Independent Neural Inference (`llama.cpp` / ONNX / PyTorch) · Deterministic Symbolic & Evidence Reasoning · 5-Tier Persistent Memory (`PostgreSQL + pgvector` / `SQLite`) · Autonomous Multi-Agent Runtime · GIP/2.0 Cryptographic Mesh Protocol · Ed25519 Signed Event Audit Ledger*
+*14-Stage Hybrid Cognitive Pipeline · Provider-Independent Local Neural Inference (`llama.cpp` GGUF / ONNX / PyTorch) · Deterministic Symbolic & Live Specialist Resolvers · Autonomous Internet Knowledge Crawler · 5-Tier Persistent Memory (`SQLite` + Optional `Supabase PostgreSQL + pgvector`) · Autonomous Multi-Agent Runtime · GIP/2.0 Cryptographic Mesh Protocol · Ed25519 Signed Event Audit Ledger*
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-2dd4bf?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-REST_v1_%26_v2-009688?style=for-the-badge&logo=fastapi&logoColor=white)](gajahmada_ai/api/server.py)
+[![Supabase pgvector](https://img.shields.io/badge/Supabase-pgvector_384d-3ecf8e?style=for-the-badge&logo=supabase&logoColor=white)](supabase/schema.sql)
 [![Cognition](https://img.shields.io/badge/Cognition-14_Stage_Hybrid-818cf8?style=for-the-badge)](gajahmada_ai/cognition/reasoning.py)
-[![Memory](https://img.shields.io/badge/Memory-5_Tier_Provenance-a78bfa?style=for-the-badge)](gajahmada_ai/memory/manager.py)
 [![Protocol](https://img.shields.io/badge/Protocol-GIP%2F2.0_Ed25519-f59e0b?style=for-the-badge)](gajahmada_ai/network/protocol.py)
 [![Tests](https://img.shields.io/badge/Pytest-18%2F18_Passing-4ade80?style=for-the-badge)](tests/)
 
@@ -32,17 +32,17 @@
 1. **🧠 14-Stage Hybrid Cognitive Reasoning Pipeline (`gajahmada_ai.cognition` & `reasoning`):**
    - Mengorkestrasi tahapan `PERCEPTION` → `INTENT CLASSIFICATION` → `MEMORY RETRIEVAL` → `PROBLEM DECOMPOSITION` → `HYPOTHESIS GENERATION` → `PARALLEL REASONING (Neural + Symbolic + Evidence)` → `EVIDENCE FUSION` → `METACOGNITIVE CRITIC` → `SUFFICIENCY EVALUATION` → `DECISION`.
    - Menghasilkan objek terstruktur `ReasoningResult` dengan `EpistemicBreakdown` yang secara tegas memisahkan **fakta terverifikasi (`verified_facts`)**, **klaim belum terverifikasi (`unverified_claims`)**, **hipotesis (`hypotheses`)**, **inferensi (`inferences`)**, **opini (`opinions`)**, dan **informasi yang belum diketahui (`unknown_information`)**.
-2. **🔌 Provider-Independent Neural Abstraction (`gajahmada_ai.neural`):**
-   - Mendukung eksekusi model lokal melalui **`LlamaCppBackend` (GGUF `llama.cpp`)**, **`OnnxBackend` (ONNX Runtime)**, dan **`PyTorchNativeBackend`** dengan `ModelRegistry` dan `ModelRouter`.
-   - **100% Bebas Ketergantungan Cloud AI Terpusat:** Tidak membutuhkan API eksternal (OpenAI, Gemini, Claude) dan berfungsi penuh secara **offline**.
-   - **Honest Capability Reporting:** Melaporkan secara jujur status `neural_inference_active` (`True` hanya ketika bobot model neural nyata dimuat; `False` ketika sistem berjalan dalam mode *Symbolic + Evidence Reasoning*).
-3. **📐 Deterministic Symbolic & Evidence Reasoning (`gajahmada_ai.reasoning`):**
-   - **Symbolic Reasoner:** Evaluasi ekspresi matematika & fungsi aljabar berbasis AST (`sqrt`, `log`, `sin`, `cos`, perpangkatan), deduksi aturan logika *forward-chaining* (Modus Ponens), dan penyelesaian silogisme kategoris secara independen tanpa LLM.
-   - **Evidence & Contradiction Engine:** Pembobotan reliabilitas sumber (*provenance weighting*) dan deteksi kontradiksi otomatis (konflik negasi/polaritas, predikat eksklusif, dan perbedaan angka/tahun).
-4. **🗄️ 5-Tier Persistent Memory & Knowledge Engine (`gajahmada_ai.memory` & `storage`):**
-   - Mengimplementasikan 5 tingkat memori: **Working Memory**, **Semantic Memory**, **Episodic Memory**, **Procedural Memory**, dan **Collective Memory**.
-   - Didukung oleh penyimpanan relasional **`PostgreSQL + pgvector`** (skema migrasi `001_initial_v2_schema.sql`) dengan *fallback* otomatis ke database relasional **`SQLite` (`gajahmada_v2.db`)** dan *384-d Vector Store (`LocalKnowledge`)*.
-   - Setiap rekaman memori memiliki hash integritas SHA-256, provenans sumber, pelestarian kontradiksi (*contradiction preservation*), riwayat versi tak berubah (*immutable versioning*), graf relasi entitas (*Knowledge Graph*), dan fitur *content-addressed backup*.
+2. **🔌 Provider-Independent Local Neural Abstraction (`gajahmada_ai.neural`):**
+   - Mendukung eksekusi model lokal melalui **`LlamaCppBackend` (GGUF `llama.cpp`)**, **`OnnxBackend` (ONNX Runtime)**, dan **`PyTorchNativeBackend`** dengan auto-discovery model `*.gguf` di `./models/` (mis. `qwen2.5-1.5b-instruct-q4_k_m.gguf`).
+   - **Ringkas Secara Default:** Jawaban dirancang singkat dan langsung ke inti (1–3 kalimat), dan otomatis menjabarkan secara mendalam hanya jika pertanyaan meminta detail (`detail`, `lengkap`, `rinci`, `uraikan`, `step by step`).
+   - **100% Bebas Ketergantungan Cloud AI Terpusat** & **Honest Capability Reporting:** Melaporkan secara jujur status `neural_inference_active` (`True` hanya ketika bobot model neural nyata dimuat).
+3. **📐 Deterministic Symbolic, Live Specialists & Autonomous Internet Crawler (`gajahmada_ai.reasoning` & `knowledge.open_knowledge`):**
+   - **Symbolic Reasoner:** Evaluasi ekspresi matematika berbasis AST (`sqrt`, `log`, `sin`, `cos`), deduksi logika *forward-chaining*, dan silogisme tanpa LLM.
+   - **Autonomous Multi-Source Crawler:** Crawling pengetahuan lintas sumber (**Wikipedia ID/EN**, **DuckDuckGo**, **Open-Meteo Live Weather**, **Katalog 114 Surah & Ayat Al-Qur'an**, dan **Direct URL Crawl** berproteksi anti-SSRF) lengkap dengan daftar **Sumber & Referensi** di akhir jawaban serta asimilasi otomatis ke Brain setiap interaksi.
+   - **Evidence & Contradiction Engine:** Pembobotan reliabilitas sumber (*provenance weighting*) dan deteksi kontradiksi otomatis.
+4. **🗄️ 5-Tier Persistent Memory & Hybrid Supabase `pgvector` Store (`gajahmada_ai.memory` & `storage`):**
+   - Mengimplementasikan 5 tingkat memori (**Working, Semantic, Episodic, Procedural, Collective**) dengan penyimpanan *local-first* **`SQLite` (`gajahmada_v2.db`)** + **384-d Vector Store (`LocalKnowledge`)**.
+   - **Integrasi Opsional Supabase (`PostgreSQL + pgvector`):** Melalui `SupabaseKnowledgeStore` (`gajahmada_ai/storage/supabase_store.py`) dan skema `supabase/schema.sql`, node serverless (seperti Vercel) maupun node lokal dapat menyinkronkan memori kolektif ber-ID **`content_hash` (SHA-256)** + tanda tangan **Ed25519**, pencarian vektor `match_knowledge` 384-d, dan blok audit `ledger_blocks` secara persisten tanpa kehilangan independensi lokal.
 5. **🤖 Autonomous Multi-Agent Runtime & Sandboxed Execution (`gajahmada_ai.agents` & `execution`):**
    - Empat agen spesialis dengan kapabilitas dan izin tool tersendiri: **`PlannerAgent`**, **`ResearcherAgent`**, **`AnalystAgent`**, dan **`VerifierAgent`** yang dikoordinasikan oleh **`AutonomousTaskScheduler`**.
    - Siklus status eksekusi eksplisit: `CREATED` → `PLANNED` → `APPROVED` → `RUNNING` → `WAITING` → `COMPLETED` / `FAILED` / `CANCELLED`, dilengkapi batas anggaran iterasi/waktu, *self-correction*, **`SandboxedExecutor`**, dan gerbang persetujuan manusia (*human approval gate*) untuk aksi sensitif.
@@ -95,8 +95,11 @@ flowchart TD
 ```text
 gajahmada/
 ├── main.py                              # Entry point utama (Localhost Uvicorn & Vercel ASGI)
-├── config.yaml                          # Konfigurasi node, bootstrap peer, dan model AI
+├── config.yaml                          # Konfigurasi node, bootstrap peer, dan path model GGUF
+├── .env.example                         # Template variabel lingkungan Supabase (salin ke .env, jangan commit .env)
 ├── vercel.json                          # Konfigurasi build & routing Vercel Serverless
+├── supabase/
+│   └── schema.sql                       # Skema PostgreSQL + pgvector (knowledge_records, ledger_blocks, match_knowledge RPC)
 ├── pytest.ini                           # Konfigurasi test suite Pytest
 ├── requirements.txt                     # Dependensi inti ringan (Vercel & Localhost)
 ├── requirements-local.txt               # Dependensi ML penuh opsional (llama-cpp, faiss, sentence-transformers)
@@ -151,9 +154,10 @@ gajahmada/
 │   │   ├── retrieval.py                 # HybridMemoryRetriever
 │   │   ├── versioning.py                # MemoryVersionController (riwayat versi tak berubah)
 │   │   └── consolidation.py             # MemoryConsolidator
-│   ├── storage/                         # Lapisan Penyimpanan Relasional & Objek
+│   ├── storage/                         # Lapisan Penyimpanan Relasional, Supabase pgvector & Objek
 │   │   ├── interfaces.py                # StorageBackend ABC
 │   │   ├── postgres.py                  # RelationalMemoryStore (PostgreSQL + pgvector & SQLite ACID fallback)
+│   │   ├── supabase_store.py            # SupabaseKnowledgeStore (PostgREST + pgvector 384-d + ledger sync)
 │   │   ├── vector_store.py              # SemanticVectorIndex (Cosine & L2 384-d)
 │   │   ├── object_store.py              # ContentAddressedObjectStore (SHA-256 JSON snapshots)
 │   │   └── migrations/001_initial_v2_schema.sql
@@ -192,6 +196,7 @@ gajahmada/
 │   │   └── audit.py                     # SecurityAuditLogger berantai hash SHA-256
 │   ├── knowledge/
 │   │   ├── rag.py                       # LocalKnowledge (FAISS IndexFlatL2 + JSON Vector Store)
+│   │   ├── open_knowledge.py            # Internet Crawler (Wikipedia, DuckDuckGo, Open-Meteo Weather, 114 Surah Al-Qur'an, Direct URL)
 │   │   └── indonesia_corpus.py          # Korpus Sejarah Nusantara & Indonesia Modern
 │   └── cli/
 │       └── main.py                      # CLI commands v1 & v2
@@ -228,20 +233,34 @@ Buka browser di: **[http://localhost:8000/ui](http://localhost:8000/ui)**
 
 ---
 
-### 2. Mode Penuh dengan Bobot Model LLaMA GGUF, FAISS Native & PostgreSQL (Opsional)
+### 2. Mode Penuh dengan Model GGUF Lokal (`llama-cpp-python`)
 
-Jika Anda ingin menjalankan model GGUF lokal (misalnya `llama-2-7b-chat.Q4_K_M.gguf`), akselerasi C++ FAISS, atau database utama PostgreSQL + `pgvector`:
+Letakkan file model GGUF di `./models/` (mis. `qwen2.5-1.5b-instruct-q4_k_m.gguf`) dan pasang `llama-cpp-python` di `.venv`:
 
 ```bash
-pip install -r requirements-local.txt
+python3 -m venv --system-site-packages .venv
+.venv/bin/pip install llama-cpp-python
 
 mkdir -p models
-# Tempatkan file model GGUF Anda di ./models/llama-2-7b-chat.Q4_K_M.gguf
-# Opsional: export DATABASE_URL="postgresql://user:pass@localhost:5432/gajahmada"
+curl -L -o models/qwen2.5-1.5b-instruct-q4_k_m.gguf \
+  https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf
 
-# Jalankan melalui CLI GajahMada 2.0
-python -m gajahmada_ai.cli.main node start --config config.yaml
+# ./run.sh otomatis mendeteksi .venv/bin/python dan memuat model GGUF dari config.yaml / ./models/
+./run.sh
 ```
+
+### 3. Integrasi Opsional Supabase (`PostgreSQL + pgvector`) untuk Memori Persisten & Vercel
+
+Agar knowledge Brain dan audit ledger tersimpan permanen di cloud/Vercel sekaligus mendukung pencarian vektor `pgvector` 384-d:
+
+1. Jalankan [supabase/schema.sql](supabase/schema.sql) di **Supabase SQL Editor** (atau via `psql`).
+2. Salin `.env.example` menjadi `.env` (untuk lokal) atau tambahkan ke **Vercel → Project Settings → Environment Variables**:
+   ```env
+   SUPABASE_URL=https://<project-ref>.supabase.co
+   SUPABASE_PUBLISHABLE_KEY=<your-publishable-key>
+   SUPABASE_SECRET_KEY=<your-secret-key>
+   ```
+3. Tanpa `.env`, GajahMada tetap berjalan 100% mandiri menggunakan SQLite lokal (*local-first*).
 
 ---
 
@@ -324,6 +343,7 @@ python -m gajahmada_ai.cli.main train-model --note "Audit Konsensus V2"
 | `POST` | `/ai/embedding` | Menghasilkan vektor embedding 384-dimensi yang dinormalisasi dari teks input. |
 | `GET` | `/knowledge/stats` | Menampilkan jumlah dokumen RAG, dimensi vektor, tipe indeks, statistik 5-tier memori, dan pratinjau dokumen. |
 | `POST` | `/knowledge/search` | Pencarian semantik *top-k* dokumen berdasarkan jarak vektor L2 384-d. |
+| `POST` | `/knowledge/crawl` | Crawling pengetahuan langsung dari internet (Wikipedia, DuckDuckGo, Cuaca, URL) & asimilasi otomatis ke Brain. |
 | `DELETE` | `/knowledge/docs/{idx}` | Menghapus dokumen tertentu dari *vector store* dan menyinkronkan ulang indeks. |
 | `GET` | `/node/info` | Informasi lengkap node (`node_id` Ed25519, nama node, peer, tinggi blok, status `neural_inference_active`, memori). |
 | `GET` | `/node/metrics` | Telemetri perangkat keras & sistem (`CPU %`, `RAM %`, `Disk Read MB`, status ledger). |
@@ -373,10 +393,17 @@ pytest -v
 
 Selain mengetik pertanyaan bahasa alami atau ekspresi matematika/logika, Anda dapat menjalankan perintah sistem langsung di kotak input **Command Interface**:
 
+- `/crawl <topik atau URL>` — Crawling pengetahuan langsung dari internet & menyimpannya ke memori Brain (lokal + Supabase).
 - `/status` — Menampilkan laporan langsung CPU, RAM, Disk, jumlah dokumen RAG, peer P2P, dan tinggi rantai blok.
 - `/time` — Menampilkan sinkronisasi waktu sistem sekarang (WIB / ISO-8601).
-- `/ingest <teks pengetahuan>` — Langsung meng-embed teks ke vektor 384-d dan menyimpannya ke dalam basis pengetahuan RAG & Semantic Memory.
+- `/ingest <teks pengetahuan>` — Langsung meng-embed teks ke vektor 384-d dan menyimpannya ke dalam basis pengetahuan RAG, Semantic Memory, & Supabase.
 - `/search <kueri pencarian>` — Mencari dokumen paling relevan secara semantik dari *vector store* 384-d.
 - `/mine <catatan audit>` — Menambang blok Proof-of-Work baru ke dalam Web3 Signed Event Ledger.
 - `/verify` — Menjalankan audit kriptografis penuh terhadap rantai blok SHA-256 dan tanda tangan Ed25519.
 - `/peers` — Menampilkan daftar node peer P2P yang terhubung.
+
+---
+
+<div align="center">
+  Support and download this repo on GitHub: <a href="https://github.com/hoed/gajahmada-ai">https://github.com/hoed/gajahmada-ai</a>
+</div>
