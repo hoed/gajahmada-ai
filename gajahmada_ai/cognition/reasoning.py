@@ -15,6 +15,7 @@ from gajahmada_ai.cognition.models import (
 )
 from gajahmada_ai.cognition.perception import PerceptionModule
 from gajahmada_ai.neural.router import ModelRouter
+from gajahmada_ai.neural.interfaces import GenerationResult
 from gajahmada_ai.reasoning.evidence import EvidenceReasoner
 from gajahmada_ai.reasoning.inference import HybridInferenceCombiner
 from gajahmada_ai.reasoning.symbolic import SymbolicReasoner
@@ -56,6 +57,7 @@ class CognitiveReasoningPipeline:
         symbolic_facts: Optional[List[str]] = None,
         max_tokens: int = 256,
         temperature: float = 0.7,
+        use_neural: bool = True,
     ) -> ReasoningResult:
         t0 = time.time()
         reasoning_id = f"rsn-{uuid.uuid4().hex[:12]}"
@@ -142,6 +144,20 @@ class CognitiveReasoningPipeline:
         )
 
         # 6C. NEURAL REASONING (Only when a local neural backend is actually loaded)
+        # Skip neural generation when a deterministic/real-time specialist should answer directly
+        # (exact math, live weather/temperature, exact Al-Qur'an verse, or live system clock).
+        ql_norm = perceived.normalized_text.lower()
+        is_exact_math = bool(symbolic_res.applicable and symbolic_res.math_value is not None)
+        is_realtime_or_scripture = any(
+            kw in ql_norm
+            for kw in (
+                "suhu", "cuaca", "temperatur", "temperature", "weather", "kelembapan",
+                "quran", "qur'an", "alquran", "al-quran", "surat ", "surah ", "ayat ",
+                "jam berapa", "tanggal berapa", "hari apa", "waktu sekarang", "jam sekarang", "what time",
+            )
+        )
+        run_neural = use_neural and not is_exact_math and not is_realtime_or_scripture
+
         context_str = "\n".join(e.content for e in evidence_res.evidence_items[:3])
         neural_res = self.model_router.route_generation(
             prompt=perceived.normalized_text,
@@ -149,6 +165,10 @@ class CognitiveReasoningPipeline:
             task_type=intent.primary_intent,
             max_tokens=max_tokens,
             temperature=temperature,
+        ) if run_neural else GenerationResult(
+            text="", backend_name="skipped", model_id="-", neural_used=False,
+            tokens_generated=0, latency_ms=0.0,
+            warning="Neural step skipped: handled by deterministic/live specialist resolver.",
         )
         steps.append(
             ReasoningStepSummary(

@@ -1275,7 +1275,119 @@ document.addEventListener('DOMContentLoaded', () => {
     );
   }
 
+  const CITY_COORDS_BROWSER = {
+    surabaya: { label: 'Kota Surabaya, Jawa Timur', lat: -7.2575, lon: 112.7521 },
+    jakarta: { label: 'DKI Jakarta', lat: -6.2088, lon: 106.8456 },
+    bandung: { label: 'Kota Bandung, Jawa Barat', lat: -6.9175, lon: 107.6191 },
+    yogyakarta: { label: 'DI Yogyakarta', lat: -7.7956, lon: 110.3695 },
+    jogja: { label: 'DI Yogyakarta', lat: -7.7956, lon: 110.3695 },
+    semarang: { label: 'Kota Semarang, Jawa Tengah', lat: -6.9667, lon: 110.4167 },
+    malang: { label: 'Kota Malang, Jawa Timur', lat: -7.9666, lon: 112.6326 },
+    medan: { label: 'Kota Medan, Sumatera Utara', lat: 3.5952, lon: 98.6722 },
+    makassar: { label: 'Kota Makassar, Sulawesi Selatan', lat: -5.1477, lon: 119.4327 },
+    denpasar: { label: 'Kota Denpasar, Bali', lat: -8.6705, lon: 115.2126 },
+    bali: { label: 'Denpasar, Bali', lat: -8.6705, lon: 115.2126 },
+    balikpapan: { label: 'Kota Balikpapan, Kalimantan Timur', lat: -1.2379, lon: 116.8529 },
+    ikn: { label: 'Ibu Kota Nusantara (IKN), Kalimantan Timur', lat: -0.9730, lon: 116.7090 },
+    palembang: { label: 'Kota Palembang, Sumatera Selatan', lat: -2.9761, lon: 104.7754 },
+    jayapura: { label: 'Kota Jayapura, Papua', lat: -2.5337, lon: 140.7181 },
+    bogor: { label: 'Kota Bogor, Jawa Barat', lat: -6.5971, lon: 106.8060 },
+    solo: { label: 'Kota Surakarta (Solo), Jawa Tengah', lat: -7.5755, lon: 110.8243 },
+    sidoarjo: { label: 'Kabupaten Sidoarjo, Jawa Timur', lat: -7.4478, lon: 112.7183 },
+    gresik: { label: 'Kabupaten Gresik, Jawa Timur', lat: -7.1566, lon: 112.6555 },
+  };
+
+  const WMO_CODES_BROWSER = {
+    0: 'Cerah (Clear Sky)',
+    1: 'Cerah Berawan (Mainly Clear)',
+    2: 'Berawan Sebagian (Partly Cloudy)',
+    3: 'Berawan Tebal (Overcast)',
+    45: 'Berkabut (Fog)',
+    51: 'Gerimis Ringan',
+    61: 'Hujan Ringan',
+    63: 'Hujan Sedang',
+    65: 'Hujan Lebat',
+    80: 'Hujan Lokal Ringan',
+    81: 'Hujan Lokal Sedang',
+    82: 'Hujan Lokal Deras',
+    95: 'Hujan Petir / Badai Guntur',
+  };
+
   async function crawlBrowserOpenKnowledge(promptText) {
+    const ql = promptText.toLowerCase();
+    const wantsDetail = /\b(detail|lengkap|rinci|uraikan|jelaskan secara|panjang|step by step|in detail|elaborate)\b/i.test(ql);
+
+    // 0. Live Weather & Temperature Decision Resolver (Open-Meteo CORS API)
+    if (/\b(suhu|cuaca|temperatur|temperature|weather|derajat|kelembapan|prakiraan cuaca)\b/i.test(ql)) {
+      let target = null;
+      for (const [k, info] of Object.entries(CITY_COORDS_BROWSER)) {
+        if (new RegExp(`\\b${k}\\b`, 'i').test(ql)) {
+          target = { ...info };
+          break;
+        }
+      }
+      if (!target) {
+        const mCity = ql.match(/(?:di|in|kota|untuk|daerah|wilayah)\s+([a-zA-Z\s]{3,25})/i);
+        const cityToken = mCity
+          ? mCity[1].replace(/\b(sekarang|hari|ini|saat|terkini|berapa|suhu|cuaca)\b/gi, '').trim()
+          : 'Surabaya';
+        try {
+          const gRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityToken || 'Surabaya')}&count=1&language=id&format=json`);
+          if (gRes.ok) {
+            const gData = await gRes.json();
+            if (gData.results?.length) {
+              const top = gData.results[0];
+              target = {
+                label: `${top.name}${top.admin1 ? ', ' + top.admin1 : ''}`,
+                lat: top.latitude,
+                lon: top.longitude,
+              };
+            }
+          }
+        } catch { /* ignore */ }
+      }
+      if (target) {
+        try {
+          const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${target.lat}&longitude=${target.lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1`;
+          const wRes = await fetch(wUrl);
+          if (wRes.ok) {
+            const wData = await wRes.json();
+            const cur = wData.current || {};
+            const daily = wData.daily || {};
+            const tempC = cur.temperature_2m;
+            const feelsC = cur.apparent_temperature;
+            const hum = cur.relative_humidity_2m;
+            const wind = cur.wind_speed_10m;
+            const cond = WMO_CODES_BROWSER[cur.weather_code] || 'Cerah Berawan';
+            const tMin = daily.temperature_2m_min?.[0];
+            const tMax = daily.temperature_2m_max?.[0];
+
+            if (tempC !== undefined) {
+              fetch(`${API_URL}/ai/ingest`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: `Pertanyaan: ${promptText} | Suhu di ${target.label}: ${tempC}°C (${cond}, kelembapan ${hum}%)` }),
+              }).then(() => refreshKnowledgeStats()).catch(() => {});
+
+              if (!wantsDetail) {
+                return (
+                  `🌡️ **${target.label}:** **\`${tempC}°C\`** (${cond}, kelembapan \`${hum}%\`, angin \`${wind} km/jam\`).\n\n` +
+                  `---\n📚 **Sumber:** Open-Meteo (${wUrl})`
+                );
+              }
+              return (
+                `🌡️ **${target.label}:** **\`${tempC}°C\`** *(terasa \`${feelsC}°C\`)*\n` +
+                `• **Kondisi:** ${cond} · **Kelembapan:** \`${hum}%\` · **Angin:** \`${wind} km/jam\`\n` +
+                (tMin !== undefined && tMax !== undefined ? `• **Rentang Hari Ini:** \`${tMin}°C\` – \`${tMax}°C\`\n` : '') +
+                `• **Koordinat:** \`${target.lat.toFixed(4)}°, ${target.lon.toFixed(4)}°\`\n\n` +
+                `---\n📚 **Sumber:**\n1. **Open-Meteo** — ${wUrl}\n2. **BMKG** — https://www.bmkg.go.id/cuaca/prakiraan-cuaca.bmkg`
+              );
+            }
+          }
+        } catch { /* ignore */ }
+      }
+    }
+
     const cleaned = promptText
       .replace(/^(?:tolong\s+|coba\s+)?(?:apa itu|siapa itu|siapakah|siapa|apakah|jelaskan secara detail tentang|jelaskan tentang|jelaskan|sebutkan|ceritakan tentang|ceritakan|bagaimana|dimana|kapan|definisi|pengertian|what is|who is|tell me about|explain|define|search|cari tentang|cari)\s+/i, '')
       .replace(/[\?\!\.]+$/, '')
@@ -1295,23 +1407,18 @@ document.addEventListener('DOMContentLoaded', () => {
               const ar = qJson.data[0];
               const id = qJson.data[1];
               const sName = ar.surah?.englishName || `Surah ${sNum}`;
-              const sTotal = ar.surah?.numberOfAyahs || '';
-          // Assimilate crawled Question + Answer knowledge back into local GajahMada Brain (RAG + Semantic Memory)
-          const cleanExtract = ( ar?.text ? `${ar.text} — "${id?.text || ''}"` : '' );
-          fetch(`${API_URL}/ai/ingest`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: `Pertanyaan: ${promptText} | Jawaban QS. ${sName} (${sNum}:${aNum}): ${cleanExtract} (Referensi: https://quran.com/${sNum}/${aNum})` }),
-          }).then(() => refreshKnowledgeStats()).catch(() => {});
+              const cleanExtract = (ar?.text ? `${ar.text} — "${id?.text || ''}"` : '');
+              fetch(`${API_URL}/ai/ingest`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: `Pertanyaan: ${promptText} | Jawaban QS. ${sName} (${sNum}:${aNum}): ${cleanExtract} (Referensi: https://quran.com/${sNum}/${aNum})` }),
+              }).then(() => refreshKnowledgeStats()).catch(() => {});
 
               return (
-                `**Al-Qur'an Surah ${sName} (Surah ke-${sNum}) — Ayat ${aNum}:**\n\n` +
-                `📖 **Teks Arab:**\n${ar.text}\n\n` +
-                `🇮🇩 **Terjemahan (Kemenag RI):**\n"${id.text}"\n\n` +
-                `• **Keterangan Surah:** QS. ${sName} (${sNum}:${aNum}) · Total ${sTotal} Ayat.\n\n` +
-                `---\n📚 **Referensi & Sumber:**\n` +
-                `1. **QS. ${sName} (${sNum}:${aNum}) — Mushaf Al-Qur'an & Terjemahan Kemenag RI** — https://quran.com/${sNum}/${aNum}\n` +
-                `2. **Al-Quran Cloud API (quran-uthmani & id.indonesian)** — https://api.alquran.cloud/v1/ayah/${sNum}:${aNum}/editions/quran-uthmani,id.indonesian`
+                `**QS. ${sName} (${sNum}:${aNum})**\n\n` +
+                `${ar.text}\n\n` +
+                `"${id.text}"\n\n` +
+                `---\n📚 **Sumber:** https://quran.com/${sNum}/${aNum}`
               );
             }
           }
@@ -1334,33 +1441,52 @@ document.addEventListener('DOMContentLoaded', () => {
         const pRes = await fetch(sumUrl);
         if (!pRes.ok) continue;
         const pData = await pRes.json();
-        const extract = (pData.extract || '').trim();
-        if (extract.length > 30) {
+        const fullExtract = (pData.extract || '').trim();
+        if (fullExtract.length > 30) {
+          // Intent Relevance Guard: Ensure Wikipedia summary matches at least 50% of core question terms
+          const stopSet = new Set(['sekarang', 'ini', 'hari', 'saat', 'pada', 'dalam', 'untuk', 'dengan', 'yang', 'dari', 'berapa']);
+          const qTokens = (cleaned.toLowerCase().match(/[a-z0-9]{3,}/g) || []).filter((t) => !stopSet.has(t));
+          const combinedText = `${bestTitle} ${fullExtract}`.toLowerCase();
+          const matchedCount = qTokens.filter((t) => combinedText.includes(t)).length;
+          if (qTokens.length >= 2 && matchedCount / qTokens.length < 0.5) {
+            continue;
+          }
+
           const pageUrl = pData.content_urls?.desktop?.page || `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(bestTitle.replace(/ /g, '_'))}`;
-          const refLines = [
-            `1. **Wikipedia (${lang.toUpperCase()}): ${pData.title || bestTitle}** — ${pageUrl}`,
-          ];
-          hits.slice(1, 3).forEach((h, i) => {
-            const hUrl = `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(h.title.replace(/ /g, '_'))}`;
-            refLines.push(`${i + 2}. **Wikipedia (${lang.toUpperCase()}): ${h.title}** — ${hUrl}`);
-          });
-          // Assimilate crawled knowledge back into local GajahMada RAG store
+          const sentences = fullExtract.split(/(?<=[.!?])\s+/);
+          const displayExtract = wantsDetail ? fullExtract : sentences.slice(0, 2).join(' ').slice(0, 340);
+
           fetch(`${API_URL}/ai/ingest`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: `${pData.title || bestTitle}: ${extract} (Referensi: ${pageUrl})` }),
+            body: JSON.stringify({ text: `${pData.title || bestTitle}: ${fullExtract} (Referensi: ${pageUrl})` }),
           }).then(() => refreshKnowledgeStats()).catch(() => {});
 
           return (
-            `**${pData.title || bestTitle}** *(Hasil Crawling Pengetahuan Internet & Ensiklopedia Terverifikasi)*:\n\n` +
-            `${extract}\n\n` +
-            `---\n📚 **Referensi & Sumber:**\n` +
-            refLines.join('\n')
+            `${displayExtract}\n\n` +
+            `---\n📚 **Sumber:** **Wikipedia (${lang.toUpperCase()}): ${pData.title || bestTitle}** — ${pageUrl}`
           );
         }
       } catch { /* try next language */ }
     }
     return null;
+  }
+
+  function formatRichChatHTML(rawText) {
+    let safe = escapeHTML(rawText);
+    // 1. Code blocks ```lang ... ```
+    safe = safe.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, '<pre style="background:#04080a;border:1px solid rgba(45,212,191,0.3);padding:8px;border-radius:3px;overflow-x:auto;margin:4px 0"><code>$2</code></pre>');
+    // 2. Bold **text** -> <strong>text</strong>
+    safe = safe.replace(/\*\*([\s\S]+?)\*\*/g, '<strong style="color:#ffffff;font-weight:700">$1</strong>');
+    // 3. Italic *text* -> <em>text</em>
+    safe = safe.replace(/(^|[^\*])\*([^\*\n]+)\*/g, '$1<em style="color:#a7f3d0">$2</em>');
+    // 4. Inline code `code` -> <code>code</code>
+    safe = safe.replace(/`([^`\n]+)`/g, '<code style="background:rgba(45,212,191,0.14);color:#2dd4bf;padding:1px 5px;border-radius:2px;font-weight:600">$1</code>');
+    // 5. Horizontal divider ---
+    safe = safe.replace(/\n---\n/g, '<hr style="border:none;border-top:1px solid rgba(45,212,191,0.28);margin:8px 0" />');
+    // 6. Clickable HTTP/HTTPS URLs
+    safe = safe.replace(/(https?:\/\/[^\s<"&]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:#2dd4bf;text-decoration:underline">$1</a>');
+    return safe;
   }
 
   function createChatElement(role, text, timeTaken = null, blockIndex = null, isDialog = false) {
@@ -1385,7 +1511,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <span class="ci-who">${who}</span>
         <span class="ci-sig">${escapeHTML(sig)}</span>
       </div>
-      <div class="ci-text">${escapeHTML(text)}</div>
+      <div class="ci-text">${isUser ? escapeHTML(text) : formatRichChatHTML(text)}</div>
     `;
     return item;
   }
@@ -1552,8 +1678,12 @@ document.addEventListener('DOMContentLoaded', () => {
         appendChatMessage('ai', reply, elapsed, localSimulatedBlock);
       } else {
         let finalReply = data.response;
-        // If backend was in offline sandbox and returned generic fallback, let browser crawl live internet with references
-        if (typeof finalReply === 'string' && finalReply.includes('Permintaan telah diproses oleh **GajahMada Hybrid Cognitive Engine**')) {
+        // If backend was in offline sandbox (or returned an offline estimate for live weather), let browser upgrade with live telemetry
+        if (
+          typeof finalReply === 'string' &&
+          (finalReply.includes('Permintaan telah diproses oleh **GajahMada Hybrid Cognitive Engine**') ||
+           finalReply.includes('Estimasi Suhu & Profil Iklim di'))
+        ) {
           const crawledReply = await crawlBrowserOpenKnowledge(text);
           if (crawledReply) finalReply = crawledReply;
         }

@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import urllib.parse
 import httpx
 
+from gajahmada_ai.neural.llama_backend import wants_detailed_answer
 from gajahmada_ai.security.ssrf import validate_peer_url
 
 _HTTP_TIMEOUT = httpx.Timeout(5.0)
@@ -183,18 +184,32 @@ OFFLINE_QURAN_VERSES: Dict[Tuple[int, int], Tuple[str, str]] = {
 }
 
 
-def format_references_footer(references: List[Dict[str, str]]) -> str:
+def _trim_concise(text: str, max_sentences: int = 2, max_chars: int = 340) -> str:
+    clean = re.sub(r"\s+", " ", (text or "").strip())
+    if len(clean) <= max_chars:
+        parts = re.split(r"(?<=[.!?])\s+", clean)
+        return " ".join(parts[:max_sentences]).strip()
+    parts = re.split(r"(?<=[.!?])\s+", clean)
+    joined = " ".join(parts[:max_sentences]).strip()
+    if len(joined) > max_chars:
+        joined = joined[: max_chars - 3].rsplit(" ", 1)[0] + "..."
+    return joined
+
+
+def format_references_footer(references: List[Dict[str, str]], max_refs: int = 2) -> str:
     """
-    Build a consistent, verifiable References footer at the end of every answer.
+    Build a concise, verifiable References footer at the end of answers.
     Each item in `references` has `title` and `url` (or `source`).
     """
     if not references:
         return ""
     seen = set()
-    lines = ["\n\n---\n📚 **Referensi & Sumber:**"]
+    lines = ["\n\n---\n📚 **Sumber:**"]
     idx = 1
     for ref in references:
-        title = str(ref.get("title") or "Sumber Referensi").strip()
+        if idx > max_refs:
+            break
+        title = str(ref.get("title") or "Sumber").strip()
         url = str(ref.get("url") or ref.get("source") or "").strip()
         key = f"{title}|{url}"
         if key in seen:
@@ -313,25 +328,20 @@ def resolve_quran_query(query: str) -> Optional[str]:
             pass
 
     refs = [
-        {"title": f"QS. {s_name} ({surah_num}:{ayah_num}) — Mushaf Al-Qur'an & Terjemahan Kemenag RI", "url": f"https://quran.com/{surah_num}/{ayah_num}"},
-        {"title": f"Al-Quran Cloud API (Edition: quran-uthmani & id.indonesian)", "url": f"https://api.alquran.cloud/v1/ayah/{surah_num}:{ayah_num}/editions/quran-uthmani,id.indonesian"},
+        {"title": f"QS. {s_name} {surah_num}:{ayah_num}", "url": f"https://quran.com/{surah_num}/{ayah_num}"},
     ]
 
     if arabic_text and id_translation:
         return (
-            f"**Al-Qur'an Surah {s_name} (Surah ke-{surah_num}: \"{s_meaning}\") — Ayat {ayah_num}:**\n\n"
-            f"📖 **Teks Arab:**\n"
+            f"**QS. {s_name} ({surah_num}:{ayah_num})**\n\n"
             f"{arabic_text}\n\n"
-            f"🇮🇩 **Terjemahan (Kemenag RI):**\n"
-            f"\"{id_translation}\"\n\n"
-            f"• **Keterangan Surah:** QS. {s_name} ({surah_num}:{ayah_num}) · Golongan {s_rev} · Total {s_total} Ayat."
+            f"\"{id_translation}\""
             + format_references_footer(refs)
         )
 
     return (
-        f"**QS. {s_name} ({surah_num}:{ayah_num}) — {s_meaning}**\n"
-        f"• Surah ke-{surah_num} ({s_rev}, {s_total} ayat).\n"
-        f"• Node saat ini dalam mode offline dan ayat {surah_num}:{ayah_num} belum di-cache di penyimpanan lokal."
+        f"**QS. {s_name} ({surah_num}:{ayah_num})** — {s_meaning}. "
+        f"Teks ayat belum tersimpan lokal dan perangkat sedang offline."
         + format_references_footer(refs)
     )
 
@@ -434,6 +444,13 @@ def resolve_open_domain_wikipedia(query: str) -> Optional[Dict[str, Any]]:
                         or f"https://{lang}.wikipedia.org/wiki/{urllib.parse.quote(best_title.replace(' ', '_'))}"
                     )
                     if extract and len(extract) > 30:
+                        # Intent Relevance Guard: Verify that the Wikipedia article actually answers the specific question intent
+                        q_tokens = [t for t in re.findall(r"[a-z0-9]{3,}", topic.lower()) if t not in {"sekarang", "ini", "hari", "saat", "pada", "dalam", "untuk", "dengan", "yang", "dari"}]
+                        combined_article = (best_title + " " + extract).lower()
+                        matched_tokens = sum(1 for t in q_tokens if t in combined_article)
+                        if q_tokens and (matched_tokens / len(q_tokens)) < 0.5:
+                            continue
+
                         refs = [{"title": f"Wikipedia ({lang.upper()}): {pdata.get('title', best_title)}", "url": page_url}]
                         for extra_hit in hits[1:3]:
                             t2 = extra_hit.get("title", "")
@@ -442,11 +459,12 @@ def resolve_open_domain_wikipedia(query: str) -> Optional[Dict[str, Any]]:
                                     "title": f"Wikipedia ({lang.upper()}): {t2}",
                                     "url": f"https://{lang}.wikipedia.org/wiki/{urllib.parse.quote(t2.replace(' ', '_'))}",
                                 })
+                        detailed = wants_detailed_answer(query)
                         return {
                             "title": pdata.get("title", best_title),
-                            "extract": extract,
+                            "extract": extract if detailed else _trim_concise(extract),
                             "source_url": page_url,
-                            "references": refs,
+                            "references": refs if detailed else refs[:1],
                             "lang": lang,
                         }
         except Exception:
@@ -629,26 +647,208 @@ OFFLINE_ENCYCLOPEDIA: List[Dict[str, Any]] = [
 
 def lookup_offline_encyclopedia(query: str) -> Optional[Dict[str, Any]]:
     ql = query.lower()
+    detailed = wants_detailed_answer(query)
     for item in OFFLINE_ENCYCLOPEDIA:
         if any(kw in ql for kw in item["keywords"]):
             return {
                 "title": item["title"],
-                "extract": item["extract"],
+                "extract": item["extract"] if detailed else _trim_concise(item["extract"]),
                 "source_url": item["references"][0]["url"],
-                "references": item["references"],
+                "references": item["references"] if detailed else item["references"][:1],
             }
     return None
 
 
+# Built-in Coordinates & Tropical Climate Profiles for Major Indonesian & World Cities
+CITY_COORDINATES: Dict[str, Tuple[str, float, float, str, str]] = {
+    "surabaya": ("Kota Surabaya, Jawa Timur", -7.2575, 112.7521, "Asia/Jakarta", "27°C – 34°C (Tropis Pesisir, Kelembapan ~65–80%)"),
+    "jakarta": ("DKI Jakarta", -6.2088, 106.8456, "Asia/Jakarta", "26°C – 33°C (Tropis Monsun, Kelembapan ~70–85%)"),
+    "bandung": ("Kota Bandung, Jawa Barat", -6.9175, 107.6191, "Asia/Jakarta", "19°C – 28°C (Tropis Dataran Tinggi, Kelembapan ~70–85%)"),
+    "yogyakarta": ("DI Yogyakarta", -7.7956, 110.3695, "Asia/Jakarta", "24°C – 32°C (Tropis, Kelembapan ~68–82%)"),
+    "jogja": ("DI Yogyakarta", -7.7956, 110.3695, "Asia/Jakarta", "24°C – 32°C (Tropis, Kelembapan ~68–82%)"),
+    "semarang": ("Kota Semarang, Jawa Tengah", -6.9667, 110.4167, "Asia/Jakarta", "26°C – 34°C (Tropis Pesisir, Kelembapan ~65–80%)"),
+    "malang": ("Kota Malang, Jawa Timur", -7.9666, 112.6326, "Asia/Jakarta", "20°C – 29°C (Tropis Dataran Tinggi, Kelembapan ~70–84%)"),
+    "medan": ("Kota Medan, Sumatera Utara", 3.5952, 98.6722, "Asia/Jakarta", "25°C – 33°C (Tropis Khatulistiwa, Kelembapan ~75–88%)"),
+    "makassar": ("Kota Makassar, Sulawesi Selatan", -5.1477, 119.4327, "Asia/Makassar", "25°C – 33°C (Tropis Maritim, Kelembapan ~70–85%)"),
+    "denpasar": ("Kota Denpasar, Bali", -8.6705, 115.2126, "Asia/Makassar", "25°C – 32°C (Tropis Bahari, Kelembapan ~70–85%)"),
+    "bali": ("Denpasar, Bali", -8.6705, 115.2126, "Asia/Makassar", "25°C – 32°C (Tropis Bahari, Kelembapan ~70–85%)"),
+    "balikpapan": ("Kota Balikpapan, Kalimantan Timur", -1.2379, 116.8529, "Asia/Makassar", "25°C – 32°C (Tropis Khatulistiwa, Kelembapan ~75–88%)"),
+    "ikn": ("Ibu Kota Nusantara (IKN), Kalimantan Timur", -0.9730, 116.7090, "Asia/Makassar", "24°C – 31°C (Tropis Hutan Hujan, Kelembapan ~78–90%)"),
+    "nusantara": ("Ibu Kota Nusantara (IKN), Kalimantan Timur", -0.9730, 116.7090, "Asia/Makassar", "24°C – 31°C (Tropis Hutan Hujan, Kelembapan ~78–90%)"),
+    "palembang": ("Kota Palembang, Sumatera Selatan", -2.9761, 104.7754, "Asia/Jakarta", "25°C – 33°C (Tropis, Kelembapan ~72–86%)"),
+    "jayapura": ("Kota Jayapura, Papua", -2.5337, 140.7181, "Asia/Jayapura", "25°C – 32°C (Tropis Pasifik, Kelembapan ~75–88%)"),
+    "aceh": ("Kota Banda Aceh, Aceh", 5.5483, 95.3238, "Asia/Jakarta", "25°C – 32°C (Tropis Maritim, Kelembapan ~72–85%)"),
+    "banjarmasin": ("Kota Banjarmasin, Kalimantan Selatan", -3.3186, 114.5944, "Asia/Makassar", "25°C – 33°C (Tropis, Kelembapan ~74–88%)"),
+    "manado": ("Kota Manado, Sulawesi Utara", 1.4748, 124.8421, "Asia/Makassar", "24°C – 31°C (Tropis Pesisir, Kelembapan ~75–88%)"),
+    "padang": ("Kota Padang, Sumatera Barat", -0.9471, 100.4172, "Asia/Jakarta", "24°C – 31°C (Tropis Samudra Hindia, Kelembapan ~75–88%)"),
+    "pekanbaru": ("Kota Pekanbaru, Riau", 0.5071, 101.4478, "Asia/Jakarta", "25°C – 33°C (Tropis, Kelembapan ~72–86%)"),
+    "pontianak": ("Kota Pontianak, Kalimantan Barat", -0.0263, 109.3425, "Asia/Jakarta", "25°C – 33°C (Garis Khatulistiwa 0°, Kelembapan ~75–88%)"),
+    "ambon": ("Kota Ambon, Maluku", -3.6954, 128.1814, "Asia/Jayapura", "25°C – 31°C (Tropis Kepulauan, Kelembapan ~75–86%)"),
+    "kupang": ("Kota Kupang, Nusa Tenggara Timur", -10.1772, 123.6070, "Asia/Makassar", "25°C – 34°C (Tropis Sabana, Kelembapan ~60–78%)"),
+    "mataram": ("Kota Mataram, Nusa Tenggara Barat", -8.5833, 116.1167, "Asia/Makassar", "24°C – 32°C (Tropis, Kelembapan ~68–82%)"),
+    "bogor": ("Kota Bogor, Jawa Barat", -6.5971, 106.8060, "Asia/Jakarta", "21°C – 30°C (Kota Hujan Tropis, Kelembapan ~75–90%)"),
+    "depok": ("Kota Depok, Jawa Barat", -6.4025, 106.7942, "Asia/Jakarta", "24°C – 32°C (Tropis, Kelembapan ~70–85%)"),
+    "tangerang": ("Kota Tangerang, Banten", -6.1783, 106.6319, "Asia/Jakarta", "25°C – 33°C (Tropis, Kelembapan ~70–85%)"),
+    "bekasi": ("Kota Bekasi, Jawa Barat", -6.2383, 106.9756, "Asia/Jakarta", "25°C – 33°C (Tropis, Kelembapan ~70–84%)"),
+    "solo": ("Kota Surakarta (Solo), Jawa Tengah", -7.5755, 110.8243, "Asia/Jakarta", "24°C – 33°C (Tropis, Kelembapan ~68–82%)"),
+    "surakarta": ("Kota Surakarta (Solo), Jawa Tengah", -7.5755, 110.8243, "Asia/Jakarta", "24°C – 33°C (Tropis, Kelembapan ~68–82%)"),
+    "sidoarjo": ("Kabupaten Sidoarjo, Jawa Timur", -7.4478, 112.7183, "Asia/Jakarta", "26°C – 34°C (Tropis Pesisir, Kelembapan ~66–82%)"),
+    "gresik": ("Kabupaten Gresik, Jawa Timur", -7.1566, 112.6555, "Asia/Jakarta", "26°C – 34°C (Tropis Pesisir, Kelembapan ~65–80%)"),
+}
+
+WMO_WEATHER_CODES: Dict[int, str] = {
+    0: "Cerah (Clear Sky)",
+    1: "Cerah Berawan (Mainly Clear)",
+    2: "Berawan Sebagian (Partly Cloudy)",
+    3: "Berawan Tebal (Overcast)",
+    45: "Berkabut (Fog)",
+    48: "Kabut Tebal",
+    51: "Gerimis Ringan (Light Drizzle)",
+    53: "Gerimis Sedang",
+    55: "Gerimis Lebat",
+    61: "Hujan Ringan (Light Rain)",
+    63: "Hujan Sedang (Moderate Rain)",
+    65: "Hujan Lebat (Heavy Rain)",
+    80: "Hujan Lokal Ringan (Rain Showers)",
+    81: "Hujan Lokal Sedang",
+    82: "Hujan Lokal Deras",
+    95: "Hujan Petir / Badai Guntur (Thunderstorm)",
+    96: "Hujan Petir Disertai Angin Kencang",
+}
+
+
+def resolve_weather_query(query: str) -> Optional[Dict[str, Any]]:
+    """
+    Intelligent Weather & Temperature Resolver.
+    Detects queries about temperature/weather ('berapa suhu di surabaya sekarang ini', 'cuaca jakarta hari ini')
+    and fetches live meteorological data from Open-Meteo API + Open-Meteo Geocoding API (with offline profile fallback).
+    Never dumps generic Wikipedia history when the user asks for temperature/weather!
+    """
+    ql = query.lower()
+    is_weather = any(w in ql for w in ("suhu", "cuaca", "temperatur", "temperature", "weather", "derajat celcius", "kelembapan", "hujan hari ini", "prakiraan cuaca"))
+    if not is_weather:
+        return None
+
+    # Extract target city name from query
+    city_name = None
+    lat, lon, tz, climate_profile = None, None, "Asia/Jakarta", "26°C – 33°C (Iklim Tropis Indonesia)"
+
+    for key, (label, c_lat, c_lon, c_tz, c_prof) in CITY_COORDINATES.items():
+        if re.search(rf"\b{re.escape(key)}\b", ql):
+            city_name, lat, lon, tz, climate_profile = label, c_lat, c_lon, c_tz, c_prof
+            break
+
+    # If city not in built-in table, extract city token after "di " / "in " / "kota "
+    raw_city_token = "Surabaya"
+    if not city_name:
+        m_city = re.search(r"(?:di|in|kota|untuk|daerah|wilayah)\s+([a-zA-Z\s]{3,25})", ql)
+        if m_city:
+            raw_city_token = re.sub(r"\b(sekarang|hari|ini|saat|terkini|berapa|suhu|cuaca)\b", "", m_city.group(1), flags=re.IGNORECASE).strip().title()
+        if not raw_city_token:
+            raw_city_token = "Surabaya"
+        city_name = raw_city_token
+
+    headers = {"User-Agent": _USER_AGENT}
+    try:
+        with httpx.Client(timeout=_HTTP_TIMEOUT, headers=headers) as client:
+            if lat is None or lon is None:
+                geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(raw_city_token)}&count=1&language=id&format=json"
+                g_res = client.get(geo_url)
+                if g_res.status_code == 200:
+                    g_results = g_res.json().get("results") or []
+                    if g_results:
+                        top = g_results[0]
+                        lat = float(top["latitude"])
+                        lon = float(top["longitude"])
+                        tz = top.get("timezone", "Asia/Jakarta")
+                        admin = top.get("admin1", "")
+                        country = top.get("country", "")
+                        city_name = f"{top.get('name', raw_city_token)}" + (f", {admin}" if admin else "") + (f" ({country})" if country else "")
+
+            if lat is not None and lon is not None:
+                meteo_url = (
+                    f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+                    f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m"
+                    f"&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1"
+                )
+                w_res = client.get(meteo_url)
+                if w_res.status_code == 200:
+                    w_data = w_res.json()
+                    curr = w_data.get("current", {})
+                    daily = w_data.get("daily", {})
+                    temp_c = curr.get("temperature_2m")
+                    feels_c = curr.get("apparent_temperature")
+                    humidity = curr.get("relative_humidity_2m")
+                    wind_kmh = curr.get("wind_speed_10m")
+                    w_code = int(curr.get("weather_code", 1))
+                    cond_str = WMO_WEATHER_CODES.get(w_code, "Berawan / Cerah Berawan")
+                    t_max = (daily.get("temperature_2m_max") or [None])[0]
+                    t_min = (daily.get("temperature_2m_min") or [None])[0]
+
+                    if temp_c is not None:
+                        detailed = wants_detailed_answer(query)
+                        if not detailed:
+                            extract = (
+                                f"🌡️ **{city_name}:** **`{temp_c}°C`** "
+                                f"({cond_str}, kelembapan `{humidity}%`, angin `{wind_kmh} km/jam`)."
+                            )
+                        else:
+                            range_line = f"• **Rentang Suhu Hari Ini:** `{t_min}°C` – `{t_max}°C`\n" if t_min is not None and t_max is not None else ""
+                            extract = (
+                                f"🌡️ **Suhu Saat Ini di {city_name}:** **`{temp_c}°C`** *(terasa `{feels_c}°C`)*\n"
+                                f"• **Kondisi:** {cond_str} · **Kelembapan:** `{humidity}%` · **Angin:** `{wind_kmh} km/jam`\n"
+                                f"{range_line}"
+                                f"• **Koordinat:** `{lat:.4f}°, {lon:.4f}°` ({tz})"
+                            )
+                        refs = [
+                            {"title": f"Open-Meteo ({city_name})", "url": f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m"},
+                            {"title": "BMKG RI", "url": "https://www.bmkg.go.id/cuaca/prakiraan-cuaca.bmkg"},
+                        ]
+                        return {
+                            "title": f"Suhu & Cuaca — {city_name}",
+                            "extract": extract,
+                            "source_url": refs[0]["url"],
+                            "references": refs if detailed else refs[:1],
+                        }
+    except Exception:
+        pass
+
+    # Offline / Sandbox Meteorological Profile Fallback (Directly answers temperature question!)
+    detailed = wants_detailed_answer(query)
+    if not detailed:
+        extract = f"🌡️ **Estimasi Suhu {city_name} (Mode Offline):** **`{climate_profile}`**."
+    else:
+        coord_str = f"`{lat:.4f}°, {lon:.4f}°`" if (lat is not None and lon is not None) else "Wilayah Tropis Indonesia"
+        extract = (
+            f"🌡️ **Estimasi Suhu & Profil Iklim {city_name}:** **`{climate_profile}`**\n"
+            f"• **Rata-Rata Siang:** `31°C – 34°C` · **Malam:** `25°C – 28°C`\n"
+            f"• **Koordinat:** {coord_str} ({tz})"
+        )
+    refs = [
+        {"title": f"BMKG — Cuaca {city_name}", "url": "https://www.bmkg.go.id/cuaca/prakiraan-cuaca.bmkg"},
+        {"title": f"Open-Meteo ({city_name})", "url": "https://open-meteo.com"},
+    ]
+    return {
+        "title": f"Suhu & Cuaca — {city_name}",
+        "extract": extract,
+        "source_url": refs[0]["url"],
+        "references": refs if detailed else refs[:1],
+    }
+
+
 def crawl_internet_knowledge(query: str) -> Optional[Dict[str, Any]]:
     """
-    Unified Multi-Source Internet Knowledge Crawler:
-    1. If query contains an explicit URL (`https://...`), crawls that URL directly.
-    2. Queries Wikipedia (ID & EN) for verified encyclopedic summaries & citations.
-    3. Queries DuckDuckGo Web Search / Instant Answer API for open internet results & citations.
-    Combines findings and returns structured text + verifiable reference URLs.
+    Unified Multi-Source Internet Knowledge Crawler with Intent-First Decision Logic:
+    1. Checks specialized real-time intent resolvers FIRST (Weather/Temperature, Direct URL).
+    2. Queries Wikipedia (ID & EN) for encyclopedic summaries ONLY when the article matches the user's question intent.
+    3. Queries DuckDuckGo Instant Answer API for open internet results.
     """
-    # Check if user asked to crawl a specific URL
+    # 1. Weather & Temperature Intent Resolver (never return generic city history for temperature questions!)
+    weather_res = resolve_weather_query(query)
+    if weather_res:
+        return weather_res
+
+    # 2. Direct URL Crawl if user provided an explicit URL
     m_url = re.search(r"(https?://[^\s\"\'<>]+)", query)
     if m_url:
         direct = crawl_direct_url(m_url.group(1))
@@ -660,22 +860,12 @@ def crawl_internet_knowledge(query: str) -> Optional[Dict[str, Any]]:
                 "references": [{"title": direct["title"], "url": direct["source_url"]}],
             }
 
+    # 3. Encyclopedic & Web Knowledge Resolution
     wiki = resolve_open_domain_wikipedia(query)
-    ddg = crawl_duckduckgo_web(query, max_results=3)
-
-    if wiki and ddg:
-        combined_refs = list(wiki.get("references", [])) + list(ddg.get("references", []))
-        extract = wiki["extract"]
-        if ddg["extract"] and ddg["extract"][:80].lower() not in extract.lower():
-            extract += f"\n\n**Informasi Tambahan Web:**\n{ddg['extract']}"
-        return {
-            "title": wiki["title"],
-            "extract": extract,
-            "source_url": wiki["source_url"],
-            "references": combined_refs,
-        }
     if wiki:
         return wiki
+
+    ddg = crawl_duckduckgo_web(query, max_results=3)
     if ddg:
         return ddg
     return lookup_offline_encyclopedia(query)

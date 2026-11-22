@@ -514,7 +514,10 @@ async def ai_chat(req: ChatRequest):
             src_type = "cognitive_brain_qa_update"
 
         # 1. Update 384-d Vector RAG Store (docs.json) if not already present and not a generic fallback
-        is_generic_fallback = "Permintaan telah diproses oleh **GajahMada Hybrid Cognitive Engine**" in response
+        is_generic_fallback = (
+            "Permintaan telah diproses oleh **GajahMada Hybrid Cognitive Engine**" in response
+            or "Belum ada data spesifik untuk" in response
+        )
         if rag and engine and not is_generic_fallback and knowledge_entry not in rag.doc_store:
             k_emb = engine.create_embedding(knowledge_entry)
             if k_emb:

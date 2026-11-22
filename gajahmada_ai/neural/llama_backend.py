@@ -34,6 +34,34 @@ def deterministic_hash_embed(text: str, dim: int = 384) -> List[float]:
     return [round(v / norm, 6) for v in vec]
 
 
+DETAIL_KEYWORDS = (
+    "detail", "lengkap", "rinci", "uraikan", "jelaskan secara", "secara mendalam", "panjang",
+    "step by step", "langkah-langkah", "in detail", "elaborate", "comprehensive", "daftar lengkap",
+)
+
+DEFAULT_LEGACY_MODEL_PATH = "./models/llama-2-7b-chat.Q4_K_M.gguf"
+
+
+def wants_detailed_answer(query: str) -> bool:
+    ql = (query or "").lower()
+    return any(w in ql for w in DETAIL_KEYWORDS)
+
+
+def find_gguf_model(preferred: str) -> Optional[str]:
+    """Return preferred GGUF if it exists; auto-discover ./models/*.gguf only for default/empty paths."""
+    if preferred and os.path.exists(preferred):
+        return preferred
+    norm_pref = os.path.normpath(preferred) if preferred else ""
+    if norm_pref and norm_pref != os.path.normpath(DEFAULT_LEGACY_MODEL_PATH):
+        return None
+    import glob
+    for d in ("./models", os.path.dirname(preferred) or "."):
+        found = sorted(glob.glob(os.path.join(d, "*.gguf")))
+        if found:
+            return found[0]
+    return None
+
+
 class LlamaCppBackend(InferenceBackend):
     """
     GGUF Local Inference Backend via llama.cpp (`llama-cpp-python`).
@@ -87,6 +115,12 @@ class LlamaCppBackend(InferenceBackend):
         except Exception:
             pass
 
+        discovered = find_gguf_model(self.model_path)
+        if discovered and discovered != self.model_path:
+            self.model_path = discovered
+            self.metadata.model_path = discovered
+            self.metadata.model_id = os.path.basename(discovered)
+
         if not os.path.exists(self.model_path):
             self._load_error = f"GGUF model file not found at '{self.model_path}'"
             self.metadata.is_loaded = False
@@ -121,6 +155,7 @@ class LlamaCppBackend(InferenceBackend):
                 model_path=self.model_path,
                 n_ctx=self.context_window,
                 n_threads=self.n_threads,
+                verbose=False,
             )
             self.metadata.is_loaded = True
             self._load_error = None
@@ -155,6 +190,22 @@ class LlamaCppBackend(InferenceBackend):
             text = f"[GGUF Local Neural Output ({self.metadata.model_id})] Processed: {prompt[:120]}"
             if context:
                 text += f" | Grounded on {len(context.splitlines())} context segment(s)."
+        elif hasattr(self._llm, "create_chat_completion"):
+            wants_detail = any(w in prompt.lower() for w in DETAIL_KEYWORDS)
+            system_msg = (
+                "Kamu adalah GajahMada, asisten berpengetahuan luas. Jawab dalam bahasa yang sama dengan pengguna. "
+                + ("Berikan jawaban terstruktur dan lengkap." if wants_detail
+                   else "Jawab SINGKAT dan langsung ke inti (maksimal 2-3 kalimat), tanpa basa-basi atau pengulangan pertanyaan.")
+                + " Jika konteks disediakan, gunakan hanya fakta dari konteks itu. Jika tidak tahu, katakan tidak tahu; jangan mengarang."
+            )
+            user_msg = f"Konteks:\n{context}\n\nPertanyaan: {prompt}" if context else prompt
+            limit = max_tokens if wants_detail else min(max_tokens, 160)
+            resp = self._llm.create_chat_completion(
+                messages=[{"role": "system", "content": system_msg}, {"role": "user", "content": user_msg}],
+                max_tokens=limit,
+                temperature=min(temperature, 0.4),
+            )
+            text = resp["choices"][0]["message"]["content"].strip()
         else:
             resp = self._llm(full_prompt, max_tokens=max_tokens, temperature=temperature)
             text = resp["choices"][0]["text"].strip()

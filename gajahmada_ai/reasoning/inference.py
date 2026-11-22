@@ -53,7 +53,10 @@ class HybridInferenceCombiner:
         if symbolic_res.applicable and symbolic_res.conclusion:
             parts.append(symbolic_res.conclusion)
 
-        if neural_res and neural_res.neural_used and neural_res.text:
+        deterministic_done = symbolic_res.applicable and symbolic_res.math_value is not None
+        if deterministic_done:
+            pass  # exact symbolic result is the complete answer; no neural elaboration needed
+        elif neural_res and neural_res.neural_used and neural_res.text:
             parts.append(neural_res.text)
         elif fallback_synthesizer is not None:
             context_text = "\n".join(e.content for e in evidence_res.evidence_items[:3])

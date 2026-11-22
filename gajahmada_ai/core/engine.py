@@ -12,7 +12,7 @@ from gajahmada_ai.knowledge.open_knowledge import (
     resolve_open_domain_wikipedia,
     resolve_quran_query,
 )
-from gajahmada_ai.neural.llama_backend import deterministic_hash_embed
+from gajahmada_ai.neural.llama_backend import deterministic_hash_embed, wants_detailed_answer
 from gajahmada_ai.neural.router import ModelRouter
 from gajahmada_ai.reasoning.symbolic import SymbolicReasoner
 
@@ -128,6 +128,7 @@ class AIModelEngine:
         now_str = now.strftime("%Y-%m-%d %H:%M:%S WIB (UTC+07:00)")
         current_year = now.year
         years_merdeka = max(1, current_year - 1945)
+        detailed = wants_detailed_answer(q)
         self.last_crawled_knowledge = None
 
         # 1. Identity / "Siapa kamu" / "Apa itu GajahMada"
@@ -136,17 +137,24 @@ class AIModelEngine:
             "nama kamu siapa", "who are you", "what are you", "perkenalkan diri",
             "apa itu gajahmada", "tentang kamu", "identitas kamu",
         ]):
+            if not detailed:
+                return (
+                    "Saya **GajahMada**, mesin kecerdasan hibrida berdaulat (*Sovereign Hybrid AI & Web3 Node*) "
+                    "yang menggabungkan model neural lokal (GGUF), penalaran simbolik, memori 5-tier, dan crawling internet otomatis."
+                    + format_references_footer([
+                        {"title": "GajahMada AI Repository", "url": "https://github.com/hoed/gajahmada-ai"},
+                    ])
+                )
             return (
                 "Saya adalah **GajahMada**, arsitektur kecerdasan hibrida berdaulat dan terdistribusi "
                 "(*Sovereign Hybrid Distributed Intelligence & Web3 Node*).\n\n"
                 "• **Asal Nama:** Terinspirasi dari **Mahapatih Gajah Mada**, tokoh pemersatu Nusantara melalui *Sumpah Palapa* (1336 M).\n"
-                "• **Kemampuan Utama Saya:**\n"
-                "  1. Menjalankan penalaran hibrida (**Symbolic + Evidence + Local Neural + Internet Knowledge Crawler**) serta menjawab berbagai pengetahuan dunia & sejarah **Nusantara hingga Indonesia sekarang** (tahun " + str(current_year) + ").\n"
-                "  2. Mengelola **5-Tier Persistent Memory** & pencarian semantik **384-d Vector RAG** (`/search`, `/crawl`, & `/ingest`).\n"
-                "  3. Mengaudit & menambang blok **Web3 Signed Event Ledger SHA-256 Proof-of-Work** (`/mine` & `/verify`).\n"
-                "  4. Memverifikasi tanda tangan kriptografis **Ed25519 (RFC 8032)** dan protokol **GIP v2.0 P2P Mesh** (`/status`, `/peers`)."
+                "• **Kemampuan Utama:**\n"
+                "  1. Penalaran hibrida (**Symbolic + Evidence + Local Neural GGUF + Internet Knowledge Crawler**).\n"
+                "  2. **5-Tier Persistent Memory** & pencarian semantik **384-d Vector RAG** (`/search`, `/crawl`, `/ingest`).\n"
+                "  3. Audit **Web3 Signed Event Ledger SHA-256 PoW** (`/mine`, `/verify`) & kriptografi **Ed25519** + **GIP v2.0 P2P Mesh** (`/status`, `/peers`)."
                 + format_references_footer([
-                    {"title": "GajahMada Sovereign Hybrid Distributed Intelligence Repository", "url": "https://github.com/hoed/gajahmada-ai"},
+                    {"title": "GajahMada AI Repository", "url": "https://github.com/hoed/gajahmada-ai"},
                 ])
             )
 
@@ -154,184 +162,221 @@ class AIModelEngine:
         if _has_word(ql, ["halo", "hai", "hello", "hi", "hey", "selamat pagi", "selamat siang", "selamat sore", "selamat malam", "assalamualaikum", "apa kabar", "ping", "tes", "test"]):
             if not _has_word(ql, ["indonesia", "nusantara", "sejarah", "gajah mada", "majapahit", "presiden", "arsitektur", "blockchain"]):
                 return (
-                    f"Halo! Saya **GajahMada** (Waktu Sistem: `{now_str}`).\n"
-                    f"Seluruh 8 lapisan arsitektur sistem dan *Autonomous Internet Knowledge Crawler* sedang aktif. Anda dapat bertanya tentang:\n"
-                    f"• **Semua Pengetahuan Umum, Sains, Agama & Ensiklopedia Dunia:** Tanyakan topik apa saja (misal: *\"Sebutkan Al-Qur'an surat 16 ayat 7\"*, *\"Apa itu komputasi kuantum?\"*, *\"Siapa penemu listrik?\"*).\n"
-                    f"• **Sejarah & Detail Indonesia:** *\"Siapa Mahapatih Gajah Mada?\"*, *\"Apa isi Sumpah Palapa?\"*, *\"Siapa Presiden Indonesia sekarang?\"*, atau *\"Apa itu IKN & 38 Provinsi?\"*\n"
-                    f"• **Arsitektur & Perintah Sistem:** `/status`, `/crawl <topik/URL>`, `/search <kueri>`, `/ingest <teks>`, `/verify`, `/mine`, `/time`."
+                    f"Halo! Saya **GajahMada** (`{now_str}`). Ada yang bisa saya bantu? "
+                    f"Ketik pertanyaan apa saja atau `/help` untuk daftar perintah."
                 )
 
         # 3. Thanks / Appreciation
         if _has_word(ql, ["terima kasih", "makasih", "thanks", "thank you", "mantap", "keren", "bagus"]):
-            return (
-                "Sama-sama! Senang dapat membantu Anda. Silakan ketik pertanyaan atau perintah berikutnya kapan saja."
-            )
+            return "Sama-sama! Silakan tanyakan hal lain jika diperlukan."
 
         # 4. Help / Capabilities
         if _has_word(ql, ["help", "bantuan", "fitur", "bisa apa", "apa yang bisa", "daftar perintah"]):
+            if not detailed:
+                return (
+                    "**Perintah Utama GajahMada:** `/crawl <topik/URL>`, `/search <kueri>`, `/ingest <teks>`, "
+                    "`/status`, `/time`, `/mine <catatan>`, `/verify`, `/peers`. Atau tanyakan langsung topik apa saja."
+                )
             return (
-                "Berikut daftar fitur dan perintah yang dapat Anda gunakan di **Command Center GajahMada**:\n"
-                "1. **Tanya Jawab Semua Pengetahuan & Crawling Internet Otomatis:** Tanyakan topik pengetahuan umum, Al-Qur'an (114 Surah), sains, teknologi, sejarah Nusantara–Indonesia, atau matematika/logika simbolik. Setiap jawaban dilengkapi **Referensi & Sumber** di bagian akhir.\n"
-                "2. **Perintah Sistem (Slash Commands):**\n"
-                "   • `/crawl <topik atau URL>` — Crawling pengetahuan langsung dari internet & menyimpannya ke memori RAG.\n"
-                "   • `/status` — Cek performa CPU, RAM, Disk, jumlah dokumen RAG, peer P2P, & blockchain.\n"
-                "   • `/time` atau `/now` — Cek sinkronisasi waktu sistem sekarang (WIB / ISO-8601).\n"
-                "   • `/ingest <teks>` — Tambahkan pengetahuan baru ke dalam Vector Store 384-d.\n"
-                "   • `/search <kueri>` — Cari dokumen di basis pengetahuan RAG secara semantik.\n"
-                "   • `/mine <catatan>` — Tambang blok Proof-of-Work baru ke Web3 Ledger.\n"
-                "   • `/verify` — Verifikasi keaslian rantai blok SHA-256 & tanda tangan Ed25519.\n"
-                "   • `/peers` — Lihat daftar node peer P2P yang terhubung."
+                "**Fitur & Perintah Command Center GajahMada:**\n"
+                "• `/crawl <topik/URL>` — Crawling pengetahuan dari internet & simpan ke memori.\n"
+                "• `/search <kueri>` — Pencarian semantik 384-d di basis pengetahuan.\n"
+                "• `/ingest <teks>` — Simpan pengetahuan baru ke Vector Store.\n"
+                "• `/status` · `/time` · `/mine <catatan>` · `/verify` · `/peers`"
             )
 
         # 5. System Time / Date Queries
         if _has_word(ql, ["jam berapa", "tanggal berapa", "hari apa", "waktu sekarang", "jam sekarang", "tahun berapa", "what time", "current time", "waktu sistem"]):
+            if not detailed:
+                return f"Waktu sistem sekarang: **`{now_str}`**."
             return (
-                f"**Waktu Sistem Sekarang (LIVE):**\n"
-                f"• **Tanggal & Jam:** `{now_str}`\n"
-                f"• **Format ISO-8601:** `{now.isoformat()}`\n"
-                f"• **Konteks Nasional:** Tahun `{current_year}` ({years_merdeka} tahun sejak Proklamasi Kemerdekaan RI 17 Agustus 1945)."
+                f"**Waktu Sistem Sekarang:** `{now_str}`\n"
+                f"• **ISO-8601:** `{now.isoformat()}`\n"
+                f"• **Tahun:** `{current_year}` ({years_merdeka} tahun Kemerdekaan RI)."
             )
 
         # 6. Math / Arithmetic & Symbolic Calculation
         sym_res = self.symbolic.reason(q)
         if sym_res.applicable and sym_res.conclusion:
-            refs = [{"title": "GajahMada Deterministic Symbolic & AST Math Engine", "url": "gajahmada_ai/reasoning/symbolic.py"}]
             if sym_res.math_value is not None:
                 formatted_num = int(sym_res.math_value) if sym_res.math_value.is_integer() else round(sym_res.math_value, 6)
-                return f"Hasil perhitungan simbolik deterministik untuk `{q}` adalah **`{formatted_num}`**." + format_references_footer(refs)
-            return f"Hasil deduksi simbolik deterministik: **{sym_res.conclusion}**" + format_references_footer(refs)
+                return f"Hasilnya adalah **`{formatted_num}`**."
+            return f"**{sym_res.conclusion}**"
 
         # 6B. Al-Qur'an Surah & Ayah Resolver (114 Surahs + Arabic & Kemenag RI Translation + References)
         quran_ans = resolve_quran_query(q)
         if quran_ans:
             return quran_ans
 
-        # 7. Specific Nusantara & Indonesia Topics (with authoritative references)
+        # 7. Specific Nusantara & Indonesia Topics (concise by default, detailed when requested)
         if _has_word(ql, ["gajah mada", "sumpah palapa", "amukti palapa", "majapahit", "hayam wuruk", "raden wijaya", "nagarakretagama", "sutasoma", "bhinneka tunggal ika", "trowulan"]):
+            refs = [{"title": "Wikipedia: Gajah Mada & Sumpah Palapa", "url": "https://id.wikipedia.org/wiki/Gajah_Mada"}]
+            if not detailed:
+                return (
+                    "**Gajah Mada** adalah Mahapatih Kemaharajaan Majapahit (1336–1364 M) yang mengucapkan **Sumpah Palapa** "
+                    "untuk menyatukan seluruh Nusantara di bawah Raja Hayam Wuruk. Dari era Majapahit pula lahir semboyan "
+                    "**\"Bhinneka Tunggal Ika\"** (*Kakawin Sutasoma*, Mpu Tantular)."
+                    + format_references_footer(refs)
+                )
             return (
                 "**Mahapatih Gajah Mada, Sumpah Palapa & Kemaharajaan Majapahit:**\n"
-                "• **Kemaharajaan Majapahit (1293 – Abad ke-16):** Didirikan oleh **Raden Wijaya** di Trowulan (Mojokerto, Jawa Timur) pada tahun 1293 setelah mengalahkan pasukan Mongol (Dinasti Yuan). Majapahit mencapai puncak kejayaan pada masa **Raja Hayam Wuruk (Sri Rajasanagara, 1350–1389)**.\n"
-                "• **Mahapatih Gajah Mada & Sumpah Palapa (1336 M):** Saat diangkat menjadi *Mahapatih Amangkubhumi* pada tahun 1336 M, Gajah Mada mengucapkan **Sumpah Palapa** (*\"Lamun huwus kalah Nusantara isun amukti palapa...\"*), yakni berpantang menikmati *palapa* (kenikmatan duniawi) sebelum menyatukan seluruh kepulauan Nusantara: **Gurun, Seran, Tanjung Pura, Haru, Pahang, Dompo, Bali, Sunda, Palembang, dan Tumasik (Singapura)**.\n"
-                "• **Warisan bagi Indonesia Modern:** Kitab *Nagarakretagama* (1365 M, Mpu Prapanca) mencatat 98 wilayah Nusantara dari Sumatera hingga Papua Barat, sedangkan *Kakawin Sutasoma* (Mpu Tantular) melahirkan semboyan **\"Bhinneka Tunggal Ika, Tan Hana Dharma Mangrwa\"** yang menjadi semboyan resmi NKRI."
-                + format_references_footer([
-                    {"title": "Kitab Pararaton & Kakawin Nagarakretagama (Desawarnana, 1365 M — Mpu Prapanca)", "url": "https://id.wikipedia.org/wiki/Gajah_Mada"},
-                    {"title": "Sumpah Palapa & Kemaharajaan Majapahit", "url": "https://id.wikipedia.org/wiki/Sumpah_Palapa"},
-                ])
+                "• **Kemaharajaan Majapahit (1293 – Abad ke-16):** Didirikan oleh **Raden Wijaya** di Trowulan (Mojokerto, Jawa Timur) pada tahun 1293, mencapai puncak kejayaan pada masa **Raja Hayam Wuruk (1350–1389)**.\n"
+                "• **Sumpah Palapa (1336 M):** Diucapkan Gajah Mada saat diangkat menjadi *Mahapatih Amangkubhumi* — berpantang menikmati *palapa* sebelum menyatukan Nusantara (Gurun, Seran, Tanjung Pura, Haru, Pahang, Dompo, Bali, Sunda, Palembang, Tumasik).\n"
+                "• **Warisan:** Kitab *Nagarakretagama* (1365 M, Mpu Prapanca) mencatat 98 wilayah Nusantara, dan *Kakawin Sutasoma* (Mpu Tantular) melahirkan semboyan **\"Bhinneka Tunggal Ika\"**."
+                + format_references_footer(refs)
             )
 
         if _has_word(ql, ["sriwijaya", "mataram kuno", "borobudur", "prambanan", "syailendra", "sanjaya", "kutai", "mulawarman", "tarumanagara", "purnawarman", "kalingga", "singasari", "kertanagara", "ken arok", "kediri", "airlangga", "pamalayu"]):
+            refs = [{"title": "Wikipedia: Sriwijaya & Kerajaan Klasik Nusantara", "url": "https://id.wikipedia.org/wiki/Sriwijaya"}]
+            if not detailed:
+                return (
+                    "Kerajaan klasik awal Nusantara dimulai dari **Kutai** dan **Tarumanagara** (abad ke-4–5 M), "
+                    "dilanjutkan kemaharajaan maritim **Sriwijaya** (abad ke-7–13 M), **Mataram Kuno** (pembangun Borobudur & Prambanan), "
+                    "hingga **Singasari** di bawah Raja Kertanagara."
+                    + format_references_footer(refs)
+                )
             return (
                 "**Kerajaan Klasik & Kemaharajaan Maritim Awal Nusantara:**\n"
-                "• **Kutai & Tarumanagara (Abad ke-4 – ke-5 M):** Kerajaan tertua di Nusantara adalah **Kutai Martapura** di Kalimantan Timur (Raja Mulawarman, 7 Prasasti Yupa) dan **Tarumanagara** di Jawa Barat (Raja Purnawarman), disusul **Kalingga** (Ratu Shima).\n"
-                "• **Kemaharajaan Sriwijaya (Abad ke-7 – ke-13 M):** Berpusat di Palembang (didirikan Dapunta Hyang Sri Jayanasa, 683 M; puncak di masa Raja Balaputradewa), Sriwijaya menguasai jalur maritim Selat Malaka & Selat Sunda serta menjadi pusat pengajaran Buddha internasional.\n"
-                "• **Mataram Kuno (Abad ke-8 – ke-10 M):** Dinasti Syailendra dan Sanjaya di Jawa Tengah membangun mahakarya dunia **Candi Borobudur** dan **Candi Prambanan**, dilanjutkan era Raja Airlangga (Kahuripan) dan Kediri.\n"
-                "• **Singasari (1222–1292 M):** Didirikan oleh Ken Arok; di bawah **Raja Kertanagara**, Singasari melancarkan **Ekspedisi Pamalayu (1275)** sebagai cikal-bakal penyatuan geopolitik Nusantara (*Cakrawala Mandala Dwipantara*)."
-                + format_references_footer([
-                    {"title": "Kemaharajaan Sriwijaya & Prasasti Kedukan Bukit (683 M)", "url": "https://id.wikipedia.org/wiki/Sriwijaya"},
-                    {"title": "Kerajaan Medang (Mataram Kuno) & Singasari", "url": "https://id.wikipedia.org/wiki/Kerajaan_Medang"},
-                ])
+                "• **Kutai & Tarumanagara (Abad ke-4 – ke-5 M):** Kerajaan tertua di Kalimantan Timur (Raja Mulawarman, Prasasti Yupa) dan Jawa Barat (Raja Purnawarman).\n"
+                "• **Sriwijaya (Abad ke-7 – ke-13 M):** Berpusat di Palembang, menguasai Selat Malaka & Selat Sunda serta pusat Buddha internasional.\n"
+                "• **Mataram Kuno (Abad ke-8 – ke-10 M):** Dinasti Syailendra & Sanjaya membangun **Candi Borobudur** dan **Candi Prambanan**.\n"
+                "• **Singasari (1222–1292 M):** Didirikan Ken Arok; Raja Kertanagara melancarkan **Ekspedisi Pamalayu (1275)**."
+                + format_references_footer(refs)
             )
 
         if _has_word(ql, ["kesultanan", "samudera pasai", "wali songo", "walisongo", "demak", "mataram islam", "sultan agung", "banten", "gowa", "tallo", "hasanuddin", "ternate", "tidore", "baabullah", "nuku", "iskandar muda", "jalur rempah"]):
+            refs = [{"title": "Jalur Rempah Kemdikbud RI", "url": "https://jalurrempah.kemdikbud.go.id"}]
+            if not detailed:
+                return (
+                    "Era Kesultanan Nusantara (abad ke-13–18) mencakup **Samudera Pasai** & **Aceh** (Sumatera), "
+                    "**Demak**, **Banten**, & **Mataram Islam** (Jawa), **Gowa-Tallo** (Makassar), serta **Ternate & Tidore** "
+                    "di Maluku sebagai pusat jalur rempah dunia."
+                    + format_references_footer(refs)
+                )
             return (
                 "**Era Kesultanan Islam & Jaringan Niaga Rempah Nusantara (Abad ke-13 – ke-18):**\n"
-                "• **Sumatera & Selat Malaka:** **Kesultanan Samudera Pasai** (Sultan Malik al-Saleh, abad ke-13) dan **Kesultanan Aceh Darussalam** (mencapai puncak kejayaan maritim & militer di bawah **Sultan Iskandar Muda**).\n"
-                "• **Jawa:** **Kesultanan Demak** (Raden Patah & dakwah kultural **Wali Songo**), **Kesultanan Cirebon**, **Kesultanan Banten** (Sultan Ageng Tirtayasa), dan **Kesultanan Mataram Islam** (mencapai puncak di bawah **Sultan Agung Hanyokrokusumo**).\n"
-                "• **Kalimantan, Sulawesi & Maluku (Pusat Rempah Dunia):** **Kesultanan Banjar & Kutai** di Kalimantan, **Kesultanan Gowa-Tallo** di Makassar (**Sultan Hasanuddin** — *Ayam Jantan dari Timur*), serta **Kesultanan Ternate** (Sultan Baabullah) dan **Tidore** (Sultan Nuku) di Maluku sebagai pusat cengkeh dan pala dunia."
-                + format_references_footer([
-                    {"title": "Jalur Rempah & Sejarah Kesultanan Nusantara", "url": "https://jalurrempah.kemdikbud.go.id"},
-                    {"title": "Sejarah Nusantara pada Era Kerajaan Islam", "url": "https://id.wikipedia.org/wiki/Sejarah_Nusantara_(1509%E2%80%931602)"},
-                ])
+                "• **Sumatera:** Samudera Pasai (Sultan Malik al-Saleh) & Aceh Darussalam (Sultan Iskandar Muda).\n"
+                "• **Jawa:** Demak (Raden Patah & Wali Songo), Cirebon, Banten (Sultan Ageng Tirtayasa), & Mataram Islam (Sultan Agung).\n"
+                "• **Sulawesi & Maluku:** Gowa-Tallo (Sultan Hasanuddin), Ternate (Sultan Baabullah), & Tidore (Sultan Nuku)."
+                + format_references_footer(refs)
             )
 
         if _has_word(ql, ["pahlawan", "kolonial", "voc", "belanda", "diponegoro", "pattimura", "imam bonjol", "cut nyak dhien", "teuku umar", "antasari", "sisingamangaraja", "kartini", "budi utomo", "kebangkitan nasional", "sumpah pemuda", "28 oktober 1928"]):
+            refs = [{"title": "Wikipedia: Sumpah Pemuda & Pergerakan Nasional", "url": "https://id.wikipedia.org/wiki/Sumpah_Pemuda"}]
+            if not detailed:
+                return (
+                    "Perjuangan kemerdekaan dimulai dari perlawanan pahlawan daerah (Diponegoro, Pattimura, Imam Bonjol, Cut Nyak Dhien), "
+                    "berlanjut ke **Kebangkitan Nasional** (**Budi Utomo**, 20 Mei 1908), dan ikrar **Sumpah Pemuda** (28 Oktober 1928: "
+                    "Satu Tanah Air, Satu Bangsa, Satu Bahasa Indonesia)."
+                    + format_references_footer(refs)
+                )
             return (
-                "**Perlawanan Pahlawan Nusantara, Kebangkitan Nasional (1908) & Sumpah Pemuda (1928):**\n"
-                "• **Perlawanan Bersenjata:** Bangsa Nusantara melawan kolonialisme melalui Sultan Agung (Mataram), Sultan Ageng Tirtayasa (Banten), Sultan Hasanuddin (Makassar), Kapitan Pattimura (Maluku, 1817), Tuanku Imam Bonjol (Perang Padri, 1803–1838), Pangeran Diponegoro (Perang Jawa, 1825–1830), Pangeran Antasari (Banjar), I Gusti Ketut Jelantik (Bali), Sisingamangaraja XII (Tapanuli), serta Teuku Umar, Cut Nyak Dhien, & Cut Meutia (Perang Aceh).\n"
-                "• **Kebangkitan Nasional (20 Mei 1908):** Dimulai dari perjuangan emansipasi **R.A. Kartini** dan berdirinya **Budi Utomo (20 Mei 1908)** oleh dr. Sutomo & dr. Wahidin Sudirohusodo, diikuti Sarekat Islam, Indische Partij (Tiga Serangkai: Douwes Dekker, Cipto Mangunkusumo, Ki Hajar Dewantara), Muhammadiyah (K.H. Ahmad Dahlan, 1912), Nahdlatul Ulama (K.H. Hasyim Asy'ari, 1926), dan PNI (Ir. Soekarno, 1927).\n"
-                "• **Sumpah Pemuda (28 Oktober 1928):** Kongres Pemuda II di Jakarta mengikrarkan: **Satu Tanah Air (Indonesia), Satu Bangsa (Bangsa Indonesia), dan Menjunjung Bahasa Persatuan (Bahasa Indonesia)**, diiringi lagu *Indonesia Raya* karya W.R. Supratman."
-                + format_references_footer([
-                    {"title": "Kebangkitan Nasional Indonesia (1908) & Sumpah Pemuda (1928)", "url": "https://id.wikipedia.org/wiki/Sumpah_Pemuda"},
-                ])
+                "**Perlawanan Kolonial, Kebangkitan Nasional (1908) & Sumpah Pemuda (1928):**\n"
+                "• **Perlawanan Bersenjata:** Pattimura (1817), Imam Bonjol (1803–1838), Diponegoro (1825–1830), Antasari, Sisingamangaraja XII, Teuku Umar, & Cut Nyak Dhien.\n"
+                "• **Kebangkitan Nasional (20 Mei 1908):** R.A. Kartini, Budi Utomo, Sarekat Islam, Muhammadiyah (1912), NU (1926), & PNI (1927).\n"
+                "• **Sumpah Pemuda (28 Oktober 1928):** Ikrar Satu Tanah Air, Satu Bangsa, dan Bahasa Persatuan Indonesia."
+                + format_references_footer(refs)
             )
 
         if _has_word(ql, ["proklamasi", "kemerdekaan", "17 agustus", "pancasila", "bpupki", "ppki", "piagam jakarta", "uud 1945", "djuanda", "deklarasi djuanda", "kaa", "konferensi asia afrika", "sudirman"]):
+            refs = [{"title": "Wikipedia: Proklamasi Kemerdekaan Indonesia", "url": "https://id.wikipedia.org/wiki/Proklamasi_Kemerdekaan_Indonesia"}]
+            if not detailed:
+                return (
+                    "**Proklamasi Kemerdekaan RI** dibacakan oleh **Ir. Soekarno dan Drs. Mohammad Hatta** pada **17 Agustus 1945** "
+                    f"di Jakarta (usia {years_merdeka} tahun pada {current_year}), dengan dasar negara **Pancasila** (1 Juni 1945) "
+                    "dan konstitusi **UUD 1945** (18 Agustus 1945)."
+                    + format_references_footer(refs)
+                )
             return (
-                f"**Kelahiran Pancasila, Proklamasi Kemerdekaan RI (17 Agustus 1945) & Kedaulatan NKRI:**\n"
-                f"• **Perumusan Dasar Negara (1945):** Dalam sidang BPUPKI (29 Mei – 1 Juni 1945), **Ir. Soekarno** menyampaikan pidato lahirnya **Pancasila** pada **1 Juni 1945**, disusul perumusan Piagam Jakarta oleh Panitia Sembilan (22 Juni 1945).\n"
-                f"• **Proklamasi Kemerdekaan (17 Agustus 1945):** Pada Jumat, **17 Agustus 1945 pukul 10.00 WIB** di Jl. Pegangsaan Timur No. 56 Jakarta, **Ir. Soekarno dan Drs. Mohammad Hatta** memproklamasikan Kemerdekaan Republik Indonesia (kini berusia **{years_merdeka} tahun** pada tahun {current_year}). Pada 18 Agustus 1945, PPKI mengesahkan **UUD 1945**.\n"
-                f"• **Revolusi Fisik & Deklarasi Djuanda:** Kemerdekaan dipertahankan melalui Pertempuran 10 November 1945 (Surabaya), gerilya Jenderal Sudirman, Serangan Umum 1 Maret 1949, hingga KMB (27 Desember 1949). Pada **13 Desember 1957**, **Deklarasi Djuanda** menyatukan seluruh laut antarpulau sebagai wilayah kedaulatan utuh NKRI (*Wawasan Nusantara*, diakui dalam UNCLOS 1982)."
-                + format_references_footer([
-                    {"title": "Proklamasi Kemerdekaan Indonesia (17 Agustus 1945) & UUD 1945", "url": "https://id.wikipedia.org/wiki/Proklamasi_Kemerdekaan_Indonesia"},
-                    {"title": "Deklarasi Djuanda (13 Desember 1957) — Negara Kepulauan NKRI", "url": "https://id.wikipedia.org/wiki/Deklarasi_Djuanda"},
-                ])
+                f"**Pancasila, Proklamasi Kemerdekaan RI (17 Agustus 1945) & Kedaulatan NKRI:**\n"
+                f"• **Pancasila (1 Juni 1945):** Dirumuskan dalam sidang BPUPKI oleh Ir. Soekarno, diikuti Piagam Jakarta (22 Juni 1945).\n"
+                f"• **Proklamasi (17 Agustus 1945):** Dibacakan Soekarno-Hatta di Jl. Pegangsaan Timur No. 56 Jakarta; UUD 1945 disahkan PPKI pada 18 Agustus 1945.\n"
+                f"• **Deklarasi Djuanda (13 Desember 1957):** Menyatukan laut antarpulau sebagai wilayah kedaulatan NKRI (*Wawasan Nusantara*)."
+                + format_references_footer(refs)
             )
 
         if _has_word(ql, ["presiden", "wakil presiden", "soekarno", "soeharto", "habibie", "gus dur", "abdurrahman wahid", "megawati", "sby", "yudhoyono", "jokowi", "joko widodo", "prabowo", "gibran", "orde baru", "reformasi"]):
+            refs = [{"title": "Wikipedia: Daftar Presiden Indonesia", "url": "https://id.wikipedia.org/wiki/Daftar_Presiden_Indonesia"}]
+            if not detailed and not _has_word(ql, ["daftar", "semua", "urutan"]):
+                return (
+                    f"Presiden Republik Indonesia saat ini ({current_year}) adalah **Prabowo Subianto** (Presiden ke-8, menjabat sejak 20 Oktober 2024), "
+                    "didampingi Wakil Presiden **Gibran Rakabuming Raka**."
+                    + format_references_footer(refs)
+                )
             return (
-                f"**Daftar Presiden Republik Indonesia (1945 – Sekarang Tahun {current_year}):**\n"
-                f"1. **Ir. Soekarno (1945–1967):** Proklamator Kemerdekaan, Bapak Bangsa, penggagas Pancasila & Konferensi Asia-Afrika 1955.\n"
-                f"2. **Jenderal Besar TNI (Purn.) Soeharto (1967–1998):** Era Orde Baru, pembangunan Repelita, pendiri ASEAN (1967), swasembada beras (1984), & peluncuran **Satelit Palapa A1 (1976)**.\n"
-                f"3. **Prof. Dr. Ing. B.J. Habibie (1998–1999):** Pelopor industri dirgantara (pesawat N-250) & awal transisi demokrasi Era Reformasi.\n"
-                f"4. **K.H. Abdurrahman Wahid / Gus Dur (1999–2001):** Bapak Pluralisme dan penegak hak-hak minoritas.\n"
-                f"5. **Megawati Soekarnoputri (2001–2004):** Presiden perempuan pertama RI; pembentukan KPK & Mahkamah Konstitusi.\n"
-                f"6. **Jenderal TNI (Purn.) Prof. Dr. Susilo Bambang Yudhoyono (2004–2014):** Presiden pertama yang dipilih langsung oleh rakyat; stabilitas makroekonomi & perdamaian Aceh.\n"
-                f"7. **Ir. Joko Widodo (2014–2024):** Pembangunan infrastruktur konektivitas Nusantara, hilirisasi sumber daya alam, Presidensi G20 2022, & inisiasi Ibu Kota Nusantara (IKN).\n"
-                f"8. **Jenderal TNI (Purn.) Prabowo Subianto (20 Oktober 2024 – Sekarang, {current_year}):** Presiden ke-8 RI (didampingi Wakil Presiden Gibran Rakabuming Raka), berfokus pada kemandirian pangan, energi, hilirisasi industri, pertahanan, dan penguatan SDM menuju Indonesia Emas 2045."
-                + format_references_footer([
-                    {"title": "Daftar Presiden Republik Indonesia — Portal Informasi Indonesia", "url": "https://id.wikipedia.org/wiki/Daftar_Presiden_Indonesia"},
-                ])
+                f"**Daftar Presiden Republik Indonesia (1945 – {current_year}):**\n"
+                "1. **Ir. Soekarno** (1945–1967)\n"
+                "2. **Soeharto** (1967–1998)\n"
+                "3. **B.J. Habibie** (1998–1999)\n"
+                "4. **K.H. Abdurrahman Wahid / Gus Dur** (1999–2001)\n"
+                "5. **Megawati Soekarnoputri** (2001–2004)\n"
+                "6. **Susilo Bambang Yudhoyono** (2004–2014)\n"
+                "7. **Joko Widodo** (2014–2024)\n"
+                f"8. **Prabowo Subianto** (2024–sekarang, {current_year}; Wapres: Gibran Rakabuming Raka)"
+                + format_references_footer(refs)
             )
 
         if _has_word(ql, ["provinsi", "38 provinsi", "ikn", "ibu kota nusantara", "geografi", "jumlah pulau", "penduduk", "populasi", "suku", "bahasa daerah", "unesco", "ekonomi", "g20", "hilirisasi", "indonesia emas"]):
+            refs = [{"title": "Wikipedia: Provinsi di Indonesia & IKN", "url": "https://id.wikipedia.org/wiki/Provinsi_di_Indonesia"}]
+            if not detailed:
+                return (
+                    f"Indonesia ({current_year}) memiliki **38 Provinsi**, **17.504+ pulau**, penduduk sekitar **282+ juta jiwa**, "
+                    "anggota **G20**, dan sedang membangun **Ibu Kota Nusantara (IKN)** di Kalimantan Timur."
+                    + format_references_footer(refs)
+                )
             return (
-                f"**Profil Indonesia Modern Sekarang (Tahun {current_year}):**\n"
-                f"• **Geografi & Demografi:** Negara kepulauan terbesar di dunia dengan **17.504+ pulau**, luas daratan **1,91 juta km²**, dan luas perairan/ZEE **6,4 juta km²**. Penduduk mencapai **~282+ juta jiwa** (terbesar ke-4 di dunia), dengan **1.340+ suku bangsa** dan **718 bahasa daerah** yang dipersatukan oleh **Bahasa Indonesia**.\n"
-                f"• **38 Provinsi & Ibu Kota Nusantara (IKN):** Terbagi atas **38 Provinsi** dari Sumatera hingga Papua (termasuk 4 provinsi baru: Papua Selatan, Papua Tengah, Papua Pegunungan, dan Papua Barat Daya), serta membangun **Ibu Kota Nusantara (IKN)** di Kalimantan Timur sebagai *Smart Forest City*.\n"
-                f"• **Ekonomi & Warisan Dunia (UNESCO):** Ekonomi terbesar di Asia Tenggara (**Anggota G20**, PDB > USD 1,4 triliun) dengan fokus hilirisasi mineral kritis (nikel, tembaga, bauksit, ekosistem EV) & ekonomi digital. Warisan UNESCO meliputi **Borobudur, Prambanan, Sangiran, Subak Bali, Komodo, Lorentz, Wayang, Keris, Batik, Angklung, Pinisi, Pencak Silat, Gamelan, dan Jamu** menuju **Visi Indonesia Emas 2045**."
-                + format_references_footer([
-                    {"title": "Provinsi di Indonesia (38 Provinsi) & Ibu Kota Nusantara (IKN)", "url": "https://id.wikipedia.org/wiki/Provinsi_di_Indonesia"},
-                    {"title": "Otorita Ibu Kota Nusantara (IKN)", "url": "https://www.ikn.go.id"},
-                ])
+                f"**Profil Indonesia Modern ({current_year}):**\n"
+                "• **Geografi & Demografi:** 17.504+ pulau, daratan 1,91 juta km², penduduk ~282+ juta jiwa, 1.340+ suku, 718 bahasa daerah.\n"
+                "• **Wilayah:** **38 Provinsi** (termasuk 4 provinsi baru di Papua) dan **Ibu Kota Nusantara (IKN)** di Kalimantan Timur.\n"
+                "• **Ekonomi & UNESCO:** Anggota G20 (PDB > USD 1,4 triliun), warisan UNESCO antara lain Borobudur, Prambanan, Komodo, Subak, Batik, Wayang, Angklung, & Gamelan."
+                + format_references_footer(refs)
             )
 
         if _has_word(ql, ["indonesia", "nusantara", "sejarah"]):
+            refs = [{"title": "Wikipedia: Sejarah Indonesia", "url": "https://id.wikipedia.org/wiki/Sejarah_Indonesia"}]
+            if not detailed:
+                return (
+                    "Sejarah Indonesia berkembang dari kerajaan klasik (**Kutai, Sriwijaya, Majapahit**), era **Kesultanan Rempah**, "
+                    "perjuangan nasional (**Budi Utomo 1908, Sumpah Pemuda 1928**), hingga **Proklamasi 17 Agustus 1945**. "
+                    f"Kini ({current_year}) Indonesia memiliki **38 Provinsi** dipimpin Presiden **Prabowo Subianto** menuju **Indonesia Emas 2045**."
+                    + format_references_footer(refs)
+                )
             return (
-                f"**Perjalanan Sejarah Lengkap: Dari Nusantara hingga Indonesia Sekarang (Tahun {current_year}):**\n"
-                f"1. **Prasejarah & Kerajaan Awal (Abad ke-4 – ke-7 M):** Dari *Homo erectus* (Sangiran) & migrasi Austronesia hingga lahirnya kerajaan tertulis tertua **Kutai Martapura** (Kalimantan Timur, Raja Mulawarman) dan **Tarumanagara** (Jawa Barat, Raja Purnawarman).\n"
-                f"2. **Kemaharajaan Maritim Sriwijaya, Mataram Kuno & Singasari (Abad ke-7 – ke-13 M):** Kejayaan bahari **Sriwijaya** di Palembang, pembangunan **Candi Borobudur & Prambanan** oleh Mataram Kuno, serta visi penyatuan **Cakrawala Mandala Dwipantara** oleh Raja Kertanagara (Singasari).\n"
-                f"3. **Kemaharajaan Majapahit & Sumpah Palapa Gajah Mada (1293 – Abad ke-16):** Di bawah Raja Hayam Wuruk dan **Mahapatih Gajah Mada** (*Sumpah Palapa*, 1336 M), kepulauan Nusantara dipersatukan dan melahirkan semboyan **\"Bhinneka Tunggal Ika\"** (*Kakawin Sutasoma*, Mpu Tantular).\n"
-                f"4. **Era Kesultanan Rempah & Perlawanan Kolonial (Abad ke-13 – ke-19):** Kejayaan Samudera Pasai, Aceh, Demak, Banten, Mataram Islam, Gowa-Tallo, Ternate, & Tidore, disusul perjuangan para pahlawan melawan kolonialisme (Diponegoro, Pattimura, Imam Bonjol, Hasanuddin, Cut Nyak Dhien).\n"
-                f"5. **Kebangkitan Nasional, Sumpah Pemuda & Proklamasi (1908 – 1945):** Berdirinya **Budi Utomo (20 Mei 1908)**, ikrar **Sumpah Pemuda (28 Oktober 1928)**, lahirnya **Pancasila (1 Juni 1945)**, hingga **Proklamasi Kemerdekaan RI (17 Agustus 1945)** oleh Soekarno-Hatta.\n"
-                f"6. **Indonesia Sekarang ({current_year} — {years_merdeka} Tahun Merdeka):** Dipersatukan oleh **Deklarasi Djuanda (1957)** & **Satelit Palapa (1976)**, berkembang melalui Era Reformasi hingga kepemimpinan **Presiden ke-8 Prabowo Subianto**. Kini Indonesia berdiri dengan **38 Provinsi**, **~282+ juta jiwa**, anggota **G20**, membangun **Ibu Kota Nusantara (IKN)** menuju **Indonesia Emas 2045**."
-                + format_references_footer([
-                    {"title": "Sejarah Nusantara & Republik Indonesia", "url": "https://id.wikipedia.org/wiki/Sejarah_Indonesia"},
-                    {"title": "Korpus Pengetahuan Sovereign GajahMada", "url": "gajahmada_ai/knowledge/indonesia_corpus.py"},
-                ])
+                f"**Ringkasan Sejarah Nusantara hingga Indonesia ({current_year}):**\n"
+                "1. **Kerajaan Awal (Abad ke-4–13 M):** Kutai, Tarumanagara, Sriwijaya, Mataram Kuno, & Singasari.\n"
+                "2. **Majapahit (1293–Abad ke-16):** Hayam Wuruk & Mahapatih Gajah Mada (*Sumpah Palapa* 1336 M).\n"
+                "3. **Kesultanan & Perlawanan Kolonial (Abad ke-13–19):** Aceh, Demak, Banten, Mataram Islam, Gowa-Tallo, Ternate-Tidore.\n"
+                "4. **Pergerakan & Kemerdekaan (1908–1945):** Budi Utomo (1908), Sumpah Pemuda (1928), Pancasila & Proklamasi (17 Agustus 1945).\n"
+                f"5. **Indonesia Modern ({current_year}):** 38 Provinsi, ~282+ juta jiwa, anggota G20, pembangunan IKN."
+                + format_references_footer(refs)
             )
 
         if _has_word(ql, ["arsitektur", "architecture", "modul", "module", "struktur"]):
+            refs = [{"title": "GajahMada 2.0 Architecture", "url": "https://github.com/hoed/gajahmada-ai"}]
+            if not detailed:
+                return (
+                    "**GajahMada 2.0** terdiri atas 8 lapisan: *Sovereign Foundation* (Ed25519/PoW Ledger), *GIP v2.0 P2P Mesh*, "
+                    "*Perception & Web Crawler*, *5-Tier Memory*, *Hybrid Reasoning* (Local GGUF + Symbolic), *Autonomous Agents*, "
+                    "*Collective Intelligence*, dan *Governance*."
+                    + format_references_footer(refs)
+                )
             return (
                 "**Arsitektur 8 Lapisan GajahMada 2.0:**\n"
-                "1. **Sovereign Foundation (`security`, `blockchain`, `storage`):** Ed25519 Identity, Key Rotation, Signed Event Ledger, PostgreSQL/SQLite Storage.\n"
-                "2. **Distributed Infrastructure (`network`):** Protokol GIP v2.0 (`GIP-IDENTITY`..`GIP-SYNC`), Replay Protection, SSRF Guard.\n"
-                "3. **Perception & Knowledge (`cognition.perception`, `knowledge.open_knowledge`):** Normalisasi input, ekstraksi entitas, & *Autonomous Internet Knowledge Crawler*.\n"
-                "4. **5-Tier Memory Engine (`memory`):** Working, Semantic, Episodic, Procedural, & Collective Memory + Knowledge Graph & Provenance.\n"
-                "5. **Hybrid Reasoning Engine (`neural`, `reasoning`, `cognition`):** Local Neural (`llama.cpp`/ONNX/PyTorch) + Symbolic + Evidence + Metacognitive Critic.\n"
-                "6. **Autonomous Agent Runtime (`agents`, `execution`):** Planner, Researcher, Analyst, Verifier, Scheduler & Sandboxed Execution.\n"
-                "7. **Collective Intelligence (`network.coordinator`, `consensus`):** Delegasi tugas multi-node & verifikasi independen.\n"
-                "8. **Intelligence Governance (`security.auth`, `policies`, `learning`):** RBAC, batas eksekusi, & eksperimen pembelajaran terkontrol."
-                + format_references_footer([
-                    {"title": "GajahMada 2.0 Architecture Specification", "url": "https://github.com/hoed/gajahmada-ai"},
-                ])
+                "1. **Sovereign Foundation:** Ed25519 Identity, Signed Event Ledger, SQLite/PostgreSQL.\n"
+                "2. **Distributed Infrastructure:** GIP v2.0 P2P, Replay Protection, SSRF Guard.\n"
+                "3. **Perception & Knowledge:** Normalisasi input & Internet Knowledge Crawler.\n"
+                "4. **5-Tier Memory Engine:** Working, Semantic, Episodic, Procedural, & Collective Memory.\n"
+                "5. **Hybrid Reasoning:** Local Neural (`llama.cpp` GGUF) + Symbolic + Evidence + Critic.\n"
+                "6. **Autonomous Agent Runtime:** Planner, Researcher, Analyst, Verifier & Sandbox.\n"
+                "7. **Collective Intelligence:** Delegasi & verifikasi multi-node.\n"
+                "8. **Intelligence Governance:** RBAC, kebijakan eksekusi, & pembelajaran terkontrol."
+                + format_references_footer(refs)
             )
 
         if _has_word(ql, ["blockchain", "web3", "chain", "block", "ledger", "pow", "hash"]):
             return (
-                "**Arsitektur Web3 & Signed Event Audit Ledger GajahMada:**\n"
-                "Setiap interaksi dan event (`NODE_REGISTERED`, `TASK_COMPLETED`, `EVIDENCE_SUBMITTED`, `RESULT_VERIFIED`, `KNOWLEDGE_ACCEPTED`) "
-                "menghasilkan hash SHA-256, ditandatangani dengan kunci privat **Ed25519** milik node, lalu ditambang dengan "
-                "**Proof-of-Work (`difficulty=2`)** ke dalam rantai blok persisten (`chain.json`)."
+                "Setiap event penting di GajahMada di-hash dengan **SHA-256**, ditandatangani **Ed25519**, "
+                "dan ditambang dengan **Proof-of-Work (`difficulty=2`)** ke dalam `chain.json`."
                 + format_references_footer([
                     {"title": "GajahMada Signed Event PoW Ledger", "url": "gajahmada_ai/blockchain/chain.py"},
                 ])
@@ -339,58 +384,47 @@ class AIModelEngine:
 
         if _has_word(ql, ["security", "keamanan", "audit", "crypto", "ed25519"]):
             return (
-                "**Keamanan & Kriptografi Ed25519 (RFC 8032):**\n"
-                "• **Identitas Node:** Menggunakan pasangan kunci asimetris Ed25519 independen (`node_key.pem` dengan izin `0600`), mendukung rotasi kunci dan pencabutan peer.\n"
-                "• **Verifikasi Blok & Protokol GIP:** Setiap blok dan pesan GIP v2.0 menyimpan `signature` Ed25519 dan proteksi *replay*."
+                "GajahMada menggunakan kriptografi **Ed25519 (RFC 8032)** untuk identitas node (`node_key.pem`, izin `0600`), "
+                "tanda tangan blok ledger, serta proteksi *replay* pada pesan P2P GIP v2.0."
                 + format_references_footer([
-                    {"title": "RFC 8032 — Edwards-Curve Digital Signature Algorithm (EdDSA)", "url": "https://datatracker.ietf.org/doc/html/rfc8032"},
+                    {"title": "RFC 8032 — EdDSA", "url": "https://datatracker.ietf.org/doc/html/rfc8032"},
                 ])
             )
 
         if _has_word(ql, ["code", "kode", "python", "buatkan", "fungsi", "script", "contoh"]):
             return (
-                f"Berikut contoh kode Python untuk memanggil API **GajahMada**:\n"
+                f"Contoh pemanggilan API **GajahMada** (Python):\n"
                 f"```python\n"
-                f"import httpx\n\n"
-                f"resp = httpx.post('http://localhost:8000/ai/chat', json={{\n"
-                f"    'prompt': {q!r},\n"
-                f"    'max_tokens': 512\n"
-                f"}}).json()\n"
+                f"import httpx\n"
+                f"resp = httpx.post('http://localhost:8000/ai/chat', json={{'prompt': {q!r}}}).json()\n"
                 f"print(resp['response'])\n"
-                f"print('Block #:', resp['block_index'], '| Hash:', resp['task_hash'][:16])\n"
                 f"```"
-                + format_references_footer([
-                    {"title": "GajahMada FastAPI REST & Web3 Gateway", "url": "https://github.com/hoed/gajahmada-ai"},
-                ])
             )
 
-        # 8. Autonomous Multi-Source Internet Knowledge Crawler (Wikipedia ID/EN + DuckDuckGo Web Search + Direct URL Crawl)
+        # 8. Autonomous Multi-Source Internet Knowledge Crawler (Wikipedia ID/EN + DuckDuckGo + Weather + Direct URL)
         crawled = crawl_internet_knowledge(q)
         if crawled:
             self.last_crawled_knowledge = crawled
             refs = crawled.get("references") or [{"title": crawled["title"], "url": crawled.get("source_url", "")}]
             return (
-                f"**{crawled['title']}** *(Hasil Crawling Pengetahuan Internet & Ensiklopedia Terverifikasi)*:\n\n"
                 f"{crawled['extract']}"
-                + format_references_footer(refs)
+                + format_references_footer(refs, max_refs=3 if detailed else 1)
             )
 
         if context:
+            clean_ctx = context.strip()
+            if not detailed and len(clean_ctx) > 360:
+                clean_ctx = clean_ctx[:357].rsplit(" ", 1)[0] + "..."
             return (
-                f"Berdasarkan basis pengetahuan terverifikasi **GajahMada (384-d Vector & Provenance Memory)** untuk pertanyaan **\"{q}\"**:\n\n"
-                f"{context}"
+                f"{clean_ctx}"
                 + format_references_footer([
-                    {"title": "GajahMada 384-d Semantic Vector Store & Provenance Memory", "url": "gajahmada_ai/memory/manager.py"},
-                ])
+                    {"title": "GajahMada Provenance Memory", "url": "gajahmada_ai/memory/manager.py"},
+                ], max_refs=1)
             )
 
         return (
-            f"Menjawab pertanyaan Anda tentang **\"{q}\"**:\n"
-            f"• Permintaan telah diproses oleh **GajahMada Hybrid Cognitive Engine** pada `{now_str}`.\n"
-            f"• Untuk jawaban mendalam mengenai **Al-Qur'an (114 Surah & Ayat)**, **Ensiklopedia Pengetahuan Umum**, **Sejarah Nusantara hingga Indonesia Sekarang**, **Sumpah Palapa Gajah Mada**, **38 Provinsi & IKN**, **Daftar Presiden RI**, atau **Arsitektur Web3**, silakan tanyakan topik terkait atau gunakan `/crawl <topik/URL>`, `/search <kata kunci>`, dan `/ingest <pengetahuan baru>`."
-            + format_references_footer([
-                {"title": "GajahMada Sovereign Hybrid Intelligence Engine", "url": "https://github.com/hoed/gajahmada-ai"},
-            ])
+            f"Belum ada data spesifik untuk **\"{q}\"** di memori lokal. "
+            f"Coba gunakan `/crawl {q}` atau `/ingest <informasi>` untuk menambahkannya ke Brain."
         )
 
     def create_embedding(self, text: str) -> List[float]:
