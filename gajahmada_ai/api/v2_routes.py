@@ -93,7 +93,28 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
             temperature=req.temperature,
         )
 
-        # Update Working Memory & record signed event on ledger
+        # Persist every question & answer interaction to Working & Persistent Semantic/Episodic Brain Memory
+        clean_ans = result.conclusion.split("\n\n---\n📚")[0].strip()
+        qa_entry = f"Pertanyaan: {req.objective.strip()} | Jawaban: {clean_ans}"
+        is_generic = "Permintaan telah diproses oleh **GajahMada Hybrid Cognitive Engine**" in result.conclusion
+        rag = rt.get("rag")
+        engine = rt.get("engine")
+        if rag and engine and not is_generic and qa_entry not in rag.doc_store:
+            emb = engine.create_embedding(qa_entry)
+            if emb:
+                rag.ingest(qa_entry, emb)
+                rag.flush()
+
+        memory.store(
+            content=qa_entry,
+            memory_type=MemoryType.EPISODIC if is_generic else MemoryType.SEMANTIC,
+            origin_node_id=identity.node_id,
+            source_type="cognitive_brain_qa_update",
+            author="cognitive_brain",
+            confidence=result.confidence,
+            verification_status=VerificationStatus(result.verification_status),
+            visibility_policy=VisibilityPolicy.COLLECTIVE,
+        )
         memory.store(
             content=f"Q: {req.objective[:160]} -> A ({result.verification_status}, conf={result.confidence})",
             memory_type=MemoryType.WORKING,

@@ -501,30 +501,50 @@ async def ai_chat(req: ChatRequest):
     )
     response = reasoning_res.conclusion
 
-    # If the internet crawler discovered new knowledge, assimilate it into RAG & Semantic Memory automatically
-    crawled_info = getattr(engine, "last_crawled_knowledge", None) if engine else None
-    if crawled_info and crawled_info.get("extract"):
-        try:
-            crawl_doc = f"{crawled_info['title']}: {crawled_info['extract']} (Referensi: {crawled_info.get('source_url', '')})"
-            if rag and crawl_doc not in rag.doc_store:
-                c_emb = engine.create_embedding(crawl_doc)
-                if c_emb:
-                    rag.ingest(crawl_doc, c_emb)
-                    rag.flush()
-            if memory_manager:
-                memory_manager.store(
-                    content=crawl_doc,
-                    memory_type=MemoryType.SEMANTIC,
-                    origin_node_id=identity.node_id if identity else "local",
-                    source_type="internet_knowledge_crawler",
-                    author="autonomous_crawler",
-                    confidence=0.88,
-                    verification_status=VerificationStatus.VERIFIED,
-                    visibility_policy=VisibilityPolicy.COLLECTIVE,
-                )
-            record_log("knowledge.crawler", "OK", f"Crawled & assimilated knowledge: '{crawled_info['title']}'")
-        except Exception as e:
-            record_log("knowledge.crawler", "WARN", f"Crawler assimilation warning: {e}")
+    # Persist every question & answer interaction into the GajahMada Brain (RAG Vector Store + 5-Tier Memory)
+    brain_record_id = None
+    try:
+        crawled_info = getattr(engine, "last_crawled_knowledge", None) if engine else None
+        if crawled_info and crawled_info.get("extract"):
+            knowledge_entry = f"{crawled_info['title']}: {crawled_info['extract']} (Referensi: {crawled_info.get('source_url', '')})"
+            src_type = "internet_knowledge_crawler"
+        else:
+            clean_resp = response.split("\n\n---\n📚")[0].strip()
+            knowledge_entry = f"Pertanyaan: {req.prompt.strip()} | Jawaban: {clean_resp}"
+            src_type = "cognitive_brain_qa_update"
+
+        # 1. Update 384-d Vector RAG Store (docs.json) if not already present and not a generic fallback
+        is_generic_fallback = "Permintaan telah diproses oleh **GajahMada Hybrid Cognitive Engine**" in response
+        if rag and engine and not is_generic_fallback and knowledge_entry not in rag.doc_store:
+            k_emb = engine.create_embedding(knowledge_entry)
+            if k_emb:
+                rag.ingest(knowledge_entry, k_emb)
+                rag.flush()
+
+        # 2. Always persist question & answer to Layer 4 Persistent Memory (gajahmada_v2.db)
+        if memory_manager:
+            target_tier = MemoryType.EPISODIC if is_generic_fallback else MemoryType.SEMANTIC
+            rec = memory_manager.store(
+                content=knowledge_entry,
+                memory_type=target_tier,
+                origin_node_id=identity.node_id if identity else "local",
+                source_type=src_type,
+                author="cognitive_brain",
+                confidence=reasoning_res.confidence,
+                verification_status=VerificationStatus(reasoning_res.verification_status),
+                visibility_policy=VisibilityPolicy.COLLECTIVE,
+            )
+            brain_record_id = rec["record_id"]
+            memory_manager.working.push({
+                "record_id": brain_record_id,
+                "question": req.prompt.strip(),
+                "answer_preview": response[:240],
+                "confidence": reasoning_res.confidence,
+                "timestamp": start,
+            })
+        record_log("memory.brain", "OK", f"Brain knowledge updated from question '{req.prompt[:32]}' (id={brain_record_id}, docs={len(rag.doc_store) if rag else 0})")
+    except Exception as e:
+        record_log("memory.brain", "WARN", f"Brain knowledge update warning: {e}")
 
     task_hash = hashlib.sha256((req.prompt + response).encode()).hexdigest()
     signature = ""
@@ -562,6 +582,8 @@ async def ai_chat(req: ChatRequest):
         "task_hash": task_hash,
         "signature": signature[:24] if signature else None,
         "rag_matches": matched_docs,
+        "brain_record_id": brain_record_id,
+        "knowledge_docs": len(rag.doc_store) if rag else 0,
         "reasoning_id": reasoning_res.reasoning_id,
         "verification_status": reasoning_res.verification_status,
         "confidence": reasoning_res.confidence,

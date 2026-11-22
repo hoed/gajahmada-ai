@@ -1296,6 +1296,14 @@ document.addEventListener('DOMContentLoaded', () => {
               const id = qJson.data[1];
               const sName = ar.surah?.englishName || `Surah ${sNum}`;
               const sTotal = ar.surah?.numberOfAyahs || '';
+          // Assimilate crawled Question + Answer knowledge back into local GajahMada Brain (RAG + Semantic Memory)
+          const cleanExtract = ( ar?.text ? `${ar.text} — "${id?.text || ''}"` : '' );
+          fetch(`${API_URL}/ai/ingest`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: `Pertanyaan: ${promptText} | Jawaban QS. ${sName} (${sNum}:${aNum}): ${cleanExtract} (Referensi: https://quran.com/${sNum}/${aNum})` }),
+          }).then(() => refreshKnowledgeStats()).catch(() => {});
+
               return (
                 `**Al-Qur'an Surah ${sName} (Surah ke-${sNum}) — Ayat ${aNum}:**\n\n` +
                 `📖 **Teks Arab:**\n${ar.text}\n\n` +
@@ -1552,6 +1560,7 @@ document.addEventListener('DOMContentLoaded', () => {
         appendChatMessage('ai', finalReply, data.time_taken, data.block_index);
         fetchNodeInfo();
         fetchChain();
+        refreshKnowledgeStats();
         syncServerLogs();
       }
       activeClusterIdx = 0;
