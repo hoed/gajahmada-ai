@@ -21,7 +21,7 @@
 
 ## 🖥️ Tactical Cyberdeck HUD Preview (`/ui`)
 
-![GajahMada Tactical Cyberdeck HUD](interface/html/screenshot.jpg)
+![GajahMada Tactical Cyberdeck HUD](interface/html/screenshot-v2.jpg)
 
 > **Live Web Console (`/ui`):** Antarmuka *Bento Grid 100vh* bergaya *Tactical Cyberdeck* yang memvisualisasikan dan mengendalikan seluruh 8 lapisan arsitektur **GajahMada 2.0** secara real-time—mulai dari graf pengetahuan 3D, telemetri log sistem, konsol perintah penalaran hibrida & slash-commands, matriks dependensi, siklus konsensus Web3, protokol jaringan P2P `GIP/2.0`, hingga penambangan blok *Signed Event Audit Ledger*.
 
