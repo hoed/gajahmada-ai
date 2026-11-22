@@ -1246,6 +1246,19 @@ document.addEventListener('DOMContentLoaded', () => {
         `• Ekonomi & Budaya: Ekonomi terbesar ASEAN (Anggota G20, PDB > USD 1,4T), hilirisasi mineral strategis, dan warisan UNESCO menuju Indonesia Emas 2045.`
       );
     }
+    if (/\b(quran|qur'an|alquran|al-quran|surat|surah|ayat)\b/.test(ql)) {
+      const mPair = ql.match(/(?:surat|surah|qs\.?|q\.s\.?)\s*(?:ke[\-\s]*)?(\d{1,3})\s*(?:ayat|:)\s*(\d{1,3})/) || ql.match(/\b(\d{1,3})\s*:\s*(\d{1,3})\b/);
+      if (mPair && Number(mPair[1]) === 16 && Number(mPair[2]) === 7) {
+        return (
+          `Al-Qur'an Surah An-Nahl (Surah ke-16: "Lebah") — Ayat 7:\n\n` +
+          `📖 Teks Arab:\n` +
+          `وَتَحْمِلُ أَثْقَالَكُمْ إِلَىٰ بَلَدٍ لَّمْ تَكُونُوا بَالِغِيهِ إِلَّا بِشِقِّ الْأَنفُسِ ۚ إِنَّ رَبَّكُمْ لَرَءُوفٌ رَّحِيمٌ\n\n` +
+          `🇮🇩 Terjemahan (Kemenag RI):\n` +
+          `"Dan ia (hewan-hewan ternak itu) mengangkut beban-bebanmu ke suatu negeri yang kamu tidak sanggup mencapainya, melainkan dengan kesukaran yang payah (menyusahkan diri). Sesungguhnya Tuhanmu benar-benar Maha Pengasih lagi Maha Penyayang."\n\n` +
+          `• Keterangan Surah: QS. An-Nahl (16:7) · Golongan Makkiyah · Total 128 Ayat.`
+        );
+      }
+    }
     if (/\b(indonesia|nusantara|sejarah|sriwijaya|kerajaan|kesultanan|kemerdekaan|proklamasi|pancasila)\b/.test(ql)) {
       return (
         `[Kronologi Nusantara hingga Indonesia Sekarang (${nowStr})]\n` +

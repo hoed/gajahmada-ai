@@ -6,6 +6,10 @@ import os
 import re
 from typing import Any, Dict, List, Optional
 
+from gajahmada_ai.knowledge.open_knowledge import (
+    resolve_open_domain_wikipedia,
+    resolve_quran_query,
+)
 from gajahmada_ai.neural.llama_backend import deterministic_hash_embed
 from gajahmada_ai.neural.router import ModelRouter
 from gajahmada_ai.reasoning.symbolic import SymbolicReasoner
@@ -187,6 +191,11 @@ class AIModelEngine:
                 return f"Hasil perhitungan simbolik deterministik untuk `{q}` adalah **`{formatted_num}`**."
             return f"Hasil deduksi simbolik deterministik: **{sym_res.conclusion}**"
 
+        # 6B. Al-Qur'an Surah & Ayah Resolver (114 Surahs + Arabic & Kemenag RI Translation)
+        quran_ans = resolve_quran_query(q)
+        if quran_ans:
+            return quran_ans
+
         # 7. Specific Nusantara & Indonesia Topics
         if _has_word(ql, ["gajah mada", "sumpah palapa", "amukti palapa", "majapahit", "hayam wuruk", "raden wijaya", "nagarakretagama", "sutasoma", "bhinneka tunggal ika", "trowulan"]):
             return (
@@ -310,10 +319,20 @@ class AIModelEngine:
                 f"*(Terverifikasi oleh Ed25519 pada `{now_str}`)*"
             )
 
+        # Open-Domain Encyclopedic Resolver (Wikipedia ID/EN + Auto-Memory Learning)
+        wiki_res = resolve_open_domain_wikipedia(q)
+        if wiki_res:
+            return (
+                f"**{wiki_res['title']}** *(Pengetahuan Ensiklopedis Terverifikasi)*:\n\n"
+                f"{wiki_res['extract']}\n\n"
+                f"• **Sumber Provenans:** {wiki_res['source_url']}\n"
+                f"*(Terverifikasi oleh Ed25519 pada `{now_str}`)*"
+            )
+
         return (
             f"Menjawab pertanyaan Anda tentang **\"{q}\"**:\n"
             f"• Permintaan telah diproses oleh **GajahMada Hybrid Cognitive Engine** pada `{now_str}`.\n"
-            f"• Untuk jawaban mendalam mengenai **Sejarah Nusantara hingga Indonesia Sekarang**, **Sumpah Palapa Gajah Mada**, **38 Provinsi & IKN**, **Daftar Presiden RI**, atau **Arsitektur Web3**, silakan tanyakan topik terkait atau gunakan `/search <kata kunci>` dan `/ingest <pengetahuan baru>`."
+            f"• Untuk jawaban mendalam mengenai **Al-Qur'an (114 Surah & Ayat)**, **Sejarah Nusantara hingga Indonesia Sekarang**, **Sumpah Palapa Gajah Mada**, **38 Provinsi & IKN**, **Daftar Presiden RI**, atau **Arsitektur Web3**, silakan tanyakan topik terkait atau gunakan `/search <kata kunci>` dan `/ingest <pengetahuan baru>`."
         )
 
     def create_embedding(self, text: str) -> List[float]:

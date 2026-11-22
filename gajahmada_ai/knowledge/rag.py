@@ -154,6 +154,8 @@ class LocalKnowledge:
 
             if query_text and q_terms and lexical_hits == 0:
                 continue
+            if query_text and len(q_terms) >= 3 and lexical_hits < 2 and (lexical_hits / len(q_terms)) < 0.34:
+                continue
 
             vec_dist = 2.0
             if idx < len(self.vectors) and len(self.vectors[idx]) == len(query_embedding):
