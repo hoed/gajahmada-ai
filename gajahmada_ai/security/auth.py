@@ -67,20 +67,63 @@ class AuthManager:
         self,
         identity: Optional[NodeIdentity] = None,
         audit_logger: Optional[SecurityAuditLogger] = None,
+        admin_key_file: Optional[str] = None,
     ):
         self.identity = identity
         self.audit_logger = audit_logger
+        self.admin_key_file = admin_key_file
         self._tokens: Dict[str, Role] = {}
         self.admin_api_key = os.environ.get("GAJAHMADA_ADMIN_KEY", "").strip()
+        if not self.admin_api_key and admin_key_file and os.path.exists(admin_key_file):
+            try:
+                with open(admin_key_file, "r", encoding="utf-8") as f:
+                    self.admin_api_key = f.read().strip()
+            except Exception:
+                self.admin_api_key = ""
         if not self.admin_api_key:
-            self.admin_api_key = "gm-sovereign-admin-" + (
-                identity.node_id[:24] if identity and identity.node_id else secrets.token_urlsafe(18)
-            )
+            # Cryptographically random 256-bit secret (NEVER derived from public node_id!)
+            self.admin_api_key = "gm-admin-" + secrets.token_urlsafe(32)
+            if admin_key_file:
+                try:
+                    os.makedirs(os.path.dirname(os.path.abspath(admin_key_file)), exist_ok=True)
+                    with open(admin_key_file, "w", encoding="utf-8") as f:
+                        f.write(self.admin_api_key)
+                    os.chmod(admin_key_file, 0o600)
+                except Exception:
+                    pass
         self._tokens[self.admin_api_key] = Role.ADMIN
 
         operator_key = os.environ.get("GAJAHMADA_OPERATOR_KEY", "").strip()
         if operator_key:
             self._tokens[operator_key] = Role.OPERATOR
+
+    def rotate_admin_key(self) -> str:
+        """Rotate the admin API key to a fresh cryptographically random secret."""
+        old_key = self.admin_api_key
+        new_key = "gm-admin-" + secrets.token_urlsafe(32)
+        self._tokens.pop(old_key, None)
+        self.admin_api_key = new_key
+        self._tokens[new_key] = Role.ADMIN
+        if self.admin_key_file:
+            try:
+                with open(self.admin_key_file, "w", encoding="utf-8") as f:
+                    f.write(new_key)
+                os.chmod(self.admin_key_file, 0o600)
+            except Exception:
+                pass
+        return new_key
+
+    def resolve_optional_actor(self, request: Request) -> Dict[str, str]:
+        """Inspect request credentials without raising; returns anonymous/reader if unauthenticated."""
+        api_key = request.headers.get("x-api-key", "").strip()
+        auth_header = request.headers.get("authorization", "").strip()
+        if not api_key and auth_header.lower().startswith("bearer "):
+            api_key = auth_header[7:].strip()
+        if api_key:
+            for registered_token, role in self._tokens.items():
+                if hmac.compare_digest(api_key, registered_token):
+                    return {"actor": f"role:{role.value}", "role": role.value}
+        return {"actor": "anonymous", "role": "anonymous"}
 
     def register_token(self, token: str, role: Role):
         if token and len(token) >= 16:

@@ -40,23 +40,24 @@ flowchart TD
 | **Cognitive Pipeline** | `gajahmada_ai/cognition/` | 14-stage pipeline (`perception`, `intent`, `decomposition`, `hypotheses`, `metacognition`, `decision`, `reasoning`) |
 | **Neural Abstraction** | `gajahmada_ai/neural/` | Provider-independent `LlamaCppBackend` (GGUF auto-discovery + concise-by-default prompt), `OnnxBackend`, `PyTorchNativeBackend`, `ModelRouter` |
 | **Symbolic & Evidence** | `gajahmada_ai/reasoning/` | `SymbolicReasoner` (AST math, forward-chaining, syllogisms), `ContradictionDetector`, `EvidenceReasoner`, `HybridInferenceCombiner` |
-| **5-Tier Memory** | `gajahmada_ai/memory/` | Working, Semantic, Episodic, Procedural, & Collective memory + Knowledge Graph, Versioning, & Provenance |
+| **5-Tier Memory** | `gajahmada_ai/memory/` | Working, Semantic, Episodic, Procedural, & Collective memory + `MemoryAuthorizationService` (anti-leak PRIVATE gate), Knowledge Graph, Versioning, & Provenance |
 | **Hybrid Storage** | `gajahmada_ai/storage/` | `RelationalMemoryStore` (SQLite/PostgreSQL), `SupabaseKnowledgeStore` (`pgvector` 384-d + `ledger_blocks` + RLS), `ContentAddressedObjectStore` |
-| **Open Knowledge** | `gajahmada_ai/knowledge/` | `LocalKnowledge` (FAISS/L2 384-d RAG), `open_knowledge.py` (multi-source crawler + live weather + 114-Surah Al-Qur'an), `indonesia_corpus.py` |
-| **Autonomous Agents** | `gajahmada_ai/agents/`, `execution/` | `PlannerAgent`, `ResearcherAgent`, `AnalystAgent`, `VerifierAgent`, `AutonomousTaskScheduler`, `SandboxedExecutor` |
+| **Open Knowledge** | `gajahmada_ai/knowledge/` | `LocalKnowledge` (FAISS/L2 384-d RAG), `open_knowledge.py` (multi-source crawler into Quarantine + live weather + 114-Surah Al-Qur'an), `indonesia_corpus.py` |
+| **Autonomous Agents** | `gajahmada_ai/agents/`, `execution/` | `PlannerAgent`, `ResearcherAgent`, `AnalystAgent`, `VerifierAgent`, `AutonomousTaskScheduler`, `SandboxedExecutor` (unforgeable authenticated human approval) |
 | **Closed-Loop Learning** | `gajahmada_ai/learning/` | `FeedbackCollector`, `ExperienceExtractor`, `StrategyAdapter` (versioned + rollback), `LearningExperimentManager` |
-| **P2P & Collective** | `gajahmada_ai/network/` | `GIP/2.0` protocol validator, `SovereignPeerNode`, `CollectiveCoordinator`, `KnowledgeSynchronizer`, `QuorumConsensusManager` |
-| **Security & Ledger** | `gajahmada_ai/security/`, `blockchain/` | Ed25519 (RFC 8032) `NodeIdentity`, key rotation, RBAC `AuthManager`, SSRF guard, rate limiter, `AIBlockchain` signed PoW event ledger |
+| **P2P & Collective** | `gajahmada_ai/network/` | Full 8-namespace `GIP/2.0` protocol + peer authorization, `SovereignPeerNode`, `CollectiveCoordinator`, `KnowledgeSynchronizer`, `QuorumConsensusManager` |
+| **Security & Ledger** | `gajahmada_ai/security/`, `blockchain/` | Ed25519 (RFC 8032) `NodeIdentity`, random/rotatable admin key `AuthManager` (fail-closed v1/v2), active rate-limit middleware, SSRF guard, `AIBlockchain` v2 canonical-hash full-envelope ledger + atomic persistence + `LEDGER_CORRUPTED` recovery |
 | **CLI & Web Interface** | `gajahmada_ai/cli/main.py`, `interface/html/` | CLI v1/v2 + Dual-mode Web UI: Homepage Command Center over fullscreen 3D Network (turbo spin while Brain thinks) & 8-panel Cyberdeck Dashboard |
 
 ---
 
-## 4. Hybrid Storage & Supabase `pgvector` + RLS Design
-- **Local-First Primary:** Every node operates independently using local SQLite (`knowledge_store/gajahmada_v2.db`) and `LocalKnowledge` 384-d vectors.
+## 4. Security Hardening, Knowledge Quarantine & Blockchain v2 Integrity
+- **Fail-Closed Auth & Rate Limiting:** Admin key is generated as a 256-bit cryptographically random secret (`secrets.token_urlsafe(32)`, rotatable via `rotate_admin_key()`), never derived from `node_id`. All v1/v2 administrative mutation endpoints enforce RBAC (`401`/`403`) by default, protected by active `SlidingWindowRateLimiter` middleware (`429`) and configurable CORS (`GAJAHMADA_ALLOWED_ORIGINS`).
+- **Centralized Memory Authorization (`MemoryAuthorizationService`):** Every read path (`/api/v2/memory`, `/api/v2/memory/{id}/versions`, `/api/v2/knowledge`) filters `PRIVATE` records, version histories, entity relations, and contradictions consistently.
+- **4-Stage Knowledge Quarantine Pipeline:** Incoming unverified LLM outputs, web-crawled data (`/knowledge/crawl`), and peer `GIP-KNOWLEDGE` enter `LOCAL` Quarantine (`UNVERIFIED`) first; promotion to `COLLECTIVE` / `VERIFIED` requires independent contradiction checks via authenticated `POST /api/v2/knowledge/promote/{record_id}` (or verified multi-node quorum).
+- **Blockchain Schema v2 (`gajahmada_ai/blockchain/chain.py`):** Uses canonical JSON hashing over all fields (`event_type`, `event_ref`, `metadata`, `timestamp`, `node_id`, `previous_hash`), signs the full event envelope with Ed25519, writes atomically (`tmp + fsync + .bak + os.replace`), and enters `LEDGER_CORRUPTED` (refusing silent overwrites) if tampering is detected while supporting explicit `recover_from_backup()` and backward-compatible v1 block verification.
 - **Optional Cloud Persistence (`supabase/schema.sql`):**
-  - `public.knowledge_records`: content-addressed by `content_hash` (SHA-256), `embedding vector(384)`, `signature` (Ed25519), and `visibility`.
-  - `public.ledger_blocks`: persistent Web3 PoW audit trail.
-  - `public.match_knowledge`: cosine-similarity semantic search RPC (`<=>`).
+  - `public.knowledge_records` (`content_hash` PK, `embedding vector(384)`, `signature`, `visibility`), `public.ledger_blocks`, and `public.match_knowledge` RPC.
   - **Row Level Security (RLS):** Enabled on both tables; public keys (`SUPABASE_PUBLISHABLE_KEY`) have read-only access to `visibility = 'COLLECTIVE'` and are blocked (`401 / 42501`) from writes; only backend services holding `SUPABASE_SECRET_KEY` may write.
 
 ---
@@ -71,8 +72,8 @@ flowchart TD
 - **UI & Health:** `GET /` (Homepage), `GET /dashboard` & `GET /ui` (Cyberdeck Dashboard), `GET /health`, `GET /api/status`
 - **v2 Cognitive & Governance (`/api/v2/*`):**
   - `/api/v2/intelligence/diagnose`, `/api/v2/intelligence/ask`, `/api/v2/reasoning/{id}`
-  - `/api/v2/memory` (GET/POST/PUT/versions/backup), `/api/v2/knowledge`
+  - `/api/v2/memory` (GET/POST/PUT/versions/backup), `/api/v2/knowledge`, `/api/v2/knowledge/promote/{record_id}`
   - `/api/v2/agents`, `/api/v2/agents/run`, `/api/v2/agents/tasks/{id}/approve`
-  - `/api/v2/network`, `/api/v2/network/gip`, `/api/v2/nodes/register`
+  - `/api/v2/network`, `/api/v2/network/gip` (all 8 GIP/2.0 namespaces), `/api/v2/nodes/register`
   - `/api/v2/system/health`, `/api/v2/system/rotate-key`, `/api/v2/system/learning/experiment`
 - **v1 Compatible Routes:** `POST /ai/chat`, `POST /ai/ingest`, `POST /ai/embedding`, `GET /knowledge/stats`, `POST /knowledge/search`, `POST /knowledge/crawl`, `GET /node/info`, `GET /node/metrics`, `GET /node/chain`, `POST /node/chain/mine`, `POST /node/chain/verify`, `POST /security/sign-verify`, `GET/POST/DELETE /node/peers`, `POST /node/sync`, `POST /node/broadcast`, `GET/POST /node/config`, `GET/DELETE /node/logs`.

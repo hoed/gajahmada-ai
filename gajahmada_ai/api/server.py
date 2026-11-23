@@ -79,12 +79,19 @@ app = FastAPI(
     version="2.0.0",
 )
 
+_allowed_origins_env = os.environ.get("GAJAHMADA_ALLOWED_ORIGINS", "").strip()
+_cors_origins = (
+    [o.strip() for o in _allowed_origins_env.split(",") if o.strip()]
+    if _allowed_origins_env
+    else ["http://localhost:8000", "http://127.0.0.1:8000", "https://gajahmada.vercel.app"]
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-API-Key", "X-Node-Id", "X-Signature", "X-Timestamp"],
 )
 
 # ─── Global singletons & live telemetry log buffer ────────────────────────
@@ -563,7 +570,15 @@ async def ai_chat(req: ChatRequest):
                 rag.ingest(knowledge_entry, k_emb)
                 rag.flush()
 
-        # 2. Always persist question & answer to Layer 4 Persistent Memory (gajahmada_v2.db)
+        # 2. Persist Q&A with P2 Knowledge Quarantine Policy:
+        #    Unverified LLM/crawler outputs enter LOCAL Quarantine (UNVERIFIED),
+        #    never directly into COLLECTIVE memory until independently verified.
+        can_promote_collective = (
+            not is_generic_fallback
+            and reasoning_res.verification_status == "VERIFIED"
+            and float(reasoning_res.confidence) >= 0.85
+            and not reasoning_res.contradictions
+        )
         if memory_manager:
             target_tier = MemoryType.EPISODIC if is_generic_fallback else MemoryType.SEMANTIC
             rec = memory_manager.store(
@@ -573,8 +588,12 @@ async def ai_chat(req: ChatRequest):
                 source_type=src_type,
                 author="cognitive_brain",
                 confidence=reasoning_res.confidence,
-                verification_status=VerificationStatus(reasoning_res.verification_status),
-                visibility_policy=VisibilityPolicy.COLLECTIVE,
+                verification_status=(
+                    VerificationStatus.VERIFIED if can_promote_collective else VerificationStatus.UNVERIFIED
+                ),
+                visibility_policy=(
+                    VisibilityPolicy.COLLECTIVE if can_promote_collective else VisibilityPolicy.LOCAL
+                ),
             )
             brain_record_id = rec["record_id"]
             memory_manager.working.push({
@@ -584,8 +603,8 @@ async def ai_chat(req: ChatRequest):
                 "confidence": reasoning_res.confidence,
                 "timestamp": start,
             })
-        # 3. Sync collective knowledge to Supabase pgvector when configured
-        if supabase_store and supabase_store.configured and not is_generic_fallback:
+        # 3. Sync ONLY verified COLLECTIVE knowledge to Supabase pgvector (never quarantined/unverified)
+        if supabase_store and supabase_store.configured and can_promote_collective:
             k_emb_sb = engine.create_embedding(knowledge_entry) if engine else None
             sig_sb = identity.sign_message(knowledge_entry.encode("utf-8")) if identity else ""
             supabase_store.upsert_knowledge(
@@ -596,7 +615,7 @@ async def ai_chat(req: ChatRequest):
                 origin_node_id=identity.node_id if identity else "local",
                 signature=sig_sb,
                 confidence=reasoning_res.confidence,
-                verification_status=reasoning_res.verification_status,
+                verification_status="VERIFIED",
                 visibility="COLLECTIVE",
             )
         record_log("memory.brain", "OK", f"Brain knowledge updated from question '{req.prompt[:32]}' (id={brain_record_id}, docs={len(rag.doc_store) if rag else 0})")
@@ -765,15 +784,17 @@ def knowledge_crawl(req: CrawlKnowledgeRequest):
             rag.ingest(crawl_doc, emb)
             rag.flush()
         if memory_manager:
+            # P2 Quarantine Policy: incoming web-crawled data enters LOCAL Quarantine (UNVERIFIED)
+            # until independently verified and promoted via /api/v2/knowledge/promote/{record_id}.
             rec = memory_manager.store(
                 content=crawl_doc,
                 memory_type=MemoryType.SEMANTIC,
                 origin_node_id=identity.node_id if identity else "local",
                 source_type="internet_knowledge_crawler",
                 author="autonomous_crawler",
-                confidence=0.88,
-                verification_status=VerificationStatus.VERIFIED,
-                visibility_policy=VisibilityPolicy.COLLECTIVE,
+                confidence=0.55,
+                verification_status=VerificationStatus.UNVERIFIED,
+                visibility_policy=VisibilityPolicy.LOCAL,
             )
             record_id = rec["record_id"]
 
@@ -794,8 +815,7 @@ def knowledge_crawl(req: CrawlKnowledgeRequest):
 @app.delete("/knowledge/docs/{doc_idx}")
 def delete_knowledge_doc(doc_idx: int, request: Request):
     ensure_initialized()
-    if os.environ.get("GAJAHMADA_REQUIRE_AUTH") == "1":
-        auth_manager.authenticate_request(request, required_capability="memory:delete")
+    auth_manager.authenticate_request(request, required_capability="memory:delete")
     if not rag or doc_idx < 0 or doc_idx >= len(rag.doc_store):
         raise HTTPException(status_code=404, detail="Document index not found.")
     removed = rag.remove_at(doc_idx)
@@ -836,8 +856,7 @@ def get_peers():
 @app.post("/node/sync")
 def sync_node(req: SyncPeersRequest, request: Request):
     ensure_initialized()
-    if os.environ.get("GAJAHMADA_REQUIRE_AUTH") == "1":
-        auth_manager.authenticate_request(request, required_capability="network:manage")
+    auth_manager.authenticate_request(request, required_capability="network:manage")
     added = []
     for peer_url in req.peers:
         clean = peer_url.strip()
@@ -861,8 +880,7 @@ def sync_node(req: SyncPeersRequest, request: Request):
 @app.delete("/node/peers")
 def remove_peer(peer: str, request: Request):
     ensure_initialized()
-    if os.environ.get("GAJAHMADA_REQUIRE_AUTH") == "1":
-        auth_manager.authenticate_request(request, required_capability="network:manage")
+    auth_manager.authenticate_request(request, required_capability="network:manage")
     p2p.remove_peer(peer.strip())
     record_log("network.p2p", "WARN", f"Unlinked peer: {peer}")
     return {"status": "removed", "peers_known": list(p2p.peers)}
@@ -951,7 +969,7 @@ def verify_full_chain():
     is_valid = blockchain.is_chain_valid(verify_signatures=True)
     sig_verified = 0
     for b in blockchain.chain[1:]:
-        if b.signature and identity.verify_message(b.task_hash.encode(), b.signature, b.node_id):
+        if b.signature and blockchain.verify_block_signature(b):
             sig_verified += 1
     record_log(
         "blockchain.chain",
@@ -991,8 +1009,7 @@ def get_node_config():
 @app.post("/node/config")
 def update_node_config(req: ConfigUpdateRequest, request: Request):
     ensure_initialized()
-    if os.environ.get("GAJAHMADA_REQUIRE_AUTH") == "1":
-        auth_manager.authenticate_request(request, required_capability="config:write")
+    auth_manager.authenticate_request(request, required_capability="config:write")
     if req.node_name:
         runtime_config["node"]["name"] = req.node_name.strip()
     if req.pow_difficulty is not None and 1 <= req.pow_difficulty <= 4:
@@ -1042,11 +1059,30 @@ def get_system_logs():
 @app.delete("/node/logs")
 def clear_system_logs(request: Request):
     ensure_initialized()
-    if os.environ.get("GAJAHMADA_REQUIRE_AUTH") == "1":
-        auth_manager.authenticate_request(request, required_capability="logs:clear")
+    auth_manager.authenticate_request(request, required_capability="logs:clear")
     system_logs.clear()
     record_log("api.server", "INFO", "System telemetry log buffer cleared by operator.")
     return {"status": "cleared", "logs": system_logs}
+
+
+# ─── Active Rate-Limiting Middleware (P0 Security Remediation) ────────────
+@app.middleware("http")
+async def enforce_rate_limit(request: Request, call_next):
+    path = request.url.path
+    if rate_limiter is not None and (
+        path.startswith(("/ai/", "/knowledge/", "/node/", "/api/v2/", "/security/"))
+    ):
+        client_ip = request.client.host if request.client else "unknown"
+        bucket_key = f"{client_ip}:{path.split('/')[1]}"
+        allowed, _remaining = rate_limiter.check(bucket_key)
+        if not allowed:
+            return Response(
+                content='{"detail":"Rate limit exceeded. Please retry later."}',
+                status_code=429,
+                media_type="application/json",
+                headers={"Retry-After": str(int(rate_limiter.window_seconds))},
+            )
+    return await call_next(request)
 
 
 # ─── Static UI (Guaranteed No-Cache on both Vercel Serverless & Localhost) ─

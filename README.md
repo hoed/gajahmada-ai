@@ -13,7 +13,7 @@
 [![Supabase pgvector](https://img.shields.io/badge/Supabase-pgvector_384d-3ecf8e?style=for-the-badge&logo=supabase&logoColor=white)](supabase/schema.sql)
 [![Cognition](https://img.shields.io/badge/Cognition-14_Stage_Hybrid-818cf8?style=for-the-badge)](gajahmada_ai/cognition/reasoning.py)
 [![Protocol](https://img.shields.io/badge/Protocol-GIP%2F2.0_Ed25519-f59e0b?style=for-the-badge)](gajahmada_ai/network/protocol.py)
-[![Tests](https://img.shields.io/badge/Pytest-19%2F19_Passing-4ade80?style=for-the-badge)](tests/)
+[![Tests](https://img.shields.io/badge/Pytest-26%2F26_Passing-4ade80?style=for-the-badge)](tests/)
 
 </div>
 
@@ -43,15 +43,15 @@
 4. **🗄️ 5-Tier Persistent Memory & Hybrid Supabase `pgvector` Store (`gajahmada_ai.memory` & `storage`):**
    - Mengimplementasikan 5 tingkat memori (**Working, Semantic, Episodic, Procedural, Collective**) dengan penyimpanan *local-first* **`SQLite` (`gajahmada_v2.db`)** + **384-d Vector Store (`LocalKnowledge`)**.
    - **Integrasi Opsional Supabase (`PostgreSQL + pgvector`):** Melalui `SupabaseKnowledgeStore` (`gajahmada_ai/storage/supabase_store.py`) dan skema `supabase/schema.sql`, node serverless (seperti Vercel) maupun node lokal dapat menyinkronkan memori kolektif ber-ID **`content_hash` (SHA-256)** + tanda tangan **Ed25519**, pencarian vektor `match_knowledge` 384-d, dan blok audit `ledger_blocks` secara persisten tanpa kehilangan independensi lokal.
-5. **🤖 Autonomous Multi-Agent Runtime & Sandboxed Execution (`gajahmada_ai.agents` & `execution`):**
-   - Empat agen spesialis dengan kapabilitas dan izin tool tersendiri: **`PlannerAgent`**, **`ResearcherAgent`**, **`AnalystAgent`**, dan **`VerifierAgent`** yang dikoordinasikan oleh **`AutonomousTaskScheduler`**.
-   - Siklus status eksekusi eksplisit: `CREATED` → `PLANNED` → `APPROVED` → `RUNNING` → `WAITING` → `COMPLETED` / `FAILED` / `CANCELLED`, dilengkapi batas anggaran iterasi/waktu, *self-correction*, **`SandboxedExecutor`**, dan gerbang persetujuan manusia (*human approval gate*) untuk aksi sensitif.
-6. **🌐 GajahMada Intelligence Protocol (`GIP/2.0`) & Collective Intelligence (`gajahmada_ai.network`):**
-   - Protokol komunikasi terdistribusi berversi (`GIP/2.0`) dengan 8 namespace: `GIP-IDENTITY`, `GIP-DISCOVERY`, `GIP-CAPABILITY`, `GIP-TASK`, `GIP-KNOWLEDGE`, `GIP-VERIFY`, `GIP-CONSENSUS`, dan `GIP-SYNC`.
-   - Dilengkapi tanda tangan digital **Ed25519**, proteksi *nonce replay* (*sliding window*), pelindung **SSRF**, delegasi tugas multi-node (`CollectiveCoordinator`), dan verifikasi kuorum berbasis independensi bukti (tidak mempercayai suara mayoritas buta tanpa bukti).
-7. **⛓️ Signed Event Audit Ledger & Sovereign Security (`gajahmada_ai.blockchain` & `security`):**
-   - Setiap node memiliki kunci privat **Ed25519 (RFC 8032)** independen (`0600`, tanpa *default seed* statis yang dapat ditebak), mendukung rotasi kunci bersertifikat ganda (`POST /api/v2/system/rotate-key`) dan pencabutan peer (*peer revocation*).
-   - `AIBlockchain` mencatat event terstruktur (`NODE_REGISTERED`, `TASK_CREATED`, `TASK_ACCEPTED`, `TASK_COMPLETED`, `EVIDENCE_SUBMITTED`, `RESULT_VERIFIED`, `KNOWLEDGE_PROPOSED`, `KNOWLEDGE_ACCEPTED`, `KNOWLEDGE_REJECTED`, `MODEL_VERSION_CHANGED`) dengan Proof-of-Work SHA-256 dan verifikasi tanda tangan Ed25519.
+5. **🤖 Autonomous Multi-Agent Runtime & Unforgeable Approval (`gajahmada_ai.agents` & `execution`):**
+   - Empat agen spesialis (**`PlannerAgent`**, **`ResearcherAgent`**, **`AnalystAgent`**, **`VerifierAgent`**) dengan siklus `CREATED` → `PLANNED` → `APPROVED` → `RUNNING` → `WAITING` → `COMPLETED` / `FAILED` / `CANCELLED`.
+   - **Persetujuan Manusia Tidak Dapat Dipalsukan:** `human_approved` dihapus dari payload publik `POST /api/v2/agents/run`; persetujuan hanya sah lewat endpoint terautentikasi `POST /api/v2/agents/tasks/{id}/approve` dan dicatat ke ledger bertanda tangan.
+6. **🌐 GajahMada Intelligence Protocol (`GIP/2.0`) & Knowledge Quarantine (`gajahmada_ai.network`):**
+   - Seluruh **8 namespace GIP/2.0** (`IDENTITY`, `DISCOVERY`, `CAPABILITY`, `TASK`, `KNOWLEDGE`, `VERIFY`, `CONSENSUS`, `SYNC`) aktif di `POST /api/v2/network/gip`, dengan pemisahan antara validasi tanda tangan Ed25519 dan otorisasi peer.
+   - **Knowledge Quarantine Pipeline:** Data hasil LLM belum terverifikasi, web crawler, dan `GIP-KNOWLEDGE` dari peer masuk ke **Quarantine (`LOCAL` + `UNVERIFIED`)** terlebih dahulu dan hanya dapat dipromosikan ke `COLLECTIVE` lewat `POST /api/v2/knowledge/promote/{record_id}` setelah lulus cek kontradiksi.
+7. **⛓️ Tamper-Evident Signed Event Ledger & Fail-Closed Security (`gajahmada_ai.blockchain` & `security`):**
+   - **Blockchain Schema v2:** Canonical JSON hashing mencakup seluruh field (`event_type`, `event_ref`, `metadata`, `timestamp`, `node_id`, `previous_hash`), tanda tangan Ed25519 atas *full event envelope*, *atomic persistence* (`tmp + fsync + .bak + os.replace`), dan mode **`LEDGER_CORRUPTED`** (tidak pernah menghapus ledger rusak secara diam-diam; blok historis v1 tetap kompatibel).
+   - **Fail-Closed Auth & Memory Authorization:** Admin key 256-bit acak & dapat dirotasi (tidak pernah diturunkan dari `node_id`), seluruh endpoint mutasi v1/v2 wajib otentikasi (`401`), middleware *rate limiting* aktif (`429`), pembatasan CORS (`GAJAHMADA_ALLOWED_ORIGINS`), serta `MemoryAuthorizationService` yang menutup kebocoran `PRIVATE` record, versi, relasi, dan kontradiksi.
 8. **📈 Controlled 3-Level Closed-Loop Learning Subsystem (`gajahmada_ai.learning`):**
    - Mendukung Level 1 (*Validated Knowledge Acquisition*), Level 2 (*Closed-Loop Procedural Strategy Extraction & Dynamic `retrieval_top_k` Adaptation* yang terhubung langsung ke `POST /ai/chat`), dan Level 3 (*Local Model Experiment Governance*).
    - Setiap adaptasi strategi diuji terhadap *Regression Dataset Suite* dan otomatis ditolak (*rollback*) jika menurunkan akurasi.
@@ -157,6 +157,7 @@ gajahmada/
 │   │   └── evaluator.py                 # ReasoningQualityEvaluator
 │   ├── memory/                          # Mesin Memori Persisten 5-Tingkat
 │   │   ├── models.py                    # MemoryRecord, MemoryType, SourceProvenance, VerificationStatus, VisibilityPolicy
+│   │   ├── authorization.py             # MemoryAuthorizationService (gerbang tunggal otorisasi PRIVATE/LOCAL/COLLECTIVE)
 │   │   ├── manager.py                   # MemoryManager terpadu (menegakkan 6 aturan memori GajahMada)
 │   │   ├── working.py                   # Tier 1: WorkingMemory
 │   │   ├── semantic.py                  # Tier 2: SemanticMemory
@@ -339,7 +340,8 @@ python -m gajahmada_ai.cli.main train-model --note "Audit Konsensus V2"
 | `PUT` | `/api/v2/memory/{record_id}` | *(Auth Required)* Memperbarui/mengoreksi memori sambil menyimpan versi sebelumnya di tabel audit `gm_memory_versions`. |
 | `GET` | `/api/v2/memory/{record_id}/versions` | Mengambil riwayat lengkap seluruh versi rekaman memori. |
 | `POST` | `/api/v2/memory/backup` | *(Auth Required)* Mengekspor *snapshot* memori ke *Content-Addressed Object Store* ber-hash SHA-256. |
-| `GET` | `/api/v2/knowledge` | Mencari relasi entitas pada *Knowledge Graph* dan daftar kontradiksi pengetahuan. |
+| `GET` | `/api/v2/knowledge` | Mencari relasi entitas & kontradiksi pada *Knowledge Graph* (terfilter oleh `MemoryAuthorizationService`). |
+| `POST` | `/api/v2/knowledge/promote/{record_id}` | *(Auth Required)* Memverifikasi dan mempromosikan knowledge dari Quarantine (`LOCAL`/`UNVERIFIED`) ke `COLLECTIVE`/`VERIFIED` + mencatat `KNOWLEDGE_ACCEPTED`. |
 | `GET` | `/api/v2/agents` | Menampilkan daftar agen spesialis (`planner`, `researcher`, `analyst`, `verifier`) beserta izin tool dan daftar tugas. |
 | `POST` | `/api/v2/agents/run` | Menjalankan objektif melalui runtime agen otonom (`CREATED` → `PLANNED` → `APPROVED` → `RUNNING` → `COMPLETED`). |
 | `POST` | `/api/v2/agents/tasks/{task_id}/approve` | *(Auth Required)* Memberikan persetujuan operator manusia untuk tugas agen yang berstatus `WAITING`. |
@@ -379,9 +381,9 @@ python -m gajahmada_ai.cli.main train-model --note "Audit Konsensus V2"
 
 ---
 
-## 🧪 Pengujian & Kriteria Penerimaan (19 Automated Tests)
+## 🧪 Pengujian & Kriteria Penerimaan (26 Automated Tests)
 
-Jalankan seluruh 19 suite pengujian otomatis menggunakan `pytest`:
+Jalankan seluruh 26 suite pengujian otomatis menggunakan `pytest`:
 
 ```bash
 pytest -v
@@ -405,6 +407,7 @@ pytest -v
 | **TEST 14** | Eksperimen pembelajaran yang gagal pada uji regresi otomatis ditolak tanpa memengaruhi model/strategi aktif. | `tests/unit/test_core_and_neural.py` | ✅ **PASSED** |
 | **TEST 15** | Seluruh perilaku API v1 yang ada tetap kompatibel sepenuhnya. | `tests/integration/test_api_compatibility.py` | ✅ **PASSED** |
 | **EXT 16–19** | SSRF & seed guard, Signed Event PoW Ledger, Real Cognitive Benchmarks, & Closed-Loop Experience Strategy Adaptation. | `tests/` | ✅ **PASSED** |
+| **AUDIT P0–P5 (20–26)** | Random/rotatable admin key, Fail-closed v1 auth, `MemoryAuthorizationService` anti-leak, unforgeable human approval, Blockchain v2 canonical metadata hash + `LEDGER_CORRUPTED` recovery, Knowledge Quarantine + GIP/2.0 full handlers, & 3-node restart persistence. | `tests/security/test_audit_remediation.py` | ✅ **PASSED** |
 
 ---
 

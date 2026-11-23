@@ -2,10 +2,11 @@ from enum import Enum
 import hashlib
 import json
 import os
+import shutil
 import time
 from typing import Any, Dict, List, Optional
 
-from gajahmada_ai.security.crypto import NodeIdentity
+from gajahmada_ai.security.crypto import NodeIdentity, canonical_json_bytes
 
 
 class LedgerEventType(str, Enum):
@@ -23,7 +24,19 @@ class LedgerEventType(str, Enum):
     AUDIT_BLOCK = "AUDIT_BLOCK"
 
 
+class LedgerCorruptedError(RuntimeError):
+    """Raised when attempting to append to a ledger in LEDGER_CORRUPTED state."""
+
+
 class Block:
+    """
+    Tamper-evident Signed Event Block (Schema v2 with legacy v1 verification support).
+    - Schema v2 hashes & signs the FULL canonical event envelope including
+      `event_type`, `event_ref`, `metadata`, `timestamp`, `node_id`, and `previous_hash`.
+    - Legacy schema v1 blocks (without `schema_version >= 2`) remain verifiable under
+      their original hash/signature formula for backward compatibility.
+    """
+
     def __init__(
         self,
         index: int,
@@ -37,7 +50,9 @@ class Block:
         event_type: str = LedgerEventType.TASK_COMPLETED.value,
         event_ref: str = "",
         metadata: Optional[Dict[str, Any]] = None,
+        schema_version: int = 2,
     ):
+        self.schema_version = int(schema_version)
         self.index = index
         self.timestamp = timestamp
         self.task_hash = task_hash
@@ -50,16 +65,49 @@ class Block:
         self.metadata = metadata or {}
         self.hash = block_hash if block_hash else self.calculate_hash()
 
+    def signable_envelope_bytes(self) -> bytes:
+        """Canonical byte serialization of the event payload signed by Ed25519."""
+        envelope = {
+            "schema_version": self.schema_version,
+            "index": self.index,
+            "timestamp": self.timestamp,
+            "task_hash": self.task_hash,
+            "node_id": self.node_id,
+            "previous_hash": self.previous_hash,
+            "event_type": self.event_type,
+            "event_ref": self.event_ref,
+            "metadata": self.metadata,
+        }
+        return canonical_json_bytes(envelope)
+
     def calculate_hash(self) -> str:
-        # Backward compatible hash formula so existing chain.json blocks remain 100% valid
-        block_string = (
-            f"{self.index}|{self.timestamp}|{self.task_hash}|"
-            f"{self.node_id}|{self.previous_hash}|{self.signature}|{self.nonce}"
-        )
-        return hashlib.sha256(block_string.encode("utf-8")).hexdigest()
+        if self.schema_version < 2:
+            # Historical v1 block verification formula
+            block_string = (
+                f"{self.index}|{self.timestamp}|{self.task_hash}|"
+                f"{self.node_id}|{self.previous_hash}|{self.signature}|{self.nonce}"
+            )
+            return hashlib.sha256(block_string.encode("utf-8")).hexdigest()
+
+        # Schema v2: Canonical hash covering EVERY block & event metadata field
+        canonical_payload = {
+            "schema_version": self.schema_version,
+            "index": self.index,
+            "timestamp": self.timestamp,
+            "task_hash": self.task_hash,
+            "node_id": self.node_id,
+            "previous_hash": self.previous_hash,
+            "event_type": self.event_type,
+            "event_ref": self.event_ref,
+            "metadata": self.metadata,
+            "signature": self.signature,
+            "nonce": self.nonce,
+        }
+        return hashlib.sha256(canonical_json_bytes(canonical_payload)).hexdigest()
 
     def to_dict(self) -> Dict[str, Any]:
-        d = {
+        d: Dict[str, Any] = {
+            "schema_version": self.schema_version,
             "index": self.index,
             "timestamp": self.timestamp,
             "task_hash": self.task_hash,
@@ -78,6 +126,8 @@ class Block:
 
     @classmethod
     def from_dict(cls, data: dict) -> "Block":
+        # Legacy blocks serialized before P1 lack `schema_version` -> verify as v1
+        sv = int(data.get("schema_version", 1))
         return cls(
             index=data["index"],
             timestamp=data["timestamp"],
@@ -87,29 +137,36 @@ class Block:
             signature=data.get("signature", ""),
             nonce=data.get("nonce", 0),
             block_hash=data.get("hash"),
-            event_type=data.get("event_type", LedgerEventType.GENESIS.value if data["index"] == 0 else LedgerEventType.TASK_COMPLETED.value),
+            event_type=data.get(
+                "event_type",
+                LedgerEventType.GENESIS.value if data["index"] == 0 else LedgerEventType.TASK_COMPLETED.value,
+            ),
             event_ref=data.get("event_ref", ""),
             metadata=data.get("metadata", {}),
+            schema_version=sv,
         )
 
 
 class AIBlockchain:
     """
-    Signed Event & Cryptographic Audit Ledger.
-    Preserves SHA-256 Proof-of-Work hash linkage AND enforces Ed25519 signature
-    verification on signed event blocks.
-    Never stores raw bulk documents or neural weight binaries on-chain—only
-    SHA-256 content hashes and compact event references.
+    Tamper-Evident Signed Event & Cryptographic Audit Ledger (P1 Remediated).
+    - Canonical JSON block hashing covering event_type, event_ref, and metadata.
+    - Ed25519 signature over the complete signed event envelope.
+    - Atomic persistence (write temp + fsync + backup + os.replace).
+    - Explicit LEDGER_CORRUPTED mode on integrity failure (never silently wipes chain).
     """
 
     def __init__(self, storage_path: Optional[str] = None):
         self.difficulty = 2
         self.storage_path = storage_path
         self.chain: List[Block] = []
+        self.status: str = "HEALTHY"
+        self.corruption_error: Optional[str] = None
         self._verifier = NodeIdentity(key_path=None)
+
         if self.storage_path and os.path.exists(self.storage_path):
             self.load()
-        if not self.chain:
+        elif not self.chain:
             self.chain = [self.create_genesis_block()]
             self.save()
 
@@ -121,12 +178,19 @@ class AIBlockchain:
             "Genesis Node",
             "0",
             event_type=LedgerEventType.GENESIS.value,
+            schema_version=2,
         )
 
     def get_latest_block(self) -> Block:
+        if not self.chain:
+            raise LedgerCorruptedError(self.corruption_error or "Ledger is empty or corrupted.")
         return self.chain[-1]
 
     def add_block(self, new_block: Block) -> Block:
+        if self.status == "LEDGER_CORRUPTED":
+            raise LedgerCorruptedError(
+                f"Cannot append block while ledger is in LEDGER_CORRUPTED state: {self.corruption_error}"
+            )
         new_block.index = len(self.chain)
         new_block.previous_hash = self.get_latest_block().hash
         new_block.hash = new_block.calculate_hash()
@@ -145,25 +209,47 @@ class AIBlockchain:
         identity: NodeIdentity,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Block:
-        """Record a typed, signed audit event on the ledger using content hashes."""
+        """Record a typed, full-envelope Ed25519 signed audit event on the ledger."""
+        if self.status == "LEDGER_CORRUPTED":
+            raise LedgerCorruptedError(
+                f"Cannot record event while ledger is in LEDGER_CORRUPTED state: {self.corruption_error}"
+            )
         t0 = time.time()
         ev_name = event_type.value if isinstance(event_type, LedgerEventType) else str(event_type)
-        task_hash = hashlib.sha256(f"{ev_name}|{content_reference}|{t0}".encode("utf-8")).hexdigest()
-        signature = identity.sign_message(task_hash.encode("utf-8"))
+        meta = metadata or {}
+        next_idx = len(self.chain)
+        prev_hash = self.get_latest_block().hash
+        task_hash = hashlib.sha256(
+            canonical_json_bytes({"event_type": ev_name, "ref": content_reference, "ts": t0, "metadata": meta})
+        ).hexdigest()
+
         block = Block(
-            index=len(self.chain),
+            index=next_idx,
             timestamp=t0,
             task_hash=task_hash,
             node_id=identity.node_id,
-            previous_hash=self.get_latest_block().hash,
-            signature=signature,
+            previous_hash=prev_hash,
+            signature="",
             event_type=ev_name,
             event_ref=content_reference[:128],
-            metadata=metadata or {},
+            metadata=meta,
+            schema_version=2,
         )
+        block.signature = identity.sign_message(block.signable_envelope_bytes())
         return self.add_block(block)
 
+    def verify_block_signature(self, block: Block) -> bool:
+        if not block.signature or block.node_id == "Genesis Node":
+            return True
+        if block.schema_version >= 2:
+            # Verify full signed envelope first; allow legacy task_hash sig for manually constructed v1-compat blocks
+            if self._verifier.verify_message(block.signable_envelope_bytes(), block.signature, block.node_id):
+                return True
+        return self._verifier.verify_message(block.task_hash.encode("utf-8"), block.signature, block.node_id)
+
     def is_chain_valid(self, verify_signatures: bool = True) -> bool:
+        if self.status == "LEDGER_CORRUPTED" or not self.chain:
+            return False
         target_prefix = "0" * self.difficulty
         for i in range(1, len(self.chain)):
             current = self.chain[i]
@@ -176,24 +262,26 @@ class AIBlockchain:
                 return False
             if not current.hash.startswith(target_prefix):
                 return False
-            if verify_signatures and current.signature and current.node_id != "Genesis Node":
-                if not self._verifier.verify_message(
-                    current.task_hash.encode("utf-8"),
-                    current.signature,
-                    current.node_id,
-                ):
-                    return False
+            if verify_signatures and not self.verify_block_signature(current):
+                return False
         return True
 
     def save(self):
         if not self.storage_path:
             return
-        try:
-            os.makedirs(os.path.dirname(os.path.abspath(self.storage_path)), exist_ok=True)
-            with open(self.storage_path, "w", encoding="utf-8") as f:
-                json.dump([b.to_dict() for b in self.chain], f, indent=2)
-        except Exception:
-            pass
+        os.makedirs(os.path.dirname(os.path.abspath(self.storage_path)), exist_ok=True)
+        tmp_path = f"{self.storage_path}.tmp"
+        bak_path = f"{self.storage_path}.bak"
+        if os.path.exists(self.storage_path) and self.status == "HEALTHY":
+            try:
+                shutil.copy2(self.storage_path, bak_path)
+            except Exception:
+                pass
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump([b.to_dict() for b in self.chain], f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, self.storage_path)
 
     def load(self):
         if not self.storage_path or not os.path.exists(self.storage_path):
@@ -201,8 +289,26 @@ class AIBlockchain:
         try:
             with open(self.storage_path, "r", encoding="utf-8") as f:
                 raw = json.load(f)
-                self.chain = [Block.from_dict(item) for item in raw]
-            if not self.is_chain_valid(verify_signatures=False):
-                self.chain = []
-        except Exception:
+            if not isinstance(raw, list) or not raw:
+                raise ValueError("Ledger JSON is empty or not a list of blocks.")
+            self.chain = [Block.from_dict(item) for item in raw]
+            if not self.is_chain_valid(verify_signatures=True):
+                self.status = "LEDGER_CORRUPTED"
+                self.corruption_error = "Loaded chain failed hash linkage, PoW, or Ed25519 signature verification."
+        except Exception as e:
+            self.status = "LEDGER_CORRUPTED"
+            self.corruption_error = f"Failed to load ledger: {e}"
             self.chain = []
+
+    def recover_from_backup(self) -> bool:
+        """Explicit operator recovery from `.bak` snapshot when in LEDGER_CORRUPTED state."""
+        if not self.storage_path:
+            return False
+        bak_path = f"{self.storage_path}.bak"
+        if not os.path.exists(bak_path):
+            return False
+        shutil.copy2(bak_path, self.storage_path)
+        self.status = "HEALTHY"
+        self.corruption_error = None
+        self.load()
+        return self.status == "HEALTHY"
