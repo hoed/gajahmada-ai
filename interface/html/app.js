@@ -393,9 +393,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const z2 = z1 * cosX + node.y * sinX;
     const fov = 2.05;
     const scale = fov / (fov + z2 + 0.35);
+    const isHome = document.body.classList.contains('view-home');
+    const spreadX = isHome ? (w < 768 ? 0.52 : 0.46) : 0.42;
+    const spreadY = isHome ? (w < 768 ? 0.42 : 0.48) : 0.42;
     return {
-      sx: w * 0.5 + x1 * w * 0.42 * scale,
-      sy: h * 0.46 + y2 * h * 0.42 * scale,
+      sx: w * 0.5 + x1 * w * spreadX * scale,
+      sy: h * (isHome ? 0.50 : 0.46) + y2 * h * spreadY * scale,
       z: z2,
       scale,
     };

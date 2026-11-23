@@ -714,33 +714,53 @@
       width: 100vw !important;
       height: 100vh !important;
     }
-    /* Floating Glassmorphic Command Center */
+    /* Floating Transparent Command Center (30% opacity, no blur, compact so 3D Network shines clearly) */
     body.view-home #panel-command-hero {
       position: fixed !important;
       top: 50% !important;
       left: 50% !important;
       transform: translate(-50%, -50%) !important;
-      width: min(860px, 94vw) !important;
-      height: min(72vh, 620px) !important;
-      max-height: calc(100vh - 92px) !important;
+      width: min(600px, 90vw) !important;
+      height: min(48vh, 380px) !important;
+      max-height: calc(100vh - 96px) !important;
       z-index: 25 !important;
-      background: rgba(5, 11, 9, 0.72) !important;
-      backdrop-filter: blur(12px) saturate(135%) !important;
-      -webkit-backdrop-filter: blur(12px) saturate(135%) !important;
-      border: 1.5px solid rgba(45, 212, 191, 0.52) !important;
+      background: rgba(4, 10, 8, 0.30) !important;
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      border: 1px solid rgba(45, 212, 191, 0.55) !important;
       border-radius: 10px !important;
-      box-shadow: 0 22px 64px rgba(0, 0, 0, 0.78), 0 0 36px rgba(45, 212, 191, 0.14) !important;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45), 0 0 24px rgba(45, 212, 191, 0.14) !important;
       transition: border-color 0.25s ease, box-shadow 0.25s ease !important;
     }
     body.view-home.brain-thinking #panel-command-hero {
       border-color: #2dd4bf !important;
-      box-shadow: 0 22px 70px rgba(0, 0, 0, 0.82), 0 0 48px rgba(45, 212, 191, 0.45), inset 0 0 22px rgba(45, 212, 191, 0.12) !important;
+      box-shadow: 0 12px 48px rgba(0, 0, 0, 0.52), 0 0 42px rgba(45, 212, 191, 0.45), inset 0 0 16px rgba(45, 212, 191, 0.14) !important;
+    }
+    body.view-home #panel-command-hero .panel-header {
+      background: rgba(5, 13, 10, 0.36) !important;
+      border-bottom: 1px solid rgba(45, 212, 191, 0.28) !important;
     }
     body.view-home #panel-command-hero .chat-feed {
-      background: rgba(3, 7, 6, 0.45) !important;
-      font-size: 12.5px !important;
+      background: transparent !important;
+      font-size: 11.5px !important;
       max-height: none !important;
+      min-height: 0 !important;
       flex: 1 !important;
+      padding: 8px 10px !important;
+    }
+    body.view-home #panel-command-hero .chat-item {
+      background: rgba(4, 12, 9, 0.34) !important;
+      border-color: rgba(45, 212, 191, 0.32) !important;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.92);
+    }
+    body.view-home #panel-command-hero .chat-item.chat-user {
+      background: rgba(15, 23, 42, 0.36) !important;
+      border-color: rgba(129, 140, 248, 0.42) !important;
+    }
+    body.view-home #panel-command-hero .quick-cmd-bar,
+    body.view-home #panel-command-hero .prompt-input-bar,
+    body.view-home #panel-command-hero .chat-typing {
+      background: rgba(4, 10, 8, 0.34) !important;
     }
     body.view-home #btn-inline-cmd-dialog,
     body.view-home #btn-toggle-maximize {
@@ -758,8 +778,44 @@
       border-left: none !important;
       border-right: none !important;
       border-bottom: none !important;
-      background: rgba(4, 9, 8, 0.72) !important;
-      backdrop-filter: blur(8px) !important;
+      background: rgba(4, 9, 8, 0.42) !important;
+      backdrop-filter: none !important;
+    }
+    /* Mobile Responsive Tuning for Homepage Focus Mode */
+    @media (max-width: 768px) {
+      body.view-home .top-bar {
+        height: 40px !important;
+        padding: 0 10px !important;
+      }
+      body.view-home #panel-command-hero {
+        width: 92vw !important;
+        height: min(50vh, 340px) !important;
+        top: 52% !important;
+        max-height: calc(100vh - 88px) !important;
+      }
+      body.view-home #panel-command-hero .chat-feed {
+        min-height: 0 !important;
+        max-height: none !important;
+        font-size: 11px !important;
+        padding: 6px 8px !important;
+      }
+      body.view-home #panel-command-hero .quick-cmd-bar {
+        padding: 4px 6px !important;
+      }
+      body.view-home #panel-command-hero .cp-chip {
+        padding: 3px 7px !important;
+        font-size: 9px !important;
+      }
+      body.view-home #panel-command-hero .prompt-input-bar {
+        height: 38px !important;
+        min-height: 38px !important;
+      }
+      body.view-home .github-bottom-bar {
+        height: auto !important;
+        min-height: 24px !important;
+        font-size: 8.5px !important;
+        padding: 4px 8px !important;
+      }
     }
     .btn-view-switch {
       border-color: #2dd4bf !important;
@@ -1523,8 +1579,8 @@
     </div>
   </div>
 
-  <script type="module" src="/ui/analytics.js?v=18.0"></script>
-  <script src="/ui/app.js?v=18.0"></script>
+  <script type="module" src="/ui/analytics.js?v=19.0"></script>
+  <script src="/ui/app.js?v=19.0"></script>
 </body>
 
 </html>
