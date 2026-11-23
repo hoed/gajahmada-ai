@@ -19,11 +19,15 @@
 
 ---
 
-## 🖥️ Tactical Cyberdeck HUD Preview (`/ui`)
+## 🖥️ Live Interface Preview (`/` Homepage & `/dashboard` Cyberdeck HUD)
 
+### 1. Homepage — Focus Command Center & Fullscreen 3D Network (`/`)
+![GajahMada Homepage Command Center & 3D Network](interface/html/screenshot-home.jpg)
+
+### 2. Full 8-Panel Tactical Cyberdeck Dashboard (`/dashboard` & `/ui`)
 ![GajahMada Tactical Cyberdeck HUD](interface/html/screenshot-v2.jpg)
 
-> **Live Web Console (`/ui`):** Antarmuka *Bento Grid 100vh* bergaya *Tactical Cyberdeck* yang memvisualisasikan dan mengendalikan seluruh 8 lapisan arsitektur **GajahMada 2.0** secara real-time—mulai dari graf pengetahuan 3D, telemetri log sistem, konsol perintah penalaran hibrida & slash-commands, matriks dependensi, siklus konsensus Web3, protokol jaringan P2P `GIP/2.0`, hingga penambangan blok *Signed Event Audit Ledger*.
+> **Dual-Mode Live Web Console (`/` & `/dashboard`):** Homepage (`/`) menampilkan **Command Center transparan (30%, tanpa blur)** di atas kanvas **3D Network Graph** layar penuh yang berakselerasi cepat saat Brain berpikir. Klik **`📊 DASHBOARD`** untuk beralih instan ke **8-Panel Tactical Cyberdeck HUD** (`/dashboard` & `/ui`) yang mengendalikan seluruh 8 lapisan arsitektur **GajahMada 2.0** secara real-time.
 
 ---
 
