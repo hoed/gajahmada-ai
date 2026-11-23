@@ -5,7 +5,9 @@ set -e
 echo "=== Gajahmada AI — Local Dev ==="
 
 PYTHON_BIN="python"
-if [ -x ".venv/bin/python" ]; then
+if [ -x ".venv312/bin/python" ]; then
+  PYTHON_BIN=".venv312/bin/python"
+elif [ -x ".venv/bin/python" ]; then
   PYTHON_BIN=".venv/bin/python"
 fi
 

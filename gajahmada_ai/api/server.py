@@ -480,11 +480,13 @@ async def ai_chat(req: ChatRequest):
     matched_docs = 0
     memory_records = []
 
+    active_top_k = int(learning_manager.adapter.active_strategy.get("retrieval_top_k", 3)) if learning_manager else 2
+
     if rag and engine:
         try:
             query_emb = engine.create_embedding(req.prompt)
             if query_emb:
-                results = rag.search(query_emb, k=2, query_text=req.prompt)
+                results = rag.search(query_emb, k=active_top_k, query_text=req.prompt)
                 if results:
                     matched_docs = len(results)
                     context = "\n".join(results)
@@ -498,7 +500,7 @@ async def ai_chat(req: ChatRequest):
                         for i, doc in enumerate(results)
                     ]
                 if supabase_store and supabase_store.configured:
-                    sb_hits = supabase_store.search_knowledge(query_emb, k=2)
+                    sb_hits = supabase_store.search_knowledge(query_emb, k=active_top_k)
                     seen_txt = {m["content"] for m in memory_records}
                     for j, hit in enumerate(sb_hits):
                         txt = (hit.get("content") or "").strip()
@@ -525,6 +527,18 @@ async def ai_chat(req: ChatRequest):
         temperature=cfg_temp,
     )
     response = reasoning_res.conclusion
+
+    # Closed-loop Experience Extraction & Bounded Strategy Adaptation (Level 1 & 2 Learning)
+    learning_outcome = (
+        learning_manager.record_outcome_and_adapt(
+            objective=req.prompt,
+            reasoning_res=reasoning_res,
+            memory_manager=memory_manager,
+            rag_matches=matched_docs,
+        )
+        if learning_manager
+        else {"strategy_version": 1, "retrieval_top_k": active_top_k, "procedural_record_id": None, "adaptation_triggered": False}
+    )
 
     # Persist every question & answer interaction into the GajahMada Brain (RAG Vector Store + 5-Tier Memory)
     brain_record_id = None
@@ -634,6 +648,8 @@ async def ai_chat(req: ChatRequest):
         "confidence": reasoning_res.confidence,
         "uncertainty": reasoning_res.uncertainty,
         "capabilities_used": reasoning_res.capabilities_used,
+        "strategy_version": learning_outcome.get("strategy_version", 1),
+        "procedural_record_id": learning_outcome.get("procedural_record_id"),
     }
 
 

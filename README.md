@@ -13,7 +13,7 @@
 [![Supabase pgvector](https://img.shields.io/badge/Supabase-pgvector_384d-3ecf8e?style=for-the-badge&logo=supabase&logoColor=white)](supabase/schema.sql)
 [![Cognition](https://img.shields.io/badge/Cognition-14_Stage_Hybrid-818cf8?style=for-the-badge)](gajahmada_ai/cognition/reasoning.py)
 [![Protocol](https://img.shields.io/badge/Protocol-GIP%2F2.0_Ed25519-f59e0b?style=for-the-badge)](gajahmada_ai/network/protocol.py)
-[![Tests](https://img.shields.io/badge/Pytest-18%2F18_Passing-4ade80?style=for-the-badge)](tests/)
+[![Tests](https://img.shields.io/badge/Pytest-19%2F19_Passing-4ade80?style=for-the-badge)](tests/)
 
 </div>
 
@@ -52,9 +52,23 @@
 7. **⛓️ Signed Event Audit Ledger & Sovereign Security (`gajahmada_ai.blockchain` & `security`):**
    - Setiap node memiliki kunci privat **Ed25519 (RFC 8032)** independen (`0600`, tanpa *default seed* statis yang dapat ditebak), mendukung rotasi kunci bersertifikat ganda (`POST /api/v2/system/rotate-key`) dan pencabutan peer (*peer revocation*).
    - `AIBlockchain` mencatat event terstruktur (`NODE_REGISTERED`, `TASK_CREATED`, `TASK_ACCEPTED`, `TASK_COMPLETED`, `EVIDENCE_SUBMITTED`, `RESULT_VERIFIED`, `KNOWLEDGE_PROPOSED`, `KNOWLEDGE_ACCEPTED`, `KNOWLEDGE_REJECTED`, `MODEL_VERSION_CHANGED`) dengan Proof-of-Work SHA-256 dan verifikasi tanda tangan Ed25519.
-8. **📈 Controlled 3-Level Learning Subsystem (`gajahmada_ai.learning`):**
-   - Mendukung Level 1 (*Validated Knowledge Acquisition*), Level 2 (*Procedural Strategy Extraction*), dan Level 3 (*Local Model Experiment Governance*).
-   - Setiap eksperimen pembelajaran diuji terhadap *Regression Dataset Suite* dan otomatis ditolak (*rollback*) jika menurunkan akurasi.
+8. **📈 Controlled 3-Level Closed-Loop Learning Subsystem (`gajahmada_ai.learning`):**
+   - Mendukung Level 1 (*Validated Knowledge Acquisition*), Level 2 (*Closed-Loop Procedural Strategy Extraction & Dynamic `retrieval_top_k` Adaptation* yang terhubung langsung ke `POST /ai/chat`), dan Level 3 (*Local Model Experiment Governance*).
+   - Setiap adaptasi strategi diuji terhadap *Regression Dataset Suite* dan otomatis ditolak (*rollback*) jika menurunkan akurasi.
+
+---
+
+## 🛡️ 7 Prinsip Arsitektur Kecerdasan Berdaulat (7/7 Terverifikasi)
+
+| # | Prinsip Arsitektur | Implementasi & Verifikasi |
+| :-: | :--- | :--- |
+| **1** | **Cognitive engine independen per node** | Tiap `SovereignPeerNode` menjalankan `CognitiveReasoningPipeline` 14-tahap secara mandiri & offline. |
+| **2** | **Persistent memory privat per node** | SQLite ACID lokal (`gajahmada_v2.db`) + isolasi `PRIVATE`/`LOCAL` (terproteksi di GIP/2.0 & Supabase RLS). |
+| **3** | **Neural-symbolic reasoning aktif** | Kombinasi model GGUF lokal (`qwen2.5-1.5b-instruct-q4_k_m.gguf` via `.venv312` `llama-cpp-python`) + AST Symbolic + Evidence Reasoner. |
+| **4** | **Strategi adaptif berbasis pengalaman** | `record_outcome_and_adapt()` otomatis mengekstrak strategi ke `PROCEDURAL` memory & menyetel `retrieval_top_k` dengan uji regresi + rollback. |
+| **5** | **Kerja sama melalui protokol terbuka** | Protokol **GIP/2.0** (8 namespace, JSON kanonik, Ed25519, proteksi *nonce replay* & anti-SSRF). |
+| **6** | **Verifikasi independen antar-node** | `QuorumConsensusManager` memverifikasi tanda tangan Ed25519 & `provenance_hash`, serta menolak mayoritas tanpa bukti primer. |
+| **7** | **Tanpa pusat pengendali tunggal** | Tidak ada node master wajib; identitas kriptografis, kebijakan, dan penyimpanan dikuasai masing-masing node. |
 
 ---
 
@@ -235,17 +249,19 @@ Buka browser di: **[http://localhost:8000/ui](http://localhost:8000/ui)**
 
 ### 2. Mode Penuh dengan Model GGUF Lokal (`llama-cpp-python`)
 
-Letakkan file model GGUF di `./models/` (mis. `qwen2.5-1.5b-instruct-q4_k_m.gguf`) dan pasang `llama-cpp-python` di `.venv`:
+Letakkan file model GGUF di `./models/` (mis. `qwen2.5-1.5b-instruct-q4_k_m.gguf`) dan pasang prebuilt CPU wheel `llama-cpp-python` di `.venv312` (cepat, tanpa kompilasi C++):
 
 ```bash
-python3 -m venv --system-site-packages .venv
-.venv/bin/pip install llama-cpp-python
+uv venv --python 3.12 .venv312
+uv pip install --python .venv312/bin/python -r requirements.txt
+uv pip install --python .venv312/bin/python llama-cpp-python \
+  --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
 
 mkdir -p models
 curl -L -o models/qwen2.5-1.5b-instruct-q4_k_m.gguf \
   https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf
 
-# ./run.sh otomatis mendeteksi .venv/bin/python dan memuat model GGUF dari config.yaml / ./models/
+# ./run.sh otomatis mendeteksi .venv312/bin/python dan memuat model GGUF dari config.yaml / ./models/
 ./run.sh
 ```
 
@@ -260,7 +276,9 @@ Agar knowledge Brain dan audit ledger tersimpan permanen di cloud/Vercel sekalig
    SUPABASE_PUBLISHABLE_KEY=<your-publishable-key>
    SUPABASE_SECRET_KEY=<your-secret-key>
    ```
-3. Tanpa `.env`, GajahMada tetap berjalan 100% mandiri menggunakan SQLite lokal (*local-first*).
+3. **Keamanan RLS (Row Level Security):** Skema `supabase/schema.sql` mengaktifkan RLS pada `knowledge_records` dan `ledger_blocks` — kunci publik (`SUPABASE_PUBLISHABLE_KEY`) hanya dapat membaca baris `visibility = 'COLLECTIVE'` dan **diblokir (`401 / 42501`)** untuk operasi `INSERT/UPDATE/DELETE`; hanya backend dengan `SUPABASE_SECRET_KEY` yang berhak menulis.
+4. **Catatan `DATABASE_URL`:** Jika password PostgreSQL mengandung karakter khusus (seperti `@` atau `#`), gunakan URL-encoding (`@` → `%40`, `#` → `%23`).
+5. Tanpa `.env`, GajahMada tetap berjalan 100% mandiri menggunakan SQLite lokal (*local-first*).
 
 ---
 
@@ -361,9 +379,9 @@ python -m gajahmada_ai.cli.main train-model --note "Audit Konsensus V2"
 
 ---
 
-## 🧪 Pengujian & Kriteria Penerimaan (15 Mandatory Acceptance Tests)
+## 🧪 Pengujian & Kriteria Penerimaan (19 Automated Tests)
 
-Jalankan seluruh 18 suite pengujian otomatis menggunakan `pytest`:
+Jalankan seluruh 19 suite pengujian otomatis menggunakan `pytest`:
 
 ```bash
 pytest -v
@@ -386,6 +404,7 @@ pytest -v
 | **TEST 13** | Peer jahat tidak dapat mengeksekusi perintah shell, memalsukan tanda tangan, atau membaca/mengubah memori `PRIVATE`. | `tests/security/test_security_and_governance.py` | ✅ **PASSED** |
 | **TEST 14** | Eksperimen pembelajaran yang gagal pada uji regresi otomatis ditolak tanpa memengaruhi model/strategi aktif. | `tests/unit/test_core_and_neural.py` | ✅ **PASSED** |
 | **TEST 15** | Seluruh perilaku API v1 yang ada tetap kompatibel sepenuhnya. | `tests/integration/test_api_compatibility.py` | ✅ **PASSED** |
+| **EXT 16–19** | SSRF & seed guard, Signed Event PoW Ledger, Real Cognitive Benchmarks, & Closed-Loop Experience Strategy Adaptation. | `tests/` | ✅ **PASSED** |
 
 ---
 

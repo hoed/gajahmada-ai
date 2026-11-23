@@ -102,3 +102,49 @@ def test_signed_blockchain_event_ledger():
         orig_sig = chain.chain[1].signature
         chain.chain[1].signature = "AAAA" + orig_sig[4:]
         assert chain.is_chain_valid(verify_signatures=True) is False
+
+
+def test_experience_extraction_and_strategy_adaptation():
+    """Verify closed-loop Level 2 experience extraction into PROCEDURAL memory and bounded strategy tuning."""
+    from types import SimpleNamespace
+    from gajahmada_ai.memory.manager import MemoryManager
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        mem = MemoryManager(
+            sqlite_path=os.path.join(tmpdir, "exp.db"),
+            backup_dir=os.path.join(tmpdir, "objects"),
+        )
+        manager = LearningExperimentManager()
+
+        # 1. High-confidence verified execution extracts a reusable Procedural Memory strategy
+        verified_res = SimpleNamespace(
+            reasoning_id="rsn-verified-1",
+            confidence=0.95,
+            verification_status="VERIFIED",
+            reasoning_steps=[
+                SimpleNamespace(stage="PERCEPTION", outcome="COMPLETED"),
+                SimpleNamespace(stage="SYMBOLIC_REASONING", outcome="VERIFIED"),
+            ],
+            capabilities_used={"symbolic_used_in_this_call": True},
+        )
+        out1 = manager.record_outcome_and_adapt("Hitung 12 * 12", verified_res, memory_manager=mem, rag_matches=1)
+        assert out1["procedural_record_id"] is not None
+        assert mem.stats()["tiers"].get("procedural", 0) >= 1
+
+        # 2. Repeated low-evidence outcomes trigger bounded, regression-verified retrieval_top_k adaptation
+        low_res = SimpleNamespace(
+            reasoning_id="rsn-low",
+            confidence=0.30,
+            verification_status="UNVERIFIED",
+            reasoning_steps=[],
+            capabilities_used={},
+        )
+        start_k = manager.adapter.active_strategy["retrieval_top_k"]
+        for _ in range(3):
+            out = manager.record_outcome_and_adapt("topik langka", low_res, memory_manager=mem, rag_matches=0)
+        assert out["adaptation_triggered"] is True
+        assert manager.adapter.active_strategy["retrieval_top_k"] == start_k + 1
+
+        # 3. Adaptation remains reversible via rollback
+        manager.rollback_last()
+        assert manager.adapter.active_strategy["retrieval_top_k"] == start_k
