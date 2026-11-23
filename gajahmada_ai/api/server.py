@@ -1096,6 +1096,8 @@ def serve_root_js():
     )
 
 
+@app.get("/dashboard", include_in_schema=False)
+@app.get("/dashboard/", include_in_schema=False)
 @app.get("/ui", include_in_schema=False)
 @app.get("/ui/", include_in_schema=False)
 def serve_ui_root():

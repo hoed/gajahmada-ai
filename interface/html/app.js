@@ -328,9 +328,62 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function resizeUniverse() {
+    if (document.body.classList.contains('view-home')) {
+      canvasU.width = window.innerWidth;
+      canvasU.height = window.innerHeight;
+      return;
+    }
     if (!canvasU.parentElement) return;
     canvasU.width = canvasU.parentElement.clientWidth;
     canvasU.height = canvasU.parentElement.clientHeight;
+  }
+
+  // ─── VIEW MODE SWITCHER: HOMEPAGE (/) vs FULL CYBERDECK DASHBOARD (/dashboard, /ui) ───
+  const elBtnToggleView = document.getElementById('btn-toggle-view');
+  function applyViewMode(mode, pushUrl = false) {
+    const isDashboard = mode === 'dashboard';
+    document.body.classList.toggle('view-home', !isDashboard);
+    document.body.classList.toggle('view-dashboard', isDashboard);
+    if (elBtnToggleView) {
+      elBtnToggleView.textContent = isDashboard ? '🏠 COMMAND HOME' : '📊 DASHBOARD';
+      elBtnToggleView.title = isDashboard
+        ? 'Kembali ke Homepage Command Center dengan latar 3D Network'
+        : 'Buka Full 8-Panel Tactical Cyberdeck Dashboard';
+    }
+    if (pushUrl && window.history && window.history.pushState) {
+      const targetPath = isDashboard ? '/dashboard' : '/';
+      if (window.location.pathname !== targetPath) {
+        window.history.pushState({ view: mode }, '', targetPath);
+      }
+    }
+    requestAnimationFrame(() => {
+      resizeUniverse();
+      if (typeof resizeSwarm === 'function') resizeSwarm();
+    });
+  }
+
+  const initialPath = (window.location.pathname || '/').toLowerCase();
+  const initialView = (initialPath.startsWith('/dashboard') || initialPath.startsWith('/ui')) ? 'dashboard' : 'home';
+  applyViewMode(initialView, false);
+
+  elBtnToggleView?.addEventListener('click', () => {
+    const nextMode = document.body.classList.contains('view-home') ? 'dashboard' : 'home';
+    applyViewMode(nextMode, true);
+  });
+
+  window.addEventListener('popstate', () => {
+    const p = (window.location.pathname || '/').toLowerCase();
+    applyViewMode((p.startsWith('/dashboard') || p.startsWith('/ui')) ? 'dashboard' : 'home', false);
+  });
+
+  // ─── BRAIN THINKING TURBO ANIMATION STATE FOR 3D NETWORK ───
+  let brainThinking = false;
+  let currentRotSpeedY = 0.0036;
+  let thinkingEnergy = 0.0; // 0.0 (calm idle) -> 1.0 (fast cognitive spin)
+
+  function setBrainThinking(active) {
+    brainThinking = Boolean(active);
+    document.body.classList.toggle('brain-thinking', brainThinking);
   }
 
   function project3D(node, w, h, cosY, sinY, cosX, sinX) {
@@ -354,16 +407,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const h = canvasU.height;
     ctxU.clearRect(0, 0, w, h);
 
-    rotY += 0.0036;
-    focusPulse += 0.06;
+    // Smooth acceleration when Brain is thinking (idle 0.0036 -> turbo 0.058 rad/frame)
+    const targetSpeedY = brainThinking ? 0.058 : 0.0036;
+    const targetEnergy = brainThinking ? 1.0 : 0.0;
+    currentRotSpeedY += (targetSpeedY - currentRotSpeedY) * 0.09;
+    thinkingEnergy += (targetEnergy - thinkingEnergy) * 0.08;
+
+    rotY += currentRotSpeedY;
+    focusPulse += 0.06 + thinkingEnergy * 0.26;
+    if (brainThinking && Math.random() < 0.035) {
+      activeClusterIdx = (activeClusterIdx + 1) % CLUSTERS.length;
+    }
+
     const cosY = Math.cos(rotY);
     const sinY = Math.sin(rotY);
-    const cosX = Math.cos(rotX + Math.sin(rotY * 0.7) * 0.06);
-    const sinX = Math.sin(rotX + Math.sin(rotY * 0.7) * 0.06);
+    const tiltAmp = 0.06 + thinkingEnergy * 0.14;
+    const cosX = Math.cos(rotX + Math.sin(rotY * 0.7) * tiltAmp);
+    const sinX = Math.sin(rotX + Math.sin(rotY * 0.7) * tiltAmp);
 
     projectedCache = graphNodes.map((n) => project3D(n, w, h, cosY, sinY, cosX, sinX));
 
-    ctxU.lineWidth = 0.6;
+    ctxU.lineWidth = 0.6 + thinkingEnergy * 0.75;
     for (let i = 0; i < graphEdges.length; i++) {
       const e = graphEdges[i];
       const pa = projectedCache[e.a];
@@ -371,9 +435,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const isFocused = e.clusterIdx === activeClusterIdx;
       if (isFocused && e.isPrimary) continue;
 
-      const depthAlpha = Math.max(0.04, Math.min(0.32, (1 - (pa.z + pb.z) * 0.4) * 0.22));
-      ctxU.strokeStyle = e.isBridge
-        ? `rgba(45, 212, 191, ${depthAlpha * 1.1})`
+      const depthAlpha = Math.max(0.05, Math.min(0.45, (1 - (pa.z + pb.z) * 0.4) * (0.22 + thinkingEnergy * 0.22)));
+      ctxU.strokeStyle = e.isBridge || thinkingEnergy > 0.35
+        ? `rgba(45, 212, 191, ${Math.min(0.75, depthAlpha * (1.1 + thinkingEnergy * 0.9))})`
         : isFocused
           ? `rgba(255, 255, 255, ${depthAlpha * 1.4})`
           : `rgba(120, 160, 145, ${depthAlpha * 0.75})`;
@@ -1641,14 +1705,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Handle direct slash commands
     if (text.startsWith('/')) {
-      const handled = await executeSlashCommand(text);
-      if (handled) {
-        syncServerLogs();
-        return;
+      setBrainThinking(true);
+      try {
+        const handled = await executeSlashCommand(text);
+        if (handled) {
+          syncServerLogs();
+          return;
+        }
+      } finally {
+        setBrainThinking(false);
       }
     }
 
     isSending = true;
+    setBrainThinking(true);
     if (elBtnSend) elBtnSend.disabled = true;
     if (elBtnModalSend) elBtnModalSend.disabled = true;
     if (elChatTyping) elChatTyping.style.display = 'flex';
@@ -1704,6 +1774,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (elChatTyping) elChatTyping.style.display = 'none';
       if (elModalChatTyping) elModalChatTyping.style.display = 'none';
       isSending = false;
+      setBrainThinking(false);
       if (elBtnSend) elBtnSend.disabled = false;
       if (elBtnModalSend) elBtnModalSend.disabled = false;
       activeInput.focus();
