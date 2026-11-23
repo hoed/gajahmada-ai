@@ -781,11 +781,57 @@
       background: rgba(4, 9, 8, 0.42) !important;
       backdrop-filter: none !important;
     }
-    /* Mobile Responsive Tuning for Homepage Focus Mode */
+    /* Mobile & Tablet Responsive Tuning for Homepage Focus Mode */
+    @media (max-width: 1024px) {
+      body.view-home .top-bar {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        height: 44px !important;
+        padding: 0 10px !important;
+        gap: 8px !important;
+      }
+      body.view-home .top-bar-left {
+        width: auto !important;
+        flex: 0 1 auto !important;
+        min-width: 0 !important;
+      }
+      body.view-home .gold-banner {
+        padding: 4px 8px !important;
+        font-size: 11px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+      }
+      body.view-home .top-bar-center {
+        width: auto !important;
+        flex: 0 0 auto !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        display: flex !important;
+        gap: 0 !important;
+      }
+      body.view-home .quick-modals-bar {
+        display: flex !important;
+        width: auto !important;
+        gap: 0 !important;
+      }
+      body.view-home #btn-toggle-view {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
+        padding: 5px 10px !important;
+        font-size: 10px !important;
+        min-height: 28px !important;
+      }
+    }
     @media (max-width: 768px) {
       body.view-home .top-bar {
-        height: 40px !important;
-        padding: 0 10px !important;
+        height: 42px !important;
+        padding: 0 8px !important;
       }
       body.view-home #panel-command-hero {
         width: 92vw !important;
@@ -1579,8 +1625,8 @@
     </div>
   </div>
 
-  <script type="module" src="/ui/analytics.js?v=19.0"></script>
-  <script src="/ui/app.js?v=19.0"></script>
+  <script type="module" src="/ui/analytics.js?v=20.0"></script>
+  <script src="/ui/app.js?v=20.0"></script>
 </body>
 
 </html>
