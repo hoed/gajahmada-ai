@@ -8,8 +8,10 @@
 
   <!-- Primary SEO Meta Tags -->
   <meta name="title" content="GajahMada — Sovereign Decentralized AI &amp; Web3 Node Architecture">
-  <meta name="description" content="GajahMada adalah platform Sovereign Decentralized AI &amp; Web3 Node dengan 384-d Vector RAG (FAISS), SHA-256 Proof-of-Work Blockchain Audit Ledger, identitas kriptografis Ed25519 (RFC 8032), dan topologi jaringan P2P Mesh.">
-  <meta name="keywords" content="GajahMada, GajahMada AI, Sovereign AI, Decentralized AI, Web3 Node, FAISS Vector RAG, Proof of Work Blockchain, Ed25519 Cryptography, P2P Mesh Network, Local LLM, LLaMA GGUF, FastAPI">
+  <meta name="description"
+    content="GajahMada adalah platform Sovereign Decentralized AI &amp; Web3 Node dengan 384-d Vector RAG (FAISS), SHA-256 Proof-of-Work Blockchain Audit Ledger, identitas kriptografis Ed25519 (RFC 8032), dan topologi jaringan P2P Mesh.">
+  <meta name="keywords"
+    content="GajahMada, GajahMada AI, Sovereign AI, Decentralized AI, Web3 Node, FAISS Vector RAG, Proof of Work Blockchain, Ed25519 Cryptography, P2P Mesh Network, Local LLM, LLaMA GGUF, FastAPI">
   <meta name="author" content="GajahMada Sovereign Network">
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
   <meta name="theme-color" content="#040706">
@@ -21,7 +23,8 @@
   <meta property="og:site_name" content="GajahMada">
   <meta property="og:url" content="https://gajahmada.vercel.app/">
   <meta property="og:title" content="GajahMada — Sovereign Decentralized AI &amp; Web3 Node Architecture">
-  <meta property="og:description" content="Autonomous Neural Inference, 384-d Semantic Vector RAG, SHA-256 Proof-of-Work Audit Ledger, Ed25519 Cryptographic Identity, and P2P Mesh Topology.">
+  <meta property="og:description"
+    content="Autonomous Neural Inference, 384-d Semantic Vector RAG, SHA-256 Proof-of-Work Audit Ledger, Ed25519 Cryptographic Identity, and P2P Mesh Topology.">
   <meta property="og:image" content="https://gajahmada.vercel.app/ui/screenshot.jpg">
   <meta property="og:image:secure_url" content="https://gajahmada.vercel.app/ui/screenshot.jpg">
   <meta property="og:image:type" content="image/jpeg">
@@ -35,7 +38,8 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:url" content="https://gajahmada.vercel.app/">
   <meta name="twitter:title" content="GajahMada — Sovereign Decentralized AI &amp; Web3 Node Architecture">
-  <meta name="twitter:description" content="Autonomous Neural Inference, 384-d Semantic Vector RAG, SHA-256 Proof-of-Work Audit Ledger, Ed25519 Identity, and P2P Mesh.">
+  <meta name="twitter:description"
+    content="Autonomous Neural Inference, 384-d Semantic Vector RAG, SHA-256 Proof-of-Work Audit Ledger, Ed25519 Identity, and P2P Mesh.">
   <meta name="twitter:image" content="https://gajahmada.vercel.app/ui/screenshot.jpg">
 
   <!-- Favicons & Apple Touch Icon -->
@@ -77,64 +81,88 @@
   <link rel="stylesheet" href="/ui/style.css?v=17.0">
   <style>
     /* Interactive clickable cues & HUD Action Toast */
-    [data-interactive], .clickable-cfg, .ov-step, .pipe-card, .mcp-cell, .mcp-dot,
-    .skill-cell, .ring-lbl, .eb-row, .bt-nav-item, .net3d-cluster-btn {
+    [data-interactive],
+    .clickable-cfg,
+    .ov-step,
+    .pipe-card,
+    .mcp-cell,
+    .mcp-dot,
+    .skill-cell,
+    .ring-lbl,
+    .eb-row,
+    .bt-nav-item,
+    .net3d-cluster-btn {
       cursor: pointer !important;
       transition: all 0.18s ease !important;
     }
+
     .eb-row {
       padding: 2px 4px !important;
       border-radius: 2px !important;
     }
+
     .eb-row:hover {
       background: rgba(45, 212, 191, 0.12) !important;
       transform: translateX(2px);
     }
-    .ov-row.clickable-cfg:hover, .ov-step:hover {
+
+    .ov-row.clickable-cfg:hover,
+    .ov-step:hover {
       background: rgba(45, 212, 191, 0.14) !important;
       color: #fff !important;
       padding-left: 4px !important;
     }
+
     .ring-lbl {
       pointer-events: auto !important;
       padding: 1px 4px !important;
       border-radius: 2px !important;
     }
+
     .ring-lbl:hover {
       color: #fff !important;
       background: rgba(45, 212, 191, 0.25) !important;
     }
+
     .mcp-dot {
       cursor: pointer !important;
       pointer-events: auto !important;
     }
+
     .mcp-dot:hover {
       transform: translate(-50%, -50%) scale(1.5) !important;
       background: #fff !important;
       border-color: #f97316 !important;
     }
+
     .net3d-legend {
       pointer-events: auto !important;
     }
+
     .net3d-cluster-btn {
       pointer-events: auto !important;
       padding: 1px 5px !important;
       border-radius: 2px !important;
       border: 1px solid transparent !important;
     }
-    .net3d-cluster-btn:hover, .net3d-cluster-btn.active {
+
+    .net3d-cluster-btn:hover,
+    .net3d-cluster-btn.active {
       background: rgba(45, 212, 191, 0.18) !important;
       border-color: rgba(45, 212, 191, 0.5) !important;
       color: #fff !important;
     }
+
     .bt-nav-item:hover {
       color: #2dd4bf !important;
       text-decoration: underline !important;
     }
+
     .panel-flash-highlight {
       box-shadow: 0 0 28px rgba(45, 212, 191, 0.65), inset 0 0 20px rgba(45, 212, 191, 0.2) !important;
       border-color: #2dd4bf !important;
     }
+
     #hud-action-toast {
       position: fixed;
       top: 46px;
@@ -158,12 +186,21 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+
     #hud-action-toast.show {
       opacity: 1;
       transform: translateX(-50%) translateY(0);
     }
-    .dashboard-viewport { grid-template-rows: 38px 0.88fr 1.68fr 0.78fr 18px 22px; }
-    .middle-row { grid-template-columns: 1.05fr 1.55fr 0.72fr; gap: 6px; }
+
+    .dashboard-viewport {
+      grid-template-rows: 38px 0.88fr 1.68fr 0.78fr 18px 22px;
+    }
+
+    .middle-row {
+      grid-template-columns: 1.05fr 1.55fr 0.72fr;
+      gap: 6px;
+    }
+
     .github-bottom-bar {
       background: linear-gradient(90deg, #070d0b 0%, #0d1a15 50%, #070d0b 100%);
       border: 1px solid rgba(45, 212, 191, 0.35);
@@ -178,6 +215,7 @@
       white-space: nowrap;
       overflow: hidden;
     }
+
     .github-bottom-bar a {
       color: #2dd4bf;
       font-weight: 700;
@@ -187,11 +225,13 @@
       gap: 5px;
       transition: color 0.18s ease, text-shadow 0.18s ease;
     }
+
     .github-bottom-bar a:hover {
       color: #f59e0b;
       text-decoration: underline;
       text-shadow: 0 0 8px rgba(245, 158, 11, 0.45);
     }
+
     .github-logo-icon {
       width: 13px;
       height: 13px;
@@ -199,6 +239,7 @@
       flex-shrink: 0;
       vertical-align: middle;
     }
+
     .top-arch-grid {
       flex: 1;
       min-height: 0;
@@ -209,7 +250,9 @@
       background: #050807;
       overflow: hidden;
     }
-    .top-cfg-box, .top-web3-box {
+
+    .top-cfg-box,
+    .top-web3-box {
       background: rgba(10, 17, 14, 0.92);
       border: 1px solid #28463b;
       border-radius: 3px;
@@ -220,6 +263,7 @@
       justify-content: space-between;
       overflow: hidden;
     }
+
     .top-logs-box {
       background: #040706;
       border: 1px solid #1e352c;
@@ -229,6 +273,7 @@
       min-height: 0;
       overflow: hidden;
     }
+
     .top-logs-hdr {
       height: 19px;
       min-height: 19px;
@@ -242,10 +287,12 @@
       color: #f59e0b;
       font-weight: 700;
     }
+
     .panel-3d-network {
       border: 1px solid rgba(45, 212, 191, 0.45);
       background: radial-gradient(ellipse at 50% 50%, #0d1f1a 0%, #040706 88%);
     }
+
     .network-3d-stage {
       position: relative;
       flex: 1;
@@ -254,12 +301,14 @@
       min-height: 0;
       overflow: hidden;
     }
+
     #universe-canvas {
       width: 100%;
       height: 100%;
       display: block;
       cursor: pointer;
     }
+
     .net3d-legend {
       position: absolute;
       bottom: 5px;
@@ -276,9 +325,26 @@
       border-radius: 2px;
       border: 1px solid rgba(45, 212, 191, 0.2);
     }
-    .net3d-legend-dots { display: flex; gap: 7px; flex-wrap: wrap; }
-    .net3d-legend-dots span { display: flex; align-items: center; gap: 3px; }
-    .net3d-legend-dots i { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+
+    .net3d-legend-dots {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+    }
+
+    .net3d-legend-dots span {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .net3d-legend-dots i {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
     .gold-banner {
       background: linear-gradient(135deg, #0b1310 0%, #13221c 100%);
       border-right: 1px solid rgba(245, 158, 11, 0.5);
@@ -295,6 +361,7 @@
       white-space: nowrap;
       box-shadow: 2px 0 16px rgba(245, 158, 11, 0.18);
     }
+
     .gm-logo-img {
       width: 26px;
       height: 26px;
@@ -303,14 +370,17 @@
       display: block;
       filter: drop-shadow(0 0 6px rgba(249, 115, 22, 0.65));
     }
+
     .brand-mobile-suffix {
       display: inline;
     }
+
     .panel-subagents {
       border: 1.5px solid rgba(129, 140, 248, 0.75);
       box-shadow: 0 0 26px rgba(129, 140, 248, 0.2), inset 0 0 32px rgba(45, 212, 191, 0.05);
       background: linear-gradient(180deg, #091118 0%, #05090b 100%);
     }
+
     .panel-subagents.maximized {
       position: fixed !important;
       inset: 8px !important;
@@ -318,11 +388,13 @@
       height: calc(100vh - 16px) !important;
       max-height: none !important;
     }
+
     .command-hero-header {
       height: 26px;
       min-height: 26px;
       background: linear-gradient(90deg, rgba(129, 140, 248, 0.2) 0%, rgba(45, 212, 191, 0.12) 100%);
     }
+
     .command-presets-bar {
       display: flex;
       align-items: center;
@@ -331,7 +403,14 @@
       padding: 2px 0;
       -webkit-overflow-scrolling: touch;
     }
-    .cp-label { font-size: 8.5px; font-weight: 800; color: #818cf8; white-space: nowrap; }
+
+    .cp-label {
+      font-size: 8.5px;
+      font-weight: 800;
+      color: #818cf8;
+      white-space: nowrap;
+    }
+
     .cp-chip {
       background: rgba(129, 140, 248, 0.12);
       border: 1px solid rgba(129, 140, 248, 0.4);
@@ -343,7 +422,13 @@
       cursor: pointer;
       white-space: nowrap;
     }
-    .cp-chip:hover { background: rgba(45, 212, 191, 0.18); border-color: #2dd4bf; color: #2dd4bf; }
+
+    .cp-chip:hover {
+      background: rgba(45, 212, 191, 0.18);
+      border-color: #2dd4bf;
+      color: #2dd4bf;
+    }
+
     .prompt-input-bar {
       height: 34px;
       min-height: 34px;
@@ -351,20 +436,32 @@
       padding: 3px 6px 3px 10px;
       gap: 8px;
     }
-    .prompt-prefix { color: #2dd4bf; font-size: 13px; font-weight: 800; }
-    .ring-gauge-wrap { width: 92px; height: 92px; }
+
+    .prompt-prefix {
+      color: #2dd4bf;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .ring-gauge-wrap {
+      width: 92px;
+      height: 92px;
+    }
 
     /* ═══════════════════════════════════════════════════════════════════
        TABLET & MOBILE RESPONSIVE OVERRIDES (<= 1024px & <= 768px)
        ═══════════════════════════════════════════════════════════════════ */
     @media (max-width: 1024px) {
-      html, body {
+
+      html,
+      body {
         height: auto !important;
         min-height: 100vh !important;
         overflow-y: auto !important;
         overflow-x: hidden !important;
         -webkit-overflow-scrolling: touch;
       }
+
       .dashboard-viewport {
         display: flex !important;
         flex-direction: column !important;
@@ -373,6 +470,7 @@
         gap: 8px !important;
         padding: 8px !important;
       }
+
       .top-bar {
         height: auto !important;
         flex-direction: column !important;
@@ -380,40 +478,48 @@
         padding: 8px !important;
         gap: 8px !important;
       }
+
       .top-bar-left {
         flex-wrap: wrap !important;
         gap: 8px !important;
       }
+
       .gold-banner {
         height: 36px !important;
         border: 1px solid rgba(245, 158, 11, 0.5) !important;
         border-radius: 3px !important;
       }
+
       .brand-mobile-suffix {
         display: inline !important;
       }
+
       .top-bar-title {
         white-space: normal !important;
         font-size: 10px !important;
         line-height: 1.35 !important;
       }
+
       .top-bar-center {
         flex-direction: column !important;
         align-items: stretch !important;
         gap: 6px !important;
       }
+
       .repo-search-pill {
         width: 100% !important;
         justify-content: space-between !important;
         overflow-x: auto !important;
         padding: 6px 10px !important;
       }
+
       .quick-modals-bar {
         display: grid !important;
         grid-template-columns: repeat(2, 1fr) !important;
         gap: 6px !important;
         width: 100% !important;
       }
+
       .top-action-btn {
         min-height: 34px !important;
         font-size: 9.5px !important;
@@ -422,6 +528,7 @@
         align-items: center !important;
         justify-content: center !important;
       }
+
       .top-bar-right {
         display: grid !important;
         grid-template-columns: repeat(4, 1fr) !important;
@@ -430,79 +537,99 @@
         border-top: 1px solid #172721 !important;
         padding-top: 6px !important;
       }
+
       .middle-row {
         display: flex !important;
         flex-direction: column !important;
         gap: 10px !important;
       }
+
       /* Prioritize Hero Command Interface & 3D Network on mobile */
       .panel-subagents {
         order: 1 !important;
         min-height: 390px !important;
         max-height: 520px !important;
       }
+
       .panel-3d-network {
         order: 2 !important;
         min-height: 270px !important;
       }
+
       .network-3d-stage {
         height: 240px !important;
         min-height: 240px !important;
       }
+
       .panel-mcp {
         order: 3 !important;
         min-height: 210px !important;
       }
+
       .top-arch-grid {
         grid-template-columns: 1fr 1fr !important;
         height: auto !important;
       }
-      .top-arch-grid > .panel-metrics {
+
+      .top-arch-grid>.panel-metrics {
         grid-column: 1 / -1 !important;
         order: -2 !important;
         min-height: 205px !important;
       }
-      .top-arch-grid > .panel-3d-network {
+
+      .top-arch-grid>.panel-3d-network {
         grid-column: 1 / -1 !important;
         order: -1 !important;
         min-height: 270px !important;
       }
-      .bottom-row > .top-logs-box {
+
+      .bottom-row>.top-logs-box {
         min-height: 210px !important;
         max-height: 260px !important;
       }
+
       .pipeline-strip {
         height: auto !important;
         grid-template-columns: 1fr !important;
         gap: 6px !important;
         padding: 6px !important;
       }
+
       .pipe-cards {
         grid-template-columns: repeat(3, 1fr) !important;
         gap: 6px !important;
       }
+
       .pipe-card {
         min-height: 52px !important;
         padding: 5px 8px !important;
       }
+
       .pipe-counter-box {
         flex-direction: row !important;
         gap: 10px !important;
         padding: 6px !important;
       }
+
       .bottom-row {
         display: grid !important;
         grid-template-columns: repeat(2, 1fr) !important;
         gap: 8px !important;
       }
-      .panel-workflow, .panel-skills, .panel-swarm, .panel-metrics {
+
+      .panel-workflow,
+      .panel-skills,
+      .panel-swarm,
+      .panel-metrics {
         min-height: 210px !important;
       }
+
       .ring-gauge-wrap {
         width: 112px !important;
         height: 112px !important;
         margin: 8px auto !important;
       }
+
       .swarm-canvas-wrap {
         height: 145px !important;
         min-height: 145px !important;
@@ -517,34 +644,43 @@
         padding: 5px 8px !important;
         gap: 4px !important;
       }
+
       .ph-left {
         flex-wrap: wrap !important;
         gap: 5px !important;
       }
+
       .p-sub {
         display: none !important;
       }
+
       .hdr-stars {
         display: none !important;
       }
+
       .top-arch-grid {
         grid-template-columns: 1fr !important;
       }
+
       .pipe-cards {
         grid-template-columns: repeat(2, 1fr) !important;
       }
+
       .bottom-row {
         grid-template-columns: 1fr !important;
       }
+
       .chat-feed {
         min-height: 220px !important;
         max-height: 310px !important;
         font-size: 11.5px !important;
       }
+
       .prompt-input-bar {
         height: 42px !important;
         min-height: 42px !important;
       }
+
       /* 16px font on inputs prevents iOS Safari auto-zoom on focus */
       #chat-prompt-input,
       #modal-chat-prompt-input,
@@ -552,24 +688,30 @@
       .modal-input-row input {
         font-size: 16px !important;
       }
+
       .cp-chip {
         padding: 5px 10px !important;
         font-size: 10px !important;
       }
-      .mcp-cell, .skill-cell {
+
+      .mcp-cell,
+      .skill-cell {
         min-height: 32px !important;
         font-size: 9px !important;
         padding: 4px !important;
       }
+
       .sd-desc {
         white-space: normal !important;
         line-height: 1.35 !important;
       }
+
       .eb-row {
         grid-template-columns: 88px 1fr 44px !important;
         font-size: 9.5px !important;
         padding: 1px 0 !important;
       }
+
       .bottom-ticker {
         height: auto !important;
         flex-direction: column !important;
@@ -577,11 +719,13 @@
         padding: 6px 8px !important;
         gap: 4px !important;
       }
+
       .bt-left {
         white-space: normal !important;
         flex-wrap: wrap !important;
         gap: 6px !important;
       }
+
       .github-bottom-bar {
         height: auto !important;
         min-height: 28px !important;
@@ -590,10 +734,12 @@
         padding: 6px 8px !important;
         text-align: center !important;
       }
+
       /* Mobile Modal Dialogs */
       .hud-modal {
         padding: 8px !important;
       }
+
       .modal-dialog,
       .modal-dialog.modal-large,
       #modal-command-center .modal-dialog {
@@ -601,9 +747,11 @@
         max-width: 98% !important;
         max-height: 92vh !important;
       }
+
       #modal-command-center .modal-dialog {
         height: 88vh !important;
       }
+
       .modal-header {
         height: auto !important;
         min-height: 36px !important;
@@ -611,9 +759,11 @@
         flex-wrap: wrap !important;
         gap: 6px !important;
       }
+
       .modal-input-row {
         flex-direction: column !important;
       }
+
       .btn-modal {
         width: 100% !important;
         min-height: 36px !important;
@@ -624,12 +774,15 @@
       .quick-modals-bar {
         grid-template-columns: 1fr 1fr !important;
       }
+
       .top-bar-right {
         grid-template-columns: repeat(2, 1fr) !important;
       }
+
       .skills-grid-16 {
         grid-template-columns: repeat(2, 1fr) !important;
       }
+
       .virtual-cursor {
         display: none !important;
       }
@@ -644,21 +797,25 @@
       overflow: hidden !important;
       background: #030706 !important;
     }
+
     body.view-home .dashboard-viewport {
       display: block !important;
       padding: 0 !important;
       background: transparent !important;
     }
+
     body.view-home .panel-universe,
     body.view-home .panel-mcp,
     body.view-home .bottom-row,
     body.view-home .bottom-ticker {
       display: none !important;
     }
+
     body.view-home .middle-row {
       display: block !important;
       position: static !important;
     }
+
     /* Minimal Floating Top Bar on Homepage */
     body.view-home .top-bar {
       position: fixed !important;
@@ -676,6 +833,7 @@
       align-items: center !important;
       justify-content: space-between !important;
     }
+
     body.view-home .top-bar-title,
     body.view-home .repo-search-pill,
     body.view-home #btn-open-cmd-dialog,
@@ -685,14 +843,17 @@
     body.view-home .top-bar-right {
       display: none !important;
     }
+
     body.view-home .top-bar-center {
       flex: 0 0 auto !important;
       justify-content: flex-end !important;
     }
+
     body.view-home .quick-modals-bar {
       display: flex !important;
       gap: 8px !important;
     }
+
     /* Fullscreen 3D Network Canvas Background */
     body.view-home #panel-02-3d {
       position: fixed !important;
@@ -706,14 +867,17 @@
       padding: 0 !important;
       background: radial-gradient(ellipse at 50% 48%, #0b221c 0%, #040908 62%, #020504 100%) !important;
     }
+
     body.view-home #panel-02-3d .panel-header,
     body.view-home #panel-02-3d .net3d-legend {
       display: none !important;
     }
+
     body.view-home #panel-02-3d .network-3d-stage {
       width: 100vw !important;
       height: 100vh !important;
     }
+
     /* Floating Transparent Command Center (30% opacity, no blur, compact so 3D Network shines clearly) */
     body.view-home #panel-command-hero {
       position: fixed !important;
@@ -732,14 +896,17 @@
       box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45), 0 0 24px rgba(45, 212, 191, 0.14) !important;
       transition: border-color 0.25s ease, box-shadow 0.25s ease !important;
     }
+
     body.view-home.brain-thinking #panel-command-hero {
       border-color: #2dd4bf !important;
       box-shadow: 0 12px 48px rgba(0, 0, 0, 0.52), 0 0 42px rgba(45, 212, 191, 0.45), inset 0 0 16px rgba(45, 212, 191, 0.14) !important;
     }
+
     body.view-home #panel-command-hero .panel-header {
       background: rgba(5, 13, 10, 0.36) !important;
       border-bottom: 1px solid rgba(45, 212, 191, 0.28) !important;
     }
+
     body.view-home #panel-command-hero .chat-feed {
       background: transparent !important;
       font-size: 11.5px !important;
@@ -748,24 +915,29 @@
       flex: 1 !important;
       padding: 8px 10px !important;
     }
+
     body.view-home #panel-command-hero .chat-item {
       background: rgba(4, 12, 9, 0.34) !important;
       border-color: rgba(45, 212, 191, 0.32) !important;
       text-shadow: 0 1px 4px rgba(0, 0, 0, 0.92);
     }
+
     body.view-home #panel-command-hero .chat-item.chat-user {
       background: rgba(15, 23, 42, 0.36) !important;
       border-color: rgba(129, 140, 248, 0.42) !important;
     }
+
     body.view-home #panel-command-hero .quick-cmd-bar,
     body.view-home #panel-command-hero .prompt-input-bar,
     body.view-home #panel-command-hero .chat-typing {
       background: rgba(4, 10, 8, 0.34) !important;
     }
+
     body.view-home #btn-inline-cmd-dialog,
     body.view-home #btn-toggle-maximize {
       display: none !important;
     }
+
     /* Bottom GitHub Bar on Homepage */
     body.view-home .github-bottom-bar {
       position: fixed !important;
@@ -781,6 +953,7 @@
       background: rgba(4, 9, 8, 0.42) !important;
       backdrop-filter: none !important;
     }
+
     /* Mobile & Tablet Responsive Tuning for Homepage Focus Mode */
     @media (max-width: 1024px) {
       body.view-home .top-bar {
@@ -792,11 +965,13 @@
         padding: 0 10px !important;
         gap: 8px !important;
       }
+
       body.view-home .top-bar-left {
         width: auto !important;
         flex: 0 1 auto !important;
         min-width: 0 !important;
       }
+
       body.view-home .gold-banner {
         padding: 4px 8px !important;
         font-size: 11px !important;
@@ -804,6 +979,7 @@
         overflow: hidden !important;
         text-overflow: ellipsis !important;
       }
+
       body.view-home .top-bar-center {
         width: auto !important;
         flex: 0 0 auto !important;
@@ -812,11 +988,13 @@
         display: flex !important;
         gap: 0 !important;
       }
+
       body.view-home .quick-modals-bar {
         display: flex !important;
         width: auto !important;
         gap: 0 !important;
       }
+
       body.view-home #btn-toggle-view {
         display: inline-flex !important;
         align-items: center !important;
@@ -828,34 +1006,41 @@
         min-height: 28px !important;
       }
     }
+
     @media (max-width: 768px) {
       body.view-home .top-bar {
         height: 42px !important;
         padding: 0 8px !important;
       }
+
       body.view-home #panel-command-hero {
         width: 92vw !important;
         height: min(50vh, 340px) !important;
         top: 52% !important;
         max-height: calc(100vh - 88px) !important;
       }
+
       body.view-home #panel-command-hero .chat-feed {
         min-height: 0 !important;
         max-height: none !important;
         font-size: 11px !important;
         padding: 6px 8px !important;
       }
+
       body.view-home #panel-command-hero .quick-cmd-bar {
         padding: 4px 6px !important;
       }
+
       body.view-home #panel-command-hero .cp-chip {
         padding: 3px 7px !important;
         font-size: 9px !important;
       }
+
       body.view-home #panel-command-hero .prompt-input-bar {
         height: 38px !important;
         min-height: 38px !important;
       }
+
       body.view-home .github-bottom-bar {
         height: auto !important;
         min-height: 24px !important;
@@ -863,6 +1048,7 @@
         padding: 4px 8px !important;
       }
     }
+
     .btn-view-switch {
       border-color: #2dd4bf !important;
       color: #ccfbf1 !important;
@@ -870,6 +1056,7 @@
       font-weight: 700 !important;
       letter-spacing: 0.4px;
     }
+
     .btn-view-switch:hover {
       background: rgba(45, 212, 191, 0.3) !important;
       color: #ffffff !important;
@@ -912,8 +1099,11 @@
           <span class="repo-stars" id="hdr-auth-tag">VERIFY ED25519</span>
         </div>
         <div class="quick-modals-bar">
-          <button class="top-action-btn btn-view-switch" id="btn-toggle-view" title="Beralih antara Homepage Command Center dan Full 8-Panel Dashboard">📊 DASHBOARD</button>
-          <button class="top-action-btn" id="btn-open-cmd-dialog" style="border-color:#818cf8;color:#c7d2fe;background:rgba(129,140,248,0.14)" title="Buka Command Center dalam bentuk Dialog Box">💬 COMMAND DIALOG</button>
+          <button class="top-action-btn btn-view-switch" id="btn-toggle-view"
+            title="Beralih antara Homepage Command Center dan Full 8-Panel Dashboard">📊 DASHBOARD</button>
+          <button class="top-action-btn" id="btn-open-cmd-dialog"
+            style="border-color:#818cf8;color:#c7d2fe;background:rgba(129,140,248,0.14)"
+            title="Buka Command Center dalam bentuk Dialog Box">💬 COMMAND DIALOG</button>
           <button class="top-action-btn" id="btn-open-rag" title="Kelola &amp; Tambah Dokumen RAG (+ Cari Semantik)">+
             KNOWLEDGE EXPANSION</button>
           <button class="top-action-btn" id="btn-open-peer" title="Kelola P2P Mesh &amp; Broadcast Gossip">+ NETWORK
@@ -955,12 +1145,17 @@
           <span class="p-sub">GET /node/logs · POST /node/config · 6 Core Modules</span>
         </div>
         <div class="ph-right">
-          <button class="tiny-btn" id="btn-sync-logs" title="Tarik log terbaru dari server (GET /node/logs)">SYNC LOGS</button>
+          <button class="tiny-btn" id="btn-sync-logs" title="Tarik log terbaru dari server (GET /node/logs)">SYNC
+            LOGS</button>
           <button class="tiny-btn" id="btn-export-logs" title="Unduh file log sistem (.log)">EXPORT</button>
           <button class="tiny-btn" id="btn-clear-logs" title="Bersihkan buffer log (DELETE /node/logs)">CLEAR</button>
-          <span class="ph-meta" id="hdr-meta-rag" data-interactive="true" title="Klik untuk membuka Knowledge Expansion">RAG DOCS <b id="graph-doc-count">0</b></span>
-          <span class="ph-meta" id="hdr-meta-engine" data-interactive="true" title="Klik untuk uji benchmark Vector Engine 384-d">ENGINE <b id="graph-engine-name">L2-STORE</b></span>
-          <span class="ph-live" id="hdr-meta-uptime" data-interactive="true" title="Klik untuk cek kesehatan &amp; uptime server"><span class="live-dot"></span><span id="hdr-uptime">ONLINE</span></span>
+          <span class="ph-meta" id="hdr-meta-rag" data-interactive="true"
+            title="Klik untuk membuka Knowledge Expansion">RAG DOCS <b id="graph-doc-count">0</b></span>
+          <span class="ph-meta" id="hdr-meta-engine" data-interactive="true"
+            title="Klik untuk uji benchmark Vector Engine 384-d">ENGINE <b id="graph-engine-name">L2-STORE</b></span>
+          <span class="ph-live" id="hdr-meta-uptime" data-interactive="true"
+            title="Klik untuk cek kesehatan &amp; uptime server"><span class="live-dot"></span><span
+              id="hdr-uptime">ONLINE</span></span>
         </div>
       </div>
 
@@ -970,26 +1165,34 @@
         <div class="top-cfg-box">
           <div class="ov-header">MODULE CONFIGURATION <span class="teal-txt">// KLIK UBAH</span></div>
           <div class="ov-row clickable-cfg" id="cfg-row-name" title="Klik untuk ganti nama node (POST /node/config)">
-            <span class="ov-check">⚙</span><span>node.name</span><span class="ov-val" id="cfg-val-name">gajahmada-alpha</span>
+            <span class="ov-check">⚙</span><span>node.name</span><span class="ov-val"
+              id="cfg-val-name">gajahmada-alpha</span>
           </div>
-          <div class="ov-row clickable-cfg" id="cfg-row-tokens" title="Klik untuk ubah batas max_tokens LLM (POST /node/config)">
+          <div class="ov-row clickable-cfg" id="cfg-row-tokens"
+            title="Klik untuk ubah batas max_tokens LLM (POST /node/config)">
             <span class="ov-check">⚙</span><span>ai.max_tokens</span><span class="ov-val" id="cfg-val-tokens">512</span>
           </div>
-          <div class="ov-row clickable-cfg" id="cfg-row-temp" title="Klik untuk ubah temperature LLM (POST /node/config)">
+          <div class="ov-row clickable-cfg" id="cfg-row-temp"
+            title="Klik untuk ubah temperature LLM (POST /node/config)">
             <span class="ov-check">⚙</span><span>ai.temperature</span><span class="ov-val" id="cfg-val-temp">0.7</span>
           </div>
-          <div class="ov-row clickable-cfg" id="cfg-row-diff" title="Klik untuk ubah PoW difficulty 1..3 (POST /node/config)">
-            <span class="ov-check">⚙</span><span>chain.pow_diff</span><span class="ov-val" id="cfg-val-diff">difficulty=2</span>
+          <div class="ov-row clickable-cfg" id="cfg-row-diff"
+            title="Klik untuk ubah PoW difficulty 1..3 (POST /node/config)">
+            <span class="ov-check">⚙</span><span>chain.pow_diff</span><span class="ov-val"
+              id="cfg-val-diff">difficulty=2</span>
           </div>
-          <div class="ov-row clickable-cfg" id="cfg-row-embed" title="Klik untuk uji benchmark 384-d Embedding Vector (POST /ai/embedding)">
-            <span class="ov-check">⚡</span><span>ai.embedding</span><span class="ov-val" id="cfg-val-embed">MiniLM-384d</span>
+          <div class="ov-row clickable-cfg" id="cfg-row-embed"
+            title="Klik untuk uji benchmark 384-d Embedding Vector (POST /ai/embedding)">
+            <span class="ov-check">⚡</span><span>ai.embedding</span><span class="ov-val"
+              id="cfg-val-embed">MiniLM-384d</span>
           </div>
         </div>
 
         <!-- Center Wide Box: SYSTEM LOGS (Swapped with System Performance on Mobile) -->
         <div class="top-logs-box" id="panel-system-logs">
           <div class="top-logs-hdr">
-            <span><span class="p-num amber" style="margin-right:5px">LOG</span>SYSTEM LOGS // LIVE TELEMETRY (GET /node/logs)</span>
+            <span><span class="p-num amber" style="margin-right:5px">LOG</span>SYSTEM LOGS // LIVE TELEMETRY (GET
+              /node/logs)</span>
             <div style="display:flex;align-items:center;gap:4px">
               <button class="tiny-btn" id="btn-sync-logs-inline" title="Tarik log terbaru">SYNC</button>
               <button class="tiny-btn" id="btn-export-logs-inline" title="Unduh file log">EXPORT</button>
@@ -1006,11 +1209,20 @@
         <div class="top-web3-box">
           <div class="ov-header">WEB3 SERVER ARCH : <span id="ov-stage-label" class="teal-txt">INGEST</span></div>
           <div class="ov-list" id="ov-stage-steps">
-            <div class="ov-step done" data-arch="gateway" style="cursor:pointer" title="Klik untuk uji FastAPI Gateway (GET /health)"><span>✓</span> 1. FastAPI REST Gateway (/ai, /node)</div>
-            <div class="ov-step done" data-arch="rag" style="cursor:pointer" title="Klik untuk uji pencarian vektor RAG (POST /knowledge/search)"><span>✓</span> 2. FAISS Vector RAG Retrieval</div>
-            <div class="ov-step active" data-arch="llm" style="cursor:pointer" title="Klik untuk uji inferensi LLM (POST /ai/chat)"><span>▶</span> 3. AIModelEngine Local Inference</div>
-            <div class="ov-step" data-arch="sign" style="cursor:pointer" title="Klik untuk uji tanda tangan Ed25519 (POST /security/sign-verify)"><span>·</span> 4. Ed25519 Payload Signature</div>
-            <div class="ov-step" data-arch="mine" style="cursor:pointer" title="Klik untuk tambang blok PoW baru (POST /node/chain/mine)"><span>·</span> 5. SHA-256 PoW Ledger Commit</div>
+            <div class="ov-step done" data-arch="gateway" style="cursor:pointer"
+              title="Klik untuk uji FastAPI Gateway (GET /health)"><span>✓</span> 1. FastAPI REST Gateway (/ai, /node)
+            </div>
+            <div class="ov-step done" data-arch="rag" style="cursor:pointer"
+              title="Klik untuk uji pencarian vektor RAG (POST /knowledge/search)"><span>✓</span> 2. FAISS Vector RAG
+              Retrieval</div>
+            <div class="ov-step active" data-arch="llm" style="cursor:pointer"
+              title="Klik untuk uji inferensi LLM (POST /ai/chat)"><span>▶</span> 3. AIModelEngine Local Inference</div>
+            <div class="ov-step" data-arch="sign" style="cursor:pointer"
+              title="Klik untuk uji tanda tangan Ed25519 (POST /security/sign-verify)"><span>·</span> 4. Ed25519 Payload
+              Signature</div>
+            <div class="ov-step" data-arch="mine" style="cursor:pointer"
+              title="Klik untuk tambang blok PoW baru (POST /node/chain/mine)"><span>·</span> 5. SHA-256 PoW Ledger
+              Commit</div>
           </div>
         </div>
       </div>
@@ -1102,23 +1314,33 @@
             <span class="p-sub">Klik node 3D atau klaster di bawah</span>
           </div>
           <div class="ph-right">
-            <span class="ph-meta" id="btn-3d-vec-probe" data-interactive="true" title="Klik untuk uji vektor 384-d">VECTORS <b id="graph-node-count">384-DIM</b></span>
-            <span class="ph-live" id="btn-3d-rotate-step" data-interactive="true" title="Klik untuk pindah fokus klaster 3D berikutnya"><span class="live-dot"></span>NEXT 3D</span>
+            <span class="ph-meta" id="btn-3d-vec-probe" data-interactive="true"
+              title="Klik untuk uji vektor 384-d">VECTORS <b id="graph-node-count">384-DIM</b></span>
+            <span class="ph-live" id="btn-3d-rotate-step" data-interactive="true"
+              title="Klik untuk pindah fokus klaster 3D berikutnya"><span class="live-dot"></span>NEXT 3D</span>
           </div>
         </div>
         <div class="network-3d-stage">
           <canvas id="universe-canvas" title="Klik klaster modul 3D untuk menginspeksi &amp; menguji modul"></canvas>
           <div class="net3d-legend">
             <div class="net3d-legend-dots">
-              <span class="net3d-cluster-btn active" data-cluster="0" title="Fokus &amp; uji gajahmada_ai.core"><i style="background:#2dd4bf"></i>core</span>
-              <span class="net3d-cluster-btn" data-cluster="1" title="Fokus &amp; buka gajahmada_ai.knowledge"><i style="background:#a78bfa"></i>rag</span>
-              <span class="net3d-cluster-btn" data-cluster="2" title="Fokus &amp; uji gajahmada_ai.api"><i style="background:#fb7185"></i>api</span>
-              <span class="net3d-cluster-btn" data-cluster="3" title="Fokus &amp; buka gajahmada_ai.blockchain"><i style="background:#fbbf24"></i>web3</span>
-              <span class="net3d-cluster-btn" data-cluster="4" title="Fokus &amp; uji gajahmada_ai.security"><i style="background:#38bdf8"></i>crypto</span>
-              <span class="net3d-cluster-btn" data-cluster="5" title="Fokus &amp; buka gajahmada_ai.network"><i style="background:#f97316"></i>p2p</span>
-              <span class="net3d-cluster-btn" data-cluster="6" title="Fokus &amp; uji gajahmada_ai.cli"><i style="background:#4ade80"></i>cli</span>
+              <span class="net3d-cluster-btn active" data-cluster="0" title="Fokus &amp; uji gajahmada_ai.core"><i
+                  style="background:#2dd4bf"></i>core</span>
+              <span class="net3d-cluster-btn" data-cluster="1" title="Fokus &amp; buka gajahmada_ai.knowledge"><i
+                  style="background:#a78bfa"></i>rag</span>
+              <span class="net3d-cluster-btn" data-cluster="2" title="Fokus &amp; uji gajahmada_ai.api"><i
+                  style="background:#fb7185"></i>api</span>
+              <span class="net3d-cluster-btn" data-cluster="3" title="Fokus &amp; buka gajahmada_ai.blockchain"><i
+                  style="background:#fbbf24"></i>web3</span>
+              <span class="net3d-cluster-btn" data-cluster="4" title="Fokus &amp; uji gajahmada_ai.security"><i
+                  style="background:#38bdf8"></i>crypto</span>
+              <span class="net3d-cluster-btn" data-cluster="5" title="Fokus &amp; buka gajahmada_ai.network"><i
+                  style="background:#f97316"></i>p2p</span>
+              <span class="net3d-cluster-btn" data-cluster="6" title="Fokus &amp; uji gajahmada_ai.cli"><i
+                  style="background:#4ade80"></i>cli</span>
             </div>
-            <span class="net3d-cluster-btn" id="btn-3d-cycle-all" title="Klik untuk memutar fokus klaster">⟳ FOCUS</span>
+            <span class="net3d-cluster-btn" id="btn-3d-cycle-all" title="Klik untuk memutar fokus klaster">⟳
+              FOCUS</span>
           </div>
         </div>
       </div>
@@ -1142,10 +1364,13 @@
             </div>
           </div>
           <div class="ph-right">
-            <button class="tiny-btn teal-btn" id="btn-inline-cmd-dialog" title="Buka Command Center sebagai Popup Dialog Box">🗗 DIALOG</button>
-            <button class="tiny-btn purple-btn" id="btn-inline-rag" title="Buka modal Knowledge Expansion">+ RAG</button>
+            <button class="tiny-btn teal-btn" id="btn-inline-cmd-dialog"
+              title="Buka Command Center sebagai Popup Dialog Box">🗗 DIALOG</button>
+            <button class="tiny-btn purple-btn" id="btn-inline-rag" title="Buka modal Knowledge Expansion">+
+              RAG</button>
             <button class="tiny-btn" id="btn-clear-chat" title="Bersihkan layar percakapan">CLEAR</button>
-            <button class="tiny-btn" id="btn-toggle-maximize" title="Perbesar / Kembalikan ukuran Command Interface">⛶ MAX</button>
+            <button class="tiny-btn" id="btn-toggle-maximize" title="Perbesar / Kembalikan ukuran Command Interface">⛶
+              MAX</button>
           </div>
         </div>
 
@@ -1172,10 +1397,16 @@
           <!-- Quick Action Command Bar -->
           <div class="command-presets-bar">
             <span class="cp-label">QUICK EXEC:</span>
-            <button type="button" class="cp-chip" data-quick-cmd="Jelaskan detail sejarah Nusantara sampai Indonesia sekarang">🇮🇩 Nusantara → Indonesia</button>
-            <button type="button" class="cp-chip" data-quick-cmd="Jelaskan Mahapatih Gajah Mada, Sumpah Palapa, dan Majapahit">🐘 Sumpah Palapa</button>
-            <button type="button" class="cp-chip" data-quick-cmd="/search 38 provinsi Ibu Kota Nusantara IKN ekonomi G20">🏛️ Indonesia Modern &amp; IKN</button>
-            <button type="button" class="cp-chip" data-quick-cmd="Jelaskan arsitektur modul GajahMada">⚡ Arsitektur</button>
+            <button type="button" class="cp-chip"
+              data-quick-cmd="Jelaskan detail sejarah Nusantara sampai Indonesia sekarang">🇮🇩 Nusantara →
+              Indonesia</button>
+            <button type="button" class="cp-chip"
+              data-quick-cmd="Jelaskan Mahapatih Gajah Mada, Sumpah Palapa, dan Majapahit">🐘 Sumpah Palapa</button>
+            <button type="button" class="cp-chip"
+              data-quick-cmd="/search 38 provinsi Ibu Kota Nusantara IKN ekonomi G20">🏛️ Indonesia Modern &amp;
+              IKN</button>
+            <button type="button" class="cp-chip" data-quick-cmd="Jelaskan arsitektur modul GajahMada">⚡
+              Arsitektur</button>
             <button type="button" class="cp-chip" data-quick-cmd="/status">📊 /status</button>
             <button type="button" class="cp-chip" data-quick-cmd="/verify">🔐 /verify</button>
             <button type="button" class="cp-chip" data-quick-cmd="/mine Audit konsensus Nusantara">⛏ /mine</button>
@@ -1202,7 +1433,9 @@
             <span class="p-sub">Klik item untuk cek versi &amp; uji endpoint</span>
           </div>
           <div class="ph-right">
-            <span class="ph-meta coral-txt" id="mcp-active-label" data-interactive="true" title="Klik untuk menampilkan laporan lengkap seluruh versi paket Python (GET /node/dependencies)">PY 3.14</span>
+            <span class="ph-meta coral-txt" id="mcp-active-label" data-interactive="true"
+              title="Klik untuk menampilkan laporan lengkap seluruh versi paket Python (GET /node/dependencies)">PY
+              3.14</span>
           </div>
         </div>
 
@@ -1215,24 +1448,36 @@
           <div class="mcp-matrix" id="mcp-matrix">
             <!-- Col 1: App Modules -->
             <div class="mcp-col">
-              <div class="mcp-cell active" data-mcp="0" data-type="mod" data-target="api.server" title="Klik untuk inspeksi modul gajahmada_ai.api.server">api.server</div>
-              <div class="mcp-cell" data-mcp="1" data-type="mod" data-target="core.engine" title="Klik untuk inspeksi modul gajahmada_ai.core.engine">core.engine</div>
-              <div class="mcp-cell" data-mcp="2" data-type="mod" data-target="knowledge.rag" title="Klik untuk inspeksi modul gajahmada_ai.knowledge.rag">knowledge.rag</div>
-              <div class="mcp-cell" data-mcp="3" data-type="mod" data-target="blockchain.chain" title="Klik untuk inspeksi modul gajahmada_ai.blockchain.chain">blockchain.chain</div>
+              <div class="mcp-cell active" data-mcp="0" data-type="mod" data-target="api.server"
+                title="Klik untuk inspeksi modul gajahmada_ai.api.server">api.server</div>
+              <div class="mcp-cell" data-mcp="1" data-type="mod" data-target="core.engine"
+                title="Klik untuk inspeksi modul gajahmada_ai.core.engine">core.engine</div>
+              <div class="mcp-cell" data-mcp="2" data-type="mod" data-target="knowledge.rag"
+                title="Klik untuk inspeksi modul gajahmada_ai.knowledge.rag">knowledge.rag</div>
+              <div class="mcp-cell" data-mcp="3" data-type="mod" data-target="blockchain.chain"
+                title="Klik untuk inspeksi modul gajahmada_ai.blockchain.chain">blockchain.chain</div>
             </div>
             <!-- Col 2: Python Dependencies -->
             <div class="mcp-col">
-              <div class="mcp-cell active" data-mcp="4" data-type="pkg" data-target="fastapi" title="Klik untuk cek versi runtime FastAPI">fastapi</div>
-              <div class="mcp-cell" data-mcp="5" data-type="pkg" data-target="cryptography" title="Klik untuk cek versi runtime Cryptography (Ed25519)">cryptography</div>
-              <div class="mcp-cell" data-mcp="6" data-type="pkg" data-target="httpx" title="Klik untuk cek versi runtime HTTPX (P2P Mesh)">httpx</div>
-              <div class="mcp-cell" data-mcp="7" data-type="pkg" data-target="psutil" title="Klik untuk cek versi runtime Psutil (Telemetry)">psutil</div>
+              <div class="mcp-cell active" data-mcp="4" data-type="pkg" data-target="fastapi"
+                title="Klik untuk cek versi runtime FastAPI">fastapi</div>
+              <div class="mcp-cell" data-mcp="5" data-type="pkg" data-target="cryptography"
+                title="Klik untuk cek versi runtime Cryptography (Ed25519)">cryptography</div>
+              <div class="mcp-cell" data-mcp="6" data-type="pkg" data-target="httpx"
+                title="Klik untuk cek versi runtime HTTPX (P2P Mesh)">httpx</div>
+              <div class="mcp-cell" data-mcp="7" data-type="pkg" data-target="psutil"
+                title="Klik untuk cek versi runtime Psutil (Telemetry)">psutil</div>
             </div>
             <!-- Col 3: Web3 & Node Endpoints -->
             <div class="mcp-col">
-              <div class="mcp-cell active" data-mcp="8" data-type="api" data-target="/node/info" title="Klik untuk eksekusi live GET /node/info">GET /node/info</div>
-              <div class="mcp-cell" data-mcp="9" data-type="api" data-target="/knowledge/stats" title="Klik untuk eksekusi live GET /knowledge/stats">GET /knowledge</div>
-              <div class="mcp-cell" data-mcp="10" data-type="api" data-target="/node/chain" title="Klik untuk eksekusi live GET /node/chain">GET /node/chain</div>
-              <div class="mcp-cell" data-mcp="11" data-type="api" data-target="/node/dependencies" title="Klik untuk eksekusi live GET /node/dependencies">GET /node/deps</div>
+              <div class="mcp-cell active" data-mcp="8" data-type="api" data-target="/node/info"
+                title="Klik untuk eksekusi live GET /node/info">GET /node/info</div>
+              <div class="mcp-cell" data-mcp="9" data-type="api" data-target="/knowledge/stats"
+                title="Klik untuk eksekusi live GET /knowledge/stats">GET /knowledge</div>
+              <div class="mcp-cell" data-mcp="10" data-type="api" data-target="/node/chain"
+                title="Klik untuk eksekusi live GET /node/chain">GET /node/chain</div>
+              <div class="mcp-cell" data-mcp="11" data-type="api" data-target="/node/dependencies"
+                title="Klik untuk eksekusi live GET /node/dependencies">GET /node/deps</div>
             </div>
           </div>
 
@@ -1240,12 +1485,18 @@
           <div class="mcp-timeline-wrap">
             <div class="mcp-track-line">
               <div class="mcp-track-fill" id="mcp-track-fill"></div>
-              <span class="mcp-dot lit" data-waypoint="0" style="left:0%" title="Klik untuk uji Waypoint 1: GET /health"></span>
-              <span class="mcp-dot lit" data-waypoint="1" style="left:20%" title="Klik untuk uji Waypoint 2: GET /node/info"></span>
-              <span class="mcp-dot active" data-waypoint="2" style="left:40%" title="Klik untuk uji Waypoint 3: GET /knowledge/stats"></span>
-              <span class="mcp-dot" data-waypoint="3" style="left:60%" title="Klik untuk uji Waypoint 4: POST /ai/embedding"></span>
-              <span class="mcp-dot" data-waypoint="4" style="left:80%" title="Klik untuk uji Waypoint 5: POST /security/sign-verify"></span>
-              <span class="mcp-dot" data-waypoint="5" style="left:100%" title="Klik untuk uji Waypoint 6: GET /node/chain"></span>
+              <span class="mcp-dot lit" data-waypoint="0" style="left:0%"
+                title="Klik untuk uji Waypoint 1: GET /health"></span>
+              <span class="mcp-dot lit" data-waypoint="1" style="left:20%"
+                title="Klik untuk uji Waypoint 2: GET /node/info"></span>
+              <span class="mcp-dot active" data-waypoint="2" style="left:40%"
+                title="Klik untuk uji Waypoint 3: GET /knowledge/stats"></span>
+              <span class="mcp-dot" data-waypoint="3" style="left:60%"
+                title="Klik untuk uji Waypoint 4: POST /ai/embedding"></span>
+              <span class="mcp-dot" data-waypoint="4" style="left:80%"
+                title="Klik untuk uji Waypoint 5: POST /security/sign-verify"></span>
+              <span class="mcp-dot" data-waypoint="5" style="left:100%"
+                title="Klik untuk uji Waypoint 6: GET /node/chain"></span>
             </div>
             <div class="mcp-track-meta">
               <span id="mcp-trace-txt">flow: api.server → fastapi → GET /node/info</span>
@@ -1276,27 +1527,39 @@
           </div>
         </div>
         <div class="workflow-body">
-          <div class="ring-gauge-wrap" id="stage-dial" title="Klik segmen atau label tahap untuk mengeksekusi fungsinya">
+          <div class="ring-gauge-wrap" id="stage-dial"
+            title="Klik segmen atau label tahap untuk mengeksekusi fungsinya">
             <svg class="ring-svg" viewBox="0 0 200 200">
               <circle cx="100" cy="100" r="84" fill="none" stroke="rgba(45,212,191,0.12)" stroke-width="1"
                 stroke-dasharray="2 6" />
               <g id="ring-segments-group"></g>
               <circle cx="100" cy="100" r="54" fill="none" stroke="rgba(45,212,191,0.18)" stroke-width="1" />
             </svg>
-            <div class="ring-center-label" style="pointer-events:auto;cursor:pointer" id="ring-center-trigger" title="Klik tengah cincin untuk menjalankan siklus 6 tahap penuh">
+            <div class="ring-center-label" style="pointer-events:auto;cursor:pointer" id="ring-center-trigger"
+              title="Klik tengah cincin untuk menjalankan siklus 6 tahap penuh">
               <div class="ring-stage-word" id="current-stage-name">ingest</div>
               <div class="ring-stage-idx" id="current-stage-idx">PHASE 1/6</div>
             </div>
-            <span class="ring-lbl pos-0" data-phase="0" title="Klik untuk eksekusi Phase 1: Ingest &amp; RAG Stats">ingest</span>
-            <span class="ring-lbl pos-1" data-phase="1" title="Klik untuk eksekusi Phase 2: Generate 384-d Vector Embedding">embed</span>
-            <span class="ring-lbl pos-2" data-phase="2" title="Klik untuk eksekusi Phase 3: AIModelEngine Inference">infer</span>
-            <span class="ring-lbl pos-3" data-phase="3" title="Klik untuk eksekusi Phase 4: Ed25519 Digital Signature">sign</span>
-            <span class="ring-lbl pos-4" data-phase="4" title="Klik untuk eksekusi Phase 5: Mine SHA-256 PoW Block">mine</span>
-            <span class="ring-lbl pos-5" data-phase="5" title="Klik untuk eksekusi Phase 6: P2P Gossip Broadcast">gossip</span>
+            <span class="ring-lbl pos-0" data-phase="0"
+              title="Klik untuk eksekusi Phase 1: Ingest &amp; RAG Stats">ingest</span>
+            <span class="ring-lbl pos-1" data-phase="1"
+              title="Klik untuk eksekusi Phase 2: Generate 384-d Vector Embedding">embed</span>
+            <span class="ring-lbl pos-2" data-phase="2"
+              title="Klik untuk eksekusi Phase 3: AIModelEngine Inference">infer</span>
+            <span class="ring-lbl pos-3" data-phase="3"
+              title="Klik untuk eksekusi Phase 4: Ed25519 Digital Signature">sign</span>
+            <span class="ring-lbl pos-4" data-phase="4"
+              title="Klik untuk eksekusi Phase 5: Mine SHA-256 PoW Block">mine</span>
+            <span class="ring-lbl pos-5" data-phase="5"
+              title="Klik untuk eksekusi Phase 6: P2P Gossip Broadcast">gossip</span>
           </div>
           <div class="workflow-footer">
-            <span id="wf-pow-toggle" data-interactive="true" title="Klik untuk mengubah tingkat kesulitan Proof-of-Work (1..3)">POW <b class="teal-txt" id="wf-pow-lbl">DIFF=2</b></span>
-            <span id="wf-status-toggle" data-interactive="true" title="Klik untuk menjalankan siklus verifikasi 6 tahap">STATUS <b id="wf-cycle-status">IDLE · AUTO</b></span>
+            <span id="wf-pow-toggle" data-interactive="true"
+              title="Klik untuk mengubah tingkat kesulitan Proof-of-Work (1..3)">POW <b class="teal-txt"
+                id="wf-pow-lbl">DIFF=2</b></span>
+            <span id="wf-status-toggle" data-interactive="true"
+              title="Klik untuk menjalankan siklus verifikasi 6 tahap">STATUS <b id="wf-cycle-status">IDLE ·
+                AUTO</b></span>
           </div>
         </div>
       </div>
@@ -1311,27 +1574,40 @@
             <span class="p-sub">Klik komponen untuk uji diagnostik nyata</span>
           </div>
           <div class="ph-right">
-            <span class="ph-meta sky-txt" id="mod-probe-badge" data-interactive="true" title="Klik untuk menguji komponen yang sedang aktif">⚡ PROBE NOW</span>
+            <span class="ph-meta sky-txt" id="mod-probe-badge" data-interactive="true"
+              title="Klik untuk menguji komponen yang sedang aktif">⚡ PROBE NOW</span>
           </div>
         </div>
         <div class="skills-body">
           <div class="skills-grid-16" id="skills-grid">
-            <div class="skill-cell active" data-skill="AIModelEngine" title="Klik untuk uji AIModelEngine">AIModelEngine</div>
-            <div class="skill-cell" data-skill="LocalKnowledge" title="Klik untuk uji LocalKnowledge RAG">LocalKnowledge</div>
+            <div class="skill-cell active" data-skill="AIModelEngine" title="Klik untuk uji AIModelEngine">AIModelEngine
+            </div>
+            <div class="skill-cell" data-skill="LocalKnowledge" title="Klik untuk uji LocalKnowledge RAG">LocalKnowledge
+            </div>
             <div class="skill-cell" data-skill="AIBlockchain" title="Klik untuk uji AIBlockchain PoW">AIBlockchain</div>
             <div class="skill-cell" data-skill="P2PNetwork" title="Klik untuk uji P2PNetwork Mesh">P2PNetwork</div>
-            <div class="skill-cell" data-skill="NodeIdentity" title="Klik untuk uji NodeIdentity Ed25519">NodeIdentity</div>
-            <div class="skill-cell" data-skill="FastAPI-Server" title="Klik untuk uji FastAPI-Server">FastAPI-Server</div>
-            <div class="skill-cell" data-skill="FAISS-IndexL2" title="Klik untuk uji FAISS-IndexL2 384-d">FAISS-IndexL2</div>
-            <div class="skill-cell" data-skill="Llama-GGUF" title="Klik untuk uji Llama-GGUF / Neural Engine">Llama-GGUF</div>
-            <div class="skill-cell" data-skill="MiniLM-L6-v2" title="Klik untuk uji MiniLM-L6-v2 384-d Embedder">MiniLM-L6-v2</div>
-            <div class="skill-cell" data-skill="Ed25519-Crypto" title="Klik untuk uji tanda tangan Ed25519">Ed25519-Crypto</div>
+            <div class="skill-cell" data-skill="NodeIdentity" title="Klik untuk uji NodeIdentity Ed25519">NodeIdentity
+            </div>
+            <div class="skill-cell" data-skill="FastAPI-Server" title="Klik untuk uji FastAPI-Server">FastAPI-Server
+            </div>
+            <div class="skill-cell" data-skill="FAISS-IndexL2" title="Klik untuk uji FAISS-IndexL2 384-d">FAISS-IndexL2
+            </div>
+            <div class="skill-cell" data-skill="Llama-GGUF" title="Klik untuk uji Llama-GGUF / Neural Engine">Llama-GGUF
+            </div>
+            <div class="skill-cell" data-skill="MiniLM-L6-v2" title="Klik untuk uji MiniLM-L6-v2 384-d Embedder">
+              MiniLM-L6-v2</div>
+            <div class="skill-cell" data-skill="Ed25519-Crypto" title="Klik untuk uji tanda tangan Ed25519">
+              Ed25519-Crypto</div>
             <div class="skill-cell" data-skill="SHA256-PoW" title="Klik untuk uji hash SHA256-PoW">SHA256-PoW</div>
             <div class="skill-cell" data-skill="CLI-Click" title="Klik untuk uji konfigurasi CLI">CLI-Click</div>
-            <div class="skill-cell" data-skill="POST /ai/chat" title="Klik untuk buka Command Center Dialog">POST /ai/chat</div>
-            <div class="skill-cell" data-skill="POST /ai/ingest" title="Klik untuk buka Knowledge Expansion Modal">POST /ai/ingest</div>
-            <div class="skill-cell" data-skill="GET /node/chain" title="Klik untuk buka Web3 Blockchain Ledger">GET /node/chain</div>
-            <div class="skill-cell" data-skill="POST /node/sync" title="Klik untuk buka P2P Network Peer Modal">POST /node/sync</div>
+            <div class="skill-cell" data-skill="POST /ai/chat" title="Klik untuk buka Command Center Dialog">POST
+              /ai/chat</div>
+            <div class="skill-cell" data-skill="POST /ai/ingest" title="Klik untuk buka Knowledge Expansion Modal">POST
+              /ai/ingest</div>
+            <div class="skill-cell" data-skill="GET /node/chain" title="Klik untuk buka Web3 Blockchain Ledger">GET
+              /node/chain</div>
+            <div class="skill-cell" data-skill="POST /node/sync" title="Klik untuk buka P2P Network Peer Modal">POST
+              /node/sync</div>
             <div class="virtual-cursor" id="skills-cursor">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="#38bdf8" stroke="#050807" stroke-width="2">
                 <polygon points="3 3 10 21 13 13 21 10 3 3" />
@@ -1339,7 +1615,8 @@
             </div>
           </div>
 
-          <div class="skill-detail-box" id="skill-detail-trigger" data-interactive="true" title="Klik untuk jalankan ulang diagnostik komponen ini">
+          <div class="skill-detail-box" id="skill-detail-trigger" data-interactive="true"
+            title="Klik untuk jalankan ulang diagnostik komponen ini">
             <div class="sd-top">
               <span class="sd-name" id="sd-name">AIModelEngine</span>
               <span class="sd-status" id="sd-status">● MODULE ACTIVE</span>
@@ -1374,8 +1651,10 @@
             </div>
           </div>
           <div class="swarm-footer">
-            <span id="swarm-host-trigger" data-interactive="true" title="Klik untuk cek info host &amp; port">HOST <b>0.0.0.0:8000</b></span>
-            <span id="swarm-peers-trigger" data-interactive="true" title="Klik untuk kelola daftar peer P2P">PEERS <b id="txt-peers-count" class="pink-txt">1</b></span>
+            <span id="swarm-host-trigger" data-interactive="true" title="Klik untuk cek info host &amp; port">HOST
+              <b>0.0.0.0:8000</b></span>
+            <span id="swarm-peers-trigger" data-interactive="true" title="Klik untuk kelola daftar peer P2P">PEERS <b
+                id="txt-peers-count" class="pink-txt">1</b></span>
           </div>
         </div>
       </div>
@@ -1398,37 +1677,51 @@
 
         <div class="metrics-body">
           <div class="eval-bars-list" id="eval-bars-list">
-            <div class="eb-row" data-metric-action="hw" title="Klik untuk refresh &amp; cetak laporan CPU Usage (GET /node/metrics)"><span class="eb-lbl">CPU USAGE</span>
+            <div class="eb-row" data-metric-action="hw"
+              title="Klik untuk refresh &amp; cetak laporan CPU Usage (GET /node/metrics)"><span class="eb-lbl">CPU
+                USAGE</span>
               <div class="eb-track">
                 <div class="eb-fill c-green" id="bar-cpu" style="width:28%"></div>
               </div><span class="eb-val" id="txt-cpu-val">28%</span>
             </div>
-            <div class="eb-row" data-metric-action="hw" title="Klik untuk refresh &amp; cetak laporan RAM Allocation (GET /node/metrics)"><span class="eb-lbl">RAM ALLOC</span>
+            <div class="eb-row" data-metric-action="hw"
+              title="Klik untuk refresh &amp; cetak laporan RAM Allocation (GET /node/metrics)"><span class="eb-lbl">RAM
+                ALLOC</span>
               <div class="eb-track">
                 <div class="eb-fill c-teal" id="bar-ram" style="width:52%"></div>
               </div><span class="eb-val" id="txt-ram-val">52%</span>
             </div>
-            <div class="eb-row" data-metric-action="hw" title="Klik untuk refresh &amp; cetak laporan Disk I/O Read (GET /node/metrics)"><span class="eb-lbl">DISK I/O READ</span>
+            <div class="eb-row" data-metric-action="hw"
+              title="Klik untuk refresh &amp; cetak laporan Disk I/O Read (GET /node/metrics)"><span class="eb-lbl">DISK
+                I/O READ</span>
               <div class="eb-track">
                 <div class="eb-fill c-amber" id="bar-disk" style="width:64%"></div>
               </div><span class="eb-val" id="txt-disk-val">0 MB</span>
             </div>
-            <div class="eb-row" data-metric-action="rag" title="Klik untuk membuka manajer dokumen RAG Vector Store (GET /knowledge/stats)"><span class="eb-lbl">RAG VECTORS</span>
+            <div class="eb-row" data-metric-action="rag"
+              title="Klik untuk membuka manajer dokumen RAG Vector Store (GET /knowledge/stats)"><span
+                class="eb-lbl">RAG VECTORS</span>
               <div class="eb-track">
                 <div class="eb-fill c-green" id="bar-rag-docs" style="width:20%"></div>
               </div><span class="eb-val" id="txt-rag-docs">0 doc</span>
             </div>
-            <div class="eb-row" data-metric-action="crypto" title="Klik untuk menjalankan self-test tanda tangan Ed25519 (POST /security/sign-verify)"><span class="eb-lbl">ED25519 KEY</span>
+            <div class="eb-row" data-metric-action="crypto"
+              title="Klik untuk menjalankan self-test tanda tangan Ed25519 (POST /security/sign-verify)"><span
+                class="eb-lbl">ED25519 KEY</span>
               <div class="eb-track">
                 <div class="eb-fill c-teal" id="bar-m5" style="width:100%"></div>
               </div><span class="eb-val">VALID</span>
             </div>
-            <div class="eb-row" data-metric-action="pow" title="Klik untuk mengubah tingkat kesulitan PoW 1..3 (POST /node/config)"><span class="eb-lbl">POW DIFFICULTY</span>
+            <div class="eb-row" data-metric-action="pow"
+              title="Klik untuk mengubah tingkat kesulitan PoW 1..3 (POST /node/config)"><span class="eb-lbl">POW
+                DIFFICULTY</span>
               <div class="eb-track">
                 <div class="eb-fill c-purple" id="bar-pow-diff" style="width:50%"></div>
               </div><span class="eb-val" id="txt-pow-diff">DIFF 2</span>
             </div>
-            <div class="eb-row" data-metric-action="chain" title="Klik untuk membuka &amp; menginspeksi Web3 Blockchain Ledger (GET /node/chain)"><span class="eb-lbl">WEB3 LEDGER</span>
+            <div class="eb-row" data-metric-action="chain"
+              title="Klik untuk membuka &amp; menginspeksi Web3 Blockchain Ledger (GET /node/chain)"><span
+                class="eb-lbl">WEB3 LEDGER</span>
               <div class="eb-track">
                 <div class="eb-fill c-green" id="bar-m7" style="width:100%"></div>
               </div><span class="eb-val" id="txt-chain-height">1 blk</span>
@@ -1437,10 +1730,13 @@
 
           <div class="metrics-bottom-row">
             <div class="mb-info">
-              <span id="mb-mode-trigger" data-interactive="true" title="Klik untuk cek status mode server">MODE: <b id="txt-node-mode" class="green-txt">FULL</b></span>
-              <span id="mb-id-trigger" data-interactive="true" title="Klik untuk verifikasi identitas Ed25519">ID: <b id="txt-ident-short">ED25519</b></span>
+              <span id="mb-mode-trigger" data-interactive="true" title="Klik untuk cek status mode server">MODE: <b
+                  id="txt-node-mode" class="green-txt">FULL</b></span>
+              <span id="mb-id-trigger" data-interactive="true" title="Klik untuk verifikasi identitas Ed25519">ID: <b
+                  id="txt-ident-short">ED25519</b></span>
             </div>
-            <div class="mb-big-counter" id="metrics-counter" data-interactive="true" title="Klik untuk refresh seluruh 7 indikator performa">7/7</div>
+            <div class="mb-big-counter" id="metrics-counter" data-interactive="true"
+              title="Klik untuk refresh seluruh 7 indikator performa">7/7</div>
           </div>
         </div>
       </div>
@@ -1453,7 +1749,8 @@
     <footer class="bottom-ticker">
       <div class="bt-left">
         <span class="bt-dot"></span>
-        <b id="bt-brand-trigger" data-interactive="true" title="Klik untuk cek status sistem penuh">GAJAHMADA v2.0 — SOVEREIGN DECENTRALIZED INTELLIGENCE</b>
+        <b id="bt-brand-trigger" data-interactive="true" title="Klik untuk cek status sistem penuh">GAJAHMADA v2.0 —
+          SOVEREIGN DECENTRALIZED INTELLIGENCE</b>
         <span class="bt-sep">·</span>
         <span class="bt-nav-item" data-jump="panel-system-logs">01. System Logs &amp; Config</span>
         <span class="bt-nav-item" data-jump="panel-02-3d">02. 3D Network Graph</span>
@@ -1465,7 +1762,8 @@
         <span class="bt-nav-item" data-jump="panel-08-metrics">08. System Performance</span>
       </div>
       <div class="bt-right">
-        <span id="hud-clock" data-interactive="true" title="Klik untuk menampilkan sinkronisasi waktu sistem sekarang (/time)">00:00:00</span>
+        <span id="hud-clock" data-interactive="true"
+          title="Klik untuk menampilkan sinkronisasi waktu sistem sekarang (/time)">00:00:00</span>
       </div>
     </footer>
 
@@ -1474,9 +1772,11 @@
          ═══════════════════════════════════════════════════════════════════ -->
     <div class="github-bottom-bar">
       <span>support and download this repo on Github</span>
-      <a href="https://github.com/hoed/gajahmada-ai" target="_blank" rel="noopener noreferrer" title="Support and download GajahMada AI on GitHub">
+      <a href="https://github.com/hoed/gajahmada-ai" target="_blank" rel="noopener noreferrer"
+        title="Support and download GajahMada AI on GitHub">
         <svg class="github-logo-icon" viewBox="0 0 16 16" aria-hidden="true">
-          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+          <path
+            d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
         </svg>
         <span>: https://github.com/hoed/gajahmada-ai</span>
       </a>
@@ -1564,11 +1864,14 @@
 
   <!-- MODAL 4: COMMAND CENTER DIALOG BOX (Interactive Popup AI Console) -->
   <div class="hud-modal" id="modal-command-center">
-    <div class="modal-dialog" style="max-width:860px;width:95%;height:82vh;display:flex;flex-direction:column;border:1.5px solid #818cf8;box-shadow:0 0 50px rgba(129,140,248,0.3)">
-      <div class="modal-header" style="height:36px;background:linear-gradient(90deg,rgba(129,140,248,0.22) 0%,rgba(45,212,191,0.14) 100%);border-bottom:1px solid rgba(129,140,248,0.45)">
+    <div class="modal-dialog"
+      style="max-width:860px;width:95%;height:82vh;display:flex;flex-direction:column;border:1.5px solid #818cf8;box-shadow:0 0 50px rgba(129,140,248,0.3)">
+      <div class="modal-header"
+        style="height:36px;background:linear-gradient(90deg,rgba(129,140,248,0.22) 0%,rgba(45,212,191,0.14) 100%);border-bottom:1px solid rgba(129,140,248,0.45)">
         <div style="display:flex;align-items:center;gap:8px">
           <img src="/ui/logo.png?v=10.0" alt="GajahMada" style="width:20px;height:20px;object-fit:contain" />
-          <span style="color:#fff;font-size:11px;font-weight:800;letter-spacing:0.6px">[03] GAJAHMADA COMMAND CENTER // AI &amp; WEB3 DIALOG BOX</span>
+          <span style="color:#fff;font-size:11px;font-weight:800;letter-spacing:0.6px">[03] GAJAHMADA COMMAND CENTER //
+            AI &amp; WEB3 DIALOG BOX</span>
           <span class="ph-badge purple-badge" style="margin-left:4px">● AI ONLINE</span>
         </div>
         <div style="display:flex;align-items:center;gap:6px">
@@ -1577,15 +1880,20 @@
         </div>
       </div>
 
-      <div class="modal-body" style="flex:1;min-height:0;max-height:none;display:flex;flex-direction:column;gap:8px;padding:12px">
+      <div class="modal-body"
+        style="flex:1;min-height:0;max-height:none;display:flex;flex-direction:column;gap:8px;padding:12px">
         <!-- Synchronized Dialog Chat Feed -->
-        <div class="chat-feed" id="modal-messages-wrap" style="flex:1;min-height:0;font-size:12px;padding:12px;gap:10px;background:#040709;border:1px solid rgba(129,140,248,0.35)">
+        <div class="chat-feed" id="modal-messages-wrap"
+          style="flex:1;min-height:0;font-size:12px;padding:12px;gap:10px;background:#040709;border:1px solid rgba(129,140,248,0.35)">
           <div class="chat-item chat-ai" style="font-size:12px;padding:10px 14px">
             <div class="ci-meta" style="font-size:9.5px;margin-bottom:4px">
               <span class="ci-who">GAJAHMADA // SOVEREIGN CORE ENGINE</span>
               <span class="ci-sig">ED25519 · SHA-256 POW VERIFIED</span>
             </div>
-            <div class="ci-text">Selamat datang di <b>GajahMada Command Center Dialog</b>. Anda dapat bertanya secara bebas (misal: <i>"siapa kamu"</i>, <i>"jelaskan sejarah Nusantara sampai Indonesia sekarang"</i>, <i>"apa isi Sumpah Palapa"</i>, <i>"siapa Presiden Indonesia sekarang"</i>) atau menjalankan perintah sistem.</div>
+            <div class="ci-text">Selamat datang di <b>GajahMada Command Center Dialog</b>. Anda dapat bertanya secara
+              bebas (misal: <i>"siapa kamu"</i>, <i>"jelaskan sejarah Nusantara sampai Indonesia sekarang"</i>, <i>"apa
+                isi Sumpah Palapa"</i>, <i>"siapa Presiden Indonesia sekarang"</i>) atau menjalankan perintah sistem.
+            </div>
           </div>
         </div>
 
@@ -1599,27 +1907,32 @@
         <div class="command-presets-bar">
           <span class="cp-label">QUICK EXEC:</span>
           <button type="button" class="cp-chip" data-quick-cmd="Siapa kamu?">🤖 Siapa Kamu?</button>
-          <button type="button" class="cp-chip" data-quick-cmd="Jelaskan detail sejarah Nusantara sampai Indonesia sekarang">🇮🇩 Nusantara → Indonesia</button>
-          <button type="button" class="cp-chip" data-quick-cmd="Jelaskan Mahapatih Gajah Mada, Sumpah Palapa, dan Majapahit">🐘 Sumpah Palapa</button>
-          <button type="button" class="cp-chip" data-quick-cmd="Sebutkan daftar Presiden Republik Indonesia dari pertama sampai sekarang">👑 Daftar Presiden RI</button>
-          <button type="button" class="cp-chip" data-quick-cmd="Jelaskan 38 Provinsi, Ibu Kota Nusantara (IKN), dan Ekonomi Indonesia sekarang">🏛️ 38 Provinsi &amp; IKN</button>
+          <button type="button" class="cp-chip"
+            data-quick-cmd="Jelaskan detail sejarah Nusantara sampai Indonesia sekarang">🇮🇩 Nusantara →
+            Indonesia</button>
+          <button type="button" class="cp-chip"
+            data-quick-cmd="Jelaskan Mahapatih Gajah Mada, Sumpah Palapa, dan Majapahit">🐘 Sumpah Palapa</button>
+          <button type="button" class="cp-chip"
+            data-quick-cmd="Sebutkan daftar Presiden Republik Indonesia dari pertama sampai sekarang">👑 Daftar Presiden
+            RI</button>
+          <button type="button" class="cp-chip"
+            data-quick-cmd="Jelaskan 38 Provinsi, Ibu Kota Nusantara (IKN), dan Ekonomi Indonesia sekarang">🏛️ 38
+            Provinsi &amp; IKN</button>
           <button type="button" class="cp-chip" data-quick-cmd="/status">📊 /status</button>
           <button type="button" class="cp-chip" data-quick-cmd="/time">🕒 /time</button>
           <button type="button" class="cp-chip" data-quick-cmd="/verify">🔐 /verify</button>
         </div>
 
         <!-- Dialog Prompt Input Bar -->
-        <form class="prompt-input-bar" id="modal-chat-form" autocomplete="off" style="height:42px;min-height:42px;padding:4px 8px 4px 12px">
+        <form class="prompt-input-bar" id="modal-chat-form" autocomplete="off"
+          style="height:42px;min-height:42px;padding:4px 8px 4px 12px">
           <span class="prompt-prefix" style="font-size:15px">❯</span>
-          <input
-            type="text"
-            id="modal-chat-prompt-input"
+          <input type="text" id="modal-chat-prompt-input"
             style="flex:1;background:transparent;border:none;outline:none;color:#fff;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600"
-            placeholder="Ketik pertanyaan atau perintah ke GajahMada lalu tekan Enter..."
-            autocomplete="off"
-            spellcheck="false"
-          />
-          <button type="submit" class="prompt-send-btn" id="btn-modal-chat-send" style="padding:7px 18px;font-size:11px">TRANSMIT ↵</button>
+            placeholder="Ketik pertanyaan atau perintah ke GajahMada lalu tekan Enter..." autocomplete="off"
+            spellcheck="false" />
+          <button type="submit" class="prompt-send-btn" id="btn-modal-chat-send"
+            style="padding:7px 18px;font-size:11px">TRANSMIT ↵</button>
         </form>
       </div>
     </div>

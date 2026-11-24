@@ -15,9 +15,16 @@ class MemoryType(str, Enum):
 
 
 class VerificationStatus(str, Enum):
+    # Explicit 6-State Epistemic Model (P2 Remediation) + backward-compatible aliases
+    UNVERIFIED = "UNVERIFIED"
+    MODEL_ASSESSED = "MODEL_ASSESSED"
+    SOURCE_CORROBORATED = "SOURCE_CORROBORATED"
+    INDEPENDENTLY_VERIFIED = "INDEPENDENTLY_VERIFIED"
+    DISPUTED = "DISPUTED"
+    REJECTED = "REJECTED"
+    # Backward-compatible aliases
     VERIFIED = "VERIFIED"
     PARTIALLY_VERIFIED = "PARTIALLY_VERIFIED"
-    UNVERIFIED = "UNVERIFIED"
     CONTRADICTED = "CONTRADICTED"
 
 

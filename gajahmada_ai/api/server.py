@@ -176,7 +176,12 @@ def ensure_initialized():
         governance_policy = GovernancePolicy()
 
     if auth_manager is None:
-        auth_manager = AuthManager(identity=identity, audit_logger=audit_logger)
+        admin_key_path = os.path.join(storage_dir, "admin_api.key")
+        auth_manager = AuthManager(
+            identity=identity,
+            audit_logger=audit_logger,
+            admin_key_file=admin_key_path,
+        )
 
     if rate_limiter is None:
         rate_limiter = SlidingWindowRateLimiter(max_requests=240, window_seconds=60.0)
@@ -628,19 +633,19 @@ async def ai_chat(req: ChatRequest):
 
     if blockchain and identity:
         try:
-            signature = identity.sign_message(task_hash.encode())
-            block = Block(
-                index=len(blockchain.chain),
-                timestamp=start,
-                task_hash=task_hash,
-                node_id=identity.node_id,
-                previous_hash=blockchain.get_latest_block().hash,
-                signature=signature,
-                event_type=LedgerEventType.TASK_COMPLETED.value,
-                event_ref=reasoning_res.reasoning_id,
+            # P0 Strict Schema v2: ALL new blocks go through record_event() with full-envelope Ed25519 signature
+            block = blockchain.record_event(
+                event_type=LedgerEventType.TASK_COMPLETED,
+                content_reference=f"{reasoning_res.reasoning_id}|{task_hash[:16]}",
+                identity=identity,
+                metadata={
+                    "reasoning_id": reasoning_res.reasoning_id,
+                    "task_hash": task_hash,
+                    "verification_status": reasoning_res.verification_status,
+                },
             )
-            blockchain.add_block(block)
             block_idx = block.index
+            signature = block.signature
             if supabase_store and supabase_store.configured:
                 supabase_store.upsert_block(block.to_dict())
         except Exception as e:
@@ -673,8 +678,9 @@ async def ai_chat(req: ChatRequest):
 
 
 @app.post("/ai/ingest")
-async def ai_ingest(req: EmbeddingRequest):
+async def ai_ingest(req: EmbeddingRequest, request: Request):
     ensure_initialized()
+    actor = auth_manager.authenticate_request(request, required_capability="memory:write")
     text = req.text.strip()
     if not text:
         raise HTTPException(status_code=400, detail="Text cannot be empty.")
@@ -764,8 +770,9 @@ class CrawlKnowledgeRequest(BaseModel):
 
 @app.post("/knowledge/crawl")
 @app.post("/api/v2/knowledge/crawl")
-def knowledge_crawl(req: CrawlKnowledgeRequest):
+def knowledge_crawl(req: CrawlKnowledgeRequest, request: Request):
     ensure_initialized()
+    auth_manager.authenticate_request(request, required_capability="memory:write")
     crawled = crawl_internet_knowledge(req.query)
     if not crawled:
         raise HTTPException(status_code=404, detail=f"No internet knowledge found for query: {req.query}")
@@ -887,8 +894,9 @@ def remove_peer(peer: str, request: Request):
 
 
 @app.post("/node/broadcast")
-async def broadcast_to_peers(req: BroadcastRequest):
+async def broadcast_to_peers(req: BroadcastRequest, request: Request):
     ensure_initialized()
+    auth_manager.authenticate_request(request, required_capability="network:manage")
     gip_msg = GIPMessage(
         message_type=GIPMessageType.GIP_DISCOVERY,
         sender_node_id=identity.node_id,
@@ -950,8 +958,9 @@ def get_chain():
 
 
 @app.post("/node/chain/mine")
-def mine_manual_block(req: MineBlockRequest):
+def mine_manual_block(req: MineBlockRequest, request: Request):
     ensure_initialized()
+    auth_manager.authenticate_request(request, required_capability="system:admin")
     t0 = time.time()
     block = blockchain.record_event(
         event_type=LedgerEventType.AUDIT_BLOCK,
@@ -986,17 +995,28 @@ def verify_full_chain():
 
 @app.post("/security/sign-verify")
 def security_sign_verify(req: SignVerifyRequest):
+    """
+    P0 Security Remediation (Signing Oracle Eliminated):
+    Verifies Ed25519 (RFC 8032) cryptographic primitives using an isolated ephemeral
+    self-test keypair and a domain-separated server nonce. The node's real private key
+    is NEVER exposed as an arbitrary signing oracle.
+    """
     ensure_initialized()
-    msg_bytes = req.message.encode("utf-8")
-    signature = identity.sign_message(msg_bytes)
-    verified = identity.verify_message(msg_bytes, signature, identity.node_id)
-    record_log("security.crypto", "OK", f"Ed25519 sign & verify self-test: verified={verified}")
+    import secrets as _secrets
+    ephemeral = NodeIdentity(key_path=None)
+    msg_digest = hashlib.sha256(req.message.encode("utf-8")).hexdigest()
+    challenge = f"GAJAHMADA_SELFTEST_V2|{_secrets.token_hex(16)}|{msg_digest}".encode("utf-8")
+    signature = ephemeral.sign_message(challenge)
+    verified = ephemeral.verify_message(challenge, signature, ephemeral.node_id)
+    record_log("security.crypto", "OK", f"Ed25519 isolated self-test: verified={verified}")
     return {
         "node_id": identity.node_id,
-        "message": req.message,
+        "selftest_ephemeral_key_id": ephemeral.node_id,
+        "message_sha256": msg_digest,
         "signature": signature,
         "verified": verified,
         "algorithm": "Ed25519 (RFC 8032)",
+        "oracle_protected": True,
     }
 
 

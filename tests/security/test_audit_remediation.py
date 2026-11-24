@@ -103,9 +103,13 @@ def test_p0_5_human_approval_cannot_be_spoofed():
     rt = get_runtime_context()
     admin_key = rt["auth"].admin_api_key
 
-    # Attempt to spoof human_approved=True on public submission
+    # Unauthenticated /agents/run must be rejected (401)
+    assert client.post("/api/v2/agents/run", json={"objective": "unauth"}).status_code == 401
+
+    # Attempt to spoof human_approved=True on authenticated submission
     r_run = client.post(
         "/api/v2/agents/run",
+        headers={"X-API-Key": admin_key},
         json={
             "objective": "Execute sensitive sovereign operation",
             "requires_human_approval": True,
@@ -176,13 +180,21 @@ def test_p1_blockchain_tamper_evident_metadata_and_corruption_recovery():
 
 
 def test_p2_and_p3_gip_full_handlers_and_knowledge_quarantine():
-    """P2 & P3: /api/v2/network/gip handles IDENTITY, TASK, KNOWLEDGE (quarantined), VERIFY, CONSENSUS."""
+    """P1/P2/P3: GIP trust lifecycle (PENDING->TRUSTED), SSRF guard, Quarantine, and source-corroborated promotion."""
     client = TestClient(app)
     rt = get_runtime_context()
     admin_key = rt["auth"].admin_api_key
     peer_id = NodeIdentity(key_path=None)
 
-    # 1. GIP-IDENTITY handshake
+    # 0. GIP-DISCOVERY with SSRF metadata URL must be blocked (400)
+    m_ssrf = GIPMessage(
+        message_type=GIPMessageType.GIP_DISCOVERY,
+        sender_node_id=peer_id.node_id,
+        payload={"node_name": "evil", "endpoint": "http://169.254.169.254/latest/meta-data"},
+    ).sign(peer_id)
+    assert client.post("/api/v2/network/gip", json=m_ssrf.model_dump()).status_code == 400
+
+    # 1. GIP-IDENTITY handshake registers peer as PENDING (NOT auto-TRUSTED!)
     m_id = GIPMessage(
         message_type=GIPMessageType.GIP_IDENTITY,
         sender_node_id=peer_id.node_id,
@@ -190,9 +202,26 @@ def test_p2_and_p3_gip_full_handlers_and_knowledge_quarantine():
     ).sign(peer_id)
     r_id = client.post("/api/v2/network/gip", json=m_id.model_dump())
     assert r_id.status_code == 200
-    assert r_id.json()["accepted"] is True
+    assert r_id.json()["trust_state"] == "PENDING"
 
-    # 2. GIP-TASK execution
+    # 1B. PENDING peer MUST be rejected from GIP-TASK (403)
+    m_task_blocked = GIPMessage(
+        message_type=GIPMessageType.GIP_TASK,
+        sender_node_id=peer_id.node_id,
+        payload={"task_id": "t-gip-00", "objective": "Hitung 2 + 2"},
+    ).sign(peer_id)
+    assert client.post("/api/v2/network/gip", json=m_task_blocked.model_dump()).status_code == 403
+
+    # 1C. Admin promotes peer to TRUSTED via /api/v2/nodes/{id}/trust
+    r_trust = client.post(
+        f"/api/v2/nodes/{peer_id.node_id}/trust",
+        headers={"X-API-Key": admin_key},
+        json={"trust_state": "TRUSTED"},
+    )
+    assert r_trust.status_code == 200
+    assert r_trust.json()["trust_state"] == "TRUSTED"
+
+    # 2. Now TRUSTED peer can execute GIP-TASK
     m_task = GIPMessage(
         message_type=GIPMessageType.GIP_TASK,
         sender_node_id=peer_id.node_id,
@@ -202,7 +231,7 @@ def test_p2_and_p3_gip_full_handlers_and_knowledge_quarantine():
     assert r_task.status_code == 200
     assert "115" in r_task.json()["reply"]["payload"]["conclusion"]
 
-    # 3. GIP-KNOWLEDGE enters LOCAL Quarantine (UNVERIFIED) — then promoted via authenticated /promote
+    # 3. GIP-KNOWLEDGE enters LOCAL Quarantine (UNVERIFIED) — promotion requires independent_sources
     m_know = GIPMessage(
         message_type=GIPMessageType.GIP_KNOWLEDGE,
         sender_node_id=peer_id.node_id,
@@ -217,11 +246,171 @@ def test_p2_and_p3_gip_full_handlers_and_knowledge_quarantine():
     assert rec_before["verification_status"] == "UNVERIFIED"
     assert rec_before["visibility_policy"] == "LOCAL"
 
-    # Promote after verification
-    r_prom = client.post(f"/api/v2/knowledge/promote/{q_rec_id}", headers={"X-API-Key": admin_key})
+    # Promotion without independent sources MUST fail (422)
+    assert client.post(
+        f"/api/v2/knowledge/promote/{q_rec_id}",
+        headers={"X-API-Key": admin_key},
+        json={"independent_sources": []},
+    ).status_code == 422
+
+    # Promotion WITH 2 independent sources succeeds as INDEPENDENTLY_VERIFIED
+    r_prom = client.post(
+        f"/api/v2/knowledge/promote/{q_rec_id}",
+        headers={"X-API-Key": admin_key},
+        json={
+            "independent_sources": ["https://bmkg.go.id/buoy-07", "node:verifier-gamma"],
+            "verification_method": "independent_node_verification",
+        },
+    )
     assert r_prom.status_code == 200
-    assert r_prom.json()["record"]["verification_status"] == "VERIFIED"
+    assert r_prom.json()["epistemic_status"] == "INDEPENDENTLY_VERIFIED"
     assert r_prom.json()["record"]["visibility_policy"] == "COLLECTIVE"
+
+
+def test_p0_signing_oracle_eliminated_and_mutation_endpoints_authenticated():
+    """P0: /security/sign-verify cannot act as an admin signing oracle; all mutation endpoints require auth."""
+    client = TestClient(app)
+    rt = get_runtime_context()
+    node_id = rt["identity"].node_id
+
+    # 1. /security/sign-verify must use isolated ephemeral key (NOT node private key)
+    r_sv = client.post("/security/sign-verify", json={"message": "POST|/api/v2/system/rotate-key|9999999999"})
+    assert r_sv.status_code == 200
+    sv_data = r_sv.json()
+    assert sv_data["oracle_protected"] is True
+    assert sv_data["selftest_ephemeral_key_id"] != node_id
+
+    # Attempt to replay that signature as X-Node-Id admin auth MUST FAIL (401)
+    r_replay = client.post(
+        "/api/v2/system/rotate-key",
+        headers={
+            "X-Node-Id": node_id,
+            "X-Signature": sv_data["signature"],
+            "X-Timestamp": "9999999999",
+        },
+    )
+    assert r_replay.status_code == 401
+
+    # 2. All state-mutating endpoints reject unauthenticated requests (401)
+    assert client.post("/ai/ingest", json={"text": "unauth injection"}).status_code == 401
+    assert client.post("/node/chain/mine", json={"note": "unauth mine"}).status_code == 401
+    assert client.post("/node/broadcast", json={"message": "unauth broadcast"}).status_code == 401
+    assert client.post("/knowledge/crawl", json={"query": "jakarta"}).status_code == 401
+
+
+def test_p0_blockchain_v2_rejects_legacy_signature_and_single_field_tamper():
+    """P0: Schema v2 blocks strictly reject legacy task_hash-only sigs AND any single-field tamper."""
+    from gajahmada_ai.blockchain.chain import Block
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        ident = NodeIdentity(key_path=os.path.join(tmpdir, "k.pem"))
+        chain = AIBlockchain(storage_path=os.path.join(tmpdir, "c.json"))
+
+        # Legacy task_hash-only signature on schema_version=2 block MUST be rejected
+        bad_v2 = Block(
+            index=1,
+            timestamp=1700000000.0,
+            task_hash="abc123",
+            node_id=ident.node_id,
+            previous_hash=chain.get_latest_block().hash,
+            signature=ident.sign_message(b"abc123"),
+            schema_version=2,
+        )
+        assert chain.verify_block_signature(bad_v2) is False
+
+        # Valid v2 block via record_event() passes; tampering ANY single field breaks validation
+        blk = chain.record_event(
+            LedgerEventType.TASK_COMPLETED, "ref-01", ident, metadata={"verification": "FAILED"}
+        )
+        assert chain.is_chain_valid(verify_signatures=True) is True
+
+        for attr, mutated in [
+            ("metadata", {"verification": "APPROVED"}),
+            ("event_type", "RESULT_VERIFIED"),
+            ("event_ref", "ref-99"),
+            ("nonce", blk.nonce + 1),
+        ]:
+            orig = getattr(blk, attr)
+            setattr(blk, attr, mutated)
+            assert chain.is_chain_valid(verify_signatures=True) is False, f"Tampering {attr} was not detected!"
+            setattr(blk, attr, orig)
+        assert chain.is_chain_valid(verify_signatures=True) is True
+
+
+def test_p1_gip_consensus_rejects_forged_submissions_and_enforces_policy_quorum():
+    """P1: GIP-CONSENSUS ignores caller signature_verified=True, rejects duplicates, & enforces policy quorum >= 2."""
+    from gajahmada_ai.security.crypto import canonical_json_bytes
+
+    client = TestClient(app)
+    rt = get_runtime_context()
+    admin_key = rt["auth"].admin_api_key
+    peer_a = NodeIdentity(key_path=None)
+    peer_b = NodeIdentity(key_path=None)
+
+    # Register & trust peer_a
+    m_id = GIPMessage(
+        message_type=GIPMessageType.GIP_IDENTITY,
+        sender_node_id=peer_a.node_id,
+        payload={"node_name": "cons-a", "endpoint": "http://127.0.0.1:9111"},
+    ).sign(peer_a)
+    assert client.post("/api/v2/network/gip", json=m_id.model_dump()).status_code == 200
+    assert client.post(
+        f"/api/v2/nodes/{peer_a.node_id}/trust",
+        headers={"X-API-Key": admin_key},
+        json={"trust_state": "TRUSTED"},
+    ).status_code == 200
+
+    # 1. Forged payload claiming signature_verified=True & quorum_size=1 MUST be rejected
+    m_forged = GIPMessage(
+        message_type=GIPMessageType.GIP_CONSENSUS,
+        sender_node_id=peer_a.node_id,
+        payload={
+            "task_id": "cons-01",
+            "quorum_size": 1,
+            "submissions": [
+                {"node_id": peer_a.node_id, "signature_verified": True, "conclusion": "fake", "confidence": 0.99},
+                {"node_id": peer_b.node_id, "signature_verified": True, "conclusion": "fake", "confidence": 0.99},
+            ],
+        },
+    ).sign(peer_a)
+    r_forged = client.post("/api/v2/network/gip", json=m_forged.model_dump())
+    assert r_forged.status_code == 200
+    c_forged = r_forged.json()["consensus"]
+    assert c_forged["quorum_reached"] is False
+    assert c_forged["rejected_submissions"] == 2
+    assert c_forged["enforced_quorum_size"] >= 2
+
+    # 2. Two genuinely signed submissions from 2 distinct nodes succeed
+    def make_signed_sub(node_ident, conclusion):
+        ev = [{"provenance_hash": f"prov-{node_ident.node_id[:8]}"}]
+        sig = node_ident.sign_message(canonical_json_bytes({
+            "task_id": "cons-02",
+            "node_id": node_ident.node_id,
+            "conclusion": conclusion,
+            "confidence": 0.92,
+            "evidence": ev,
+        }))
+        return {
+            "node_id": node_ident.node_id,
+            "conclusion": conclusion,
+            "confidence": 0.92,
+            "symbolic_verified": True,
+            "evidence": ev,
+            "signature": sig,
+        }
+
+    m_valid = GIPMessage(
+        message_type=GIPMessageType.GIP_CONSENSUS,
+        sender_node_id=peer_a.node_id,
+        payload={
+            "task_id": "cons-02",
+            "submissions": [make_signed_sub(peer_a, "120"), make_signed_sub(peer_b, "120")],
+        },
+    ).sign(peer_a)
+    r_valid = client.post("/api/v2/network/gip", json=m_valid.model_dump())
+    assert r_valid.status_code == 200
+    assert r_valid.json()["consensus"]["quorum_reached"] is True
+    assert r_valid.json()["consensus"]["participating_nodes"] == 2
 
 
 def test_p5_three_independent_nodes_end_to_end_and_restart_consistency():

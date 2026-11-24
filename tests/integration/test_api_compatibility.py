@@ -74,7 +74,14 @@ def test_15_existing_supported_api_behavior_remains_compatible():
     assert r_v2_ask.status_code == 200
     assert "225" in r_v2_ask.json()["conclusion"]
 
-    r_v2_agent = client.post("/api/v2/agents/run", json={"objective": "Investigasi Sumpah Palapa 1336 M"})
+    rt = get_runtime_context()
+    admin_key = rt["auth"].admin_api_key
+
+    r_v2_agent = client.post(
+        "/api/v2/agents/run",
+        headers={"X-API-Key": admin_key},
+        json={"objective": "Investigasi Sumpah Palapa 1336 M"},
+    )
     assert r_v2_agent.status_code == 200
     assert r_v2_agent.json()["state"] == "COMPLETED"
 
@@ -83,8 +90,6 @@ def test_15_existing_supported_api_behavior_remains_compatible():
     assert r_v2_sys.json()["status"] == "healthy"
 
     # Authenticated v2 memory write test
-    rt = get_runtime_context()
-    admin_key = rt["auth"].admin_api_key
     r_v2_mem = client.post(
         "/api/v2/memory",
         headers={"X-API-Key": admin_key},

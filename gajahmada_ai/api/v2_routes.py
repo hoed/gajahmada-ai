@@ -6,7 +6,10 @@ from gajahmada_ai.blockchain.chain import LedgerEventType
 from gajahmada_ai.memory.authorization import MemoryAuthorizationService
 from gajahmada_ai.memory.models import MemoryType, VerificationStatus, VisibilityPolicy
 from gajahmada_ai.network.consensus import QuorumConsensusManager
+from gajahmada_ai.network.discovery import PeerTrustState
 from gajahmada_ai.network.protocol import GIPMessage, GIPMessageType
+from gajahmada_ai.security.crypto import canonical_json_bytes
+from gajahmada_ai.security.ssrf import validate_peer_url
 
 
 class V2AskRequest(BaseModel):
@@ -55,6 +58,17 @@ class V2LearningExperimentRequest(BaseModel):
     simulate_failure: bool = False
 
 
+class V2PromoteKnowledgeRequest(BaseModel):
+    """P2 Remediation: Promotion requires explicit independent sources & verification method."""
+    independent_sources: List[str] = Field(..., min_length=1)
+    verification_method: str = Field(default="source_corroboration", min_length=3, max_length=64)
+    verifier_notes: str = Field(default="", max_length=1024)
+
+
+class V2PeerTrustRequest(BaseModel):
+    trust_state: str = Field(..., description="PENDING | AUTHENTICATED | TRUSTED | REVOKED")
+
+
 def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
     router = APIRouter(prefix="/api/v2", tags=["GajahMada 2.0 Sovereign Intelligence API"])
     mem_auth = MemoryAuthorizationService()
@@ -81,14 +95,19 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
         }
 
     @router.post("/intelligence/ask")
-    def intelligence_ask(req: V2AskRequest):
+    def intelligence_ask(req: V2AskRequest, request: Request):
         rt = get_runtime()
         cognition = rt["cognition"]
         memory = rt["memory"]
         blockchain = rt["blockchain"]
         identity = rt["identity"]
+        auth = rt["auth"]
 
-        retrieved = memory.retrieve(query=req.objective, top_k=4)
+        actor = auth.resolve_optional_actor(request)
+        can_write_state = actor["role"] in ("admin", "operator")
+
+        raw_retrieved = memory.retrieve(query=req.objective, top_k=4)
+        retrieved = mem_auth.filter_records(raw_retrieved, actor["role"])
         result = cognition.execute(
             objective=req.objective,
             memory_records=retrieved,
@@ -97,57 +116,44 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
             temperature=req.temperature,
         )
 
-        # P2 Knowledge Quarantine Policy:
-        # Unverified reasoning outputs enter LOCAL Quarantine (UNVERIFIED) — never auto-published to COLLECTIVE.
-        clean_ans = result.conclusion.split("\n\n---\n📚")[0].strip()
-        qa_entry = f"Pertanyaan: {req.objective.strip()} | Jawaban: {clean_ans}"
-        is_generic = (
-            "Permintaan telah diproses oleh **GajahMada Hybrid Cognitive Engine**" in result.conclusion
-            or "Belum ada data spesifik untuk" in result.conclusion
-        )
-        can_promote_collective = (
-            not is_generic
-            and result.verification_status == "VERIFIED"
-            and float(result.confidence) >= 0.85
-            and not result.contradictions
-        )
-
-        rag = rt.get("rag")
-        engine = rt.get("engine")
-        if rag and engine and can_promote_collective and qa_entry not in rag.doc_store:
-            emb = engine.create_embedding(qa_entry)
-            if emb:
-                rag.ingest(qa_entry, emb)
-                rag.flush()
-
-        memory.store(
-            content=qa_entry,
-            memory_type=MemoryType.EPISODIC if is_generic else MemoryType.SEMANTIC,
-            origin_node_id=identity.node_id,
-            source_type="cognitive_brain_qa_update",
-            author="cognitive_brain",
-            confidence=result.confidence,
-            verification_status=(
-                VerificationStatus.VERIFIED if can_promote_collective else VerificationStatus.UNVERIFIED
-            ),
-            visibility_policy=(
-                VisibilityPolicy.COLLECTIVE if can_promote_collective else VisibilityPolicy.LOCAL
-            ),
-        )
-        memory.store(
-            content=f"Q: {req.objective[:160]} -> A ({result.verification_status}, conf={result.confidence})",
-            memory_type=MemoryType.WORKING,
-            origin_node_id=identity.node_id,
-            source_type="cognitive_pipeline",
-            confidence=result.confidence,
-            verification_status=VerificationStatus(result.verification_status),
-        )
-        blockchain.record_event(
-            LedgerEventType.TASK_COMPLETED,
-            f"{result.reasoning_id}|status={result.verification_status}|conf={result.confidence}",
-            identity,
-            metadata={"reasoning_id": result.reasoning_id, "verification_status": result.verification_status},
-        )
+        # P0 + P2: Public unauthenticated /ask is read-only (cannot mutate memory or ledger).
+        # Authenticated operators persist into LOCAL Quarantine (MODEL_ASSESSED / UNVERIFIED),
+        # NEVER auto-promoting model output to COLLECTIVE without independent verification.
+        if can_write_state:
+            clean_ans = result.conclusion.split("\n\n---\n📚")[0].strip()
+            qa_entry = f"Pertanyaan: {req.objective.strip()} | Jawaban: {clean_ans}"
+            is_generic = (
+                "Permintaan telah diproses oleh **GajahMada Hybrid Cognitive Engine**" in result.conclusion
+                or "Belum ada data spesifik untuk" in result.conclusion
+            )
+            epistemic_status = (
+                VerificationStatus.DISPUTED if result.contradictions
+                else (VerificationStatus.MODEL_ASSESSED if not is_generic else VerificationStatus.UNVERIFIED)
+            )
+            memory.store(
+                content=qa_entry,
+                memory_type=MemoryType.EPISODIC if is_generic else MemoryType.SEMANTIC,
+                origin_node_id=identity.node_id,
+                source_type="cognitive_brain_qa_update",
+                author=actor["actor"],
+                confidence=result.confidence,
+                verification_status=epistemic_status,
+                visibility_policy=VisibilityPolicy.LOCAL,
+            )
+            memory.store(
+                content=f"Q: {req.objective[:160]} -> A ({epistemic_status.value}, conf={result.confidence})",
+                memory_type=MemoryType.WORKING,
+                origin_node_id=identity.node_id,
+                source_type="cognitive_pipeline",
+                confidence=result.confidence,
+                verification_status=epistemic_status,
+            )
+            blockchain.record_event(
+                LedgerEventType.TASK_COMPLETED,
+                f"{result.reasoning_id}|status={epistemic_status.value}|conf={result.confidence}",
+                identity,
+                metadata={"reasoning_id": result.reasoning_id, "epistemic_status": epistemic_status.value},
+            )
         return result.model_dump()
 
     # ─── 2. /api/v2/reasoning ─────────────────────────────────────────────────
@@ -162,8 +168,8 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
         }
 
     @router.post("/reasoning")
-    def run_reasoning(req: V2AskRequest):
-        return intelligence_ask(req)
+    def run_reasoning(req: V2AskRequest, request: Request):
+        return intelligence_ask(req, request)
 
     @router.get("/reasoning/{reasoning_id}")
     def inspect_reasoning(reasoning_id: str):
@@ -277,8 +283,11 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
         }
 
     @router.post("/knowledge/promote/{record_id}")
-    def promote_quarantined_knowledge(record_id: str, request: Request):
-        """P2 Knowledge Integrity: Promote a Quarantined (UNVERIFIED/LOCAL) record to VERIFIED/COLLECTIVE after checks."""
+    def promote_quarantined_knowledge(record_id: str, req: V2PromoteKnowledgeRequest, request: Request):
+        """
+        P2 Knowledge Integrity: Promote Quarantined record ONLY after independent source
+        corroboration and contradiction checks (never solely from absence of contradictions).
+        """
         rt = get_runtime()
         auth = rt["auth"]
         memory = rt["memory"]
@@ -292,12 +301,21 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
         if rec.get("visibility_policy") == VisibilityPolicy.PRIVATE.value:
             raise HTTPException(status_code=403, detail="PRIVATE memory cannot be promoted to COLLECTIVE.")
 
+        clean_sources = [s.strip() for s in req.independent_sources if s and len(s.strip()) >= 4]
+        if not clean_sources:
+            raise HTTPException(
+                status_code=400,
+                detail="Promotion requires at least one traceable independent source or verifier reference.",
+            )
+
         open_contras = [
             c for c in memory.storage.list_contradictions()
             if c.get("resolution_status") == "OPEN"
             and (c.get("record_a_id") == record_id or c.get("record_b_id") == record_id)
         ]
         if open_contras:
+            rec["verification_status"] = VerificationStatus.DISPUTED.value
+            memory.storage.save_record(rec)
             blockchain.record_event(
                 LedgerEventType.KNOWLEDGE_REJECTED,
                 f"{record_id}|open_contradictions={len(open_contras)}",
@@ -309,20 +327,34 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
                 detail=f"Cannot promote record '{record_id}': {len(open_contras)} unresolved contradiction(s).",
             )
 
-        rec["verification_status"] = VerificationStatus.VERIFIED.value
+        new_status = (
+            VerificationStatus.INDEPENDENTLY_VERIFIED.value
+            if len(clean_sources) >= 2 or req.verification_method == "independent_node_verification"
+            else VerificationStatus.SOURCE_CORROBORATED.value
+        )
+        rec["verification_status"] = new_status
         rec["visibility_policy"] = VisibilityPolicy.COLLECTIVE.value
-        rec["confidence"] = max(float(rec.get("confidence", 0.75)), 0.85)
+        prov = rec.get("source_provenance") or {}
+        if isinstance(prov, dict):
+            prov["corroborating_sources"] = clean_sources
+            prov["verification_method"] = req.verification_method
+            rec["source_provenance"] = prov
         memory.storage.save_record(rec)
         memory.versioning.record_version_snapshot(
-            rec, modified_by=actor_info["actor"], reason="independent_verification_promoted"
+            rec, modified_by=actor_info["actor"], reason=f"promoted:{req.verification_method}"
         )
         blockchain.record_event(
             LedgerEventType.KNOWLEDGE_ACCEPTED,
-            f"{record_id}|promoted_by={actor_info['actor']}",
+            f"{record_id}|status={new_status}|sources={len(clean_sources)}",
             identity,
-            metadata={"record_id": record_id, "actor": actor_info["actor"]},
+            metadata={
+                "record_id": record_id,
+                "epistemic_status": new_status,
+                "independent_sources": clean_sources,
+                "verification_method": req.verification_method,
+            },
         )
-        return {"status": "promoted", "record": rec}
+        return {"status": "promoted", "epistemic_status": new_status, "record": rec}
 
     # ─── 4. /api/v2/agents ────────────────────────────────────────────────────
     @router.get("/agents")
@@ -335,13 +367,15 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
         }
 
     @router.post("/agents/run")
-    def run_autonomous_agent(req: V2AgentRunRequest):
+    def run_autonomous_agent(req: V2AgentRunRequest, request: Request):
         rt = get_runtime()
+        auth = rt["auth"]
         scheduler = rt["scheduler"]
         blockchain = rt["blockchain"]
         identity = rt["identity"]
 
-        # P0: Always force human_approved=False on submission; approval must go through authenticated /approve
+        # P0: Authenticate agent execution AND always force human_approved=False on submission
+        actor_info = auth.authenticate_request(request, required_capability="agent:run")
         task = scheduler.submit_objective(
             objective=req.objective,
             requires_human_approval=req.requires_human_approval,
@@ -353,7 +387,11 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
             LedgerEventType.TASK_CREATED,
             f"{task.task_id}|state={task.state.value}",
             identity,
-            metadata={"task_id": task.task_id, "requires_human_approval": req.requires_human_approval},
+            metadata={
+                "task_id": task.task_id,
+                "actor": actor_info["actor"],
+                "requires_human_approval": req.requires_human_approval,
+            },
         )
         return task.to_dict()
 
@@ -428,33 +466,63 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
             )
             raise HTTPException(status_code=403, detail=f"GIP message rejected: {reason}")
 
-        # Step 2: Peer authorization (separate from signature validity!)
-        # Handshake types (IDENTITY/DISCOVERY) register peer; operational types require registered or allowed peer
-        known_ids = {p["node_id"] for p in discovery.list_active_peers()}
-        if msg.message_type not in (GIPMessageType.GIP_IDENTITY, GIPMessageType.GIP_DISCOVERY):
-            if validator.allowed_peers is not None and msg.sender_node_id not in validator.allowed_peers:
-                raise HTTPException(status_code=403, detail="Peer signature valid, but peer is not authorized.")
-            if known_ids and msg.sender_node_id not in known_ids and msg.sender_node_id != identity.node_id:
+        # Step 2: Explicit Peer Trust State Enforcement (UNKNOWN -> PENDING -> AUTHENTICATED -> TRUSTED -> REVOKED)
+        # Signature validity proves key ownership, NOT network trust.
+        # Operational GIP namespaces ALWAYS require TRUSTED state (even when peer registry is empty!).
+        policy = rt["policy"]
+        sender_trust = discovery.get_trust_state(msg.sender_node_id)
+        if msg.message_type not in (GIPMessageType.GIP_IDENTITY, GIPMessageType.GIP_DISCOVERY, GIPMessageType.GIP_CAPABILITY):
+            if msg.sender_node_id != identity.node_id and sender_trust != PeerTrustState.TRUSTED:
+                audit_logger.record(
+                    event_type="GIP_UNTRUSTED_PEER_REJECTED",
+                    severity="HIGH",
+                    actor=msg.sender_node_id[:16],
+                    action=f"GIP:{msg.message_type}",
+                    outcome="REJECTED",
+                    details={"trust_state": sender_trust.value},
+                )
                 raise HTTPException(
                     status_code=403,
-                    detail="Peer signature valid, but peer has not completed GIP-IDENTITY/DISCOVERY registration.",
+                    detail=f"Peer signature valid, but peer trust_state='{sender_trust.value}' is not TRUSTED.",
                 )
 
         # Step 3: Full 8-namespace GIP/2.0 operational dispatch
         if msg.message_type in (GIPMessageType.GIP_IDENTITY, GIPMessageType.GIP_DISCOVERY, GIPMessageType.GIP_CAPABILITY):
-            discovery.register_peer(
+            raw_ep = str(msg.payload.get("endpoint", "")).strip()
+            if not raw_ep:
+                raise HTTPException(status_code=400, detail="GIP discovery requires a valid endpoint URL.")
+            ok_ep, clean_or_reason = validate_peer_url(raw_ep, allow_local=policy.allow_local_peers)
+            if not ok_ep:
+                audit_logger.record(
+                    event_type="GIP_SSRF_BLOCKED",
+                    severity="HIGH",
+                    actor=msg.sender_node_id[:16],
+                    action=f"GIP:{msg.message_type}",
+                    outcome="BLOCKED",
+                    details={"endpoint": raw_ep, "reason": clean_or_reason},
+                )
+                raise HTTPException(status_code=400, detail=f"GIP endpoint blocked by SSRF guard: {clean_or_reason}")
+
+            # Discovered peers start in PENDING (never auto-TRUSTED until operator approves)
+            desc = discovery.register_peer(
                 node_id=msg.sender_node_id,
-                endpoint=msg.payload.get("endpoint", "http://127.0.0.1:8000"),
+                endpoint=clean_or_reason,
                 node_name=msg.payload.get("node_name", "peer"),
                 capabilities=msg.payload.get("capabilities", ["symbolic", "evidence"]),
+                trust_state=PeerTrustState.PENDING,
             )
             ack = GIPMessage(
                 message_type=GIPMessageType.GIP_CAPABILITY,
                 sender_node_id=identity.node_id,
                 recipient_node_id=msg.sender_node_id,
-                payload={"status": "registered", "in_reply_to": msg.message_id, "capabilities": ["symbolic", "evidence", "verification", "memory"]},
+                payload={
+                    "status": "registered_pending_trust",
+                    "trust_state": desc.trust_state.value,
+                    "in_reply_to": msg.message_id,
+                    "capabilities": ["symbolic", "evidence", "verification", "memory"],
+                },
             ).sign(identity)
-            return {"accepted": True, "ack": ack.model_dump()}
+            return {"accepted": True, "trust_state": desc.trust_state.value, "ack": ack.model_dump()}
 
         if msg.message_type == GIPMessageType.GIP_TASK:
             objective = str(msg.payload.get("objective", "")).strip()
@@ -510,26 +578,73 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
 
         if msg.message_type == GIPMessageType.GIP_VERIFY:
             task_id = str(msg.payload.get("task_id", msg.message_id))
-            submission = {
-                "node_id": msg.sender_node_id,
-                "signature_verified": True,
-                "conclusion": msg.payload.get("conclusion", ""),
-                "confidence": float(msg.payload.get("confidence", 0.5)),
-                "symbolic_verified": bool(msg.payload.get("symbolic_verified", False)),
-                "evidence": msg.payload.get("evidence", []),
-            }
-            eval_res = consensus_mgr.evaluate_submissions(task_id=task_id, submissions=[submission], quorum_size=1)
+            # Single-node submission verified by outer Ed25519 envelope — NOT multi-node consensus!
             blockchain.record_event(
-                LedgerEventType.RESULT_VERIFIED, f"{task_id}|status={eval_res['status']}", identity,
-                metadata={"task_id": task_id, "consensus_status": eval_res["status"]},
+                LedgerEventType.EVIDENCE_SUBMITTED,
+                f"verify:{task_id}|from={msg.sender_node_id[:16]}",
+                identity,
+                metadata={"task_id": task_id, "sender": msg.sender_node_id, "single_node_submission": True},
             )
-            return {"accepted": True, "verification": eval_res}
+            return {
+                "accepted": True,
+                "status": "SINGLE_NODE_SUBMISSION_VERIFIED",
+                "multi_node_consensus": False,
+                "task_id": task_id,
+                "sender_node_id": msg.sender_node_id,
+            }
 
         if msg.message_type == GIPMessageType.GIP_CONSENSUS:
+            # P1 Consensus Integrity:
+            # 1. NEVER trust caller-supplied `signature_verified`.
+            # 2. Verify EACH submission's individual Ed25519 signature over its canonical payload.
+            # 3. Reject duplicate node_ids (Sybil / replay inflation).
+            # 4. Enforce quorum_size strictly from local GovernancePolicy (>= 2), NEVER peer payload.
             task_id = str(msg.payload.get("task_id", msg.message_id))
-            submissions = msg.payload.get("submissions", [])
-            quorum_size = int(msg.payload.get("quorum_size", 2))
-            eval_res = consensus_mgr.evaluate_submissions(task_id=task_id, submissions=submissions, quorum_size=quorum_size)
+            raw_subs = msg.payload.get("submissions", [])
+            if not isinstance(raw_subs, list):
+                raise HTTPException(status_code=400, detail="GIP-CONSENSUS submissions must be a list.")
+
+            verified_subs: List[Dict[str, Any]] = []
+            seen_nodes = set()
+            rejected_count = 0
+            for sub in raw_subs:
+                if not isinstance(sub, dict):
+                    rejected_count += 1
+                    continue
+                sub_node_id = str(sub.get("node_id", "")).strip()
+                sub_sig = str(sub.get("signature", "")).strip()
+                if not sub_node_id or not sub_sig or sub_node_id in seen_nodes:
+                    rejected_count += 1
+                    continue
+                if identity.is_revoked(sub_node_id):
+                    rejected_count += 1
+                    continue
+                canonical_sub = canonical_json_bytes({
+                    "task_id": task_id,
+                    "node_id": sub_node_id,
+                    "conclusion": str(sub.get("conclusion", "")),
+                    "confidence": float(sub.get("confidence", 0.5)),
+                    "evidence": sub.get("evidence", []),
+                })
+                if not identity.verify_message(canonical_sub, sub_sig, sub_node_id):
+                    rejected_count += 1
+                    continue
+                seen_nodes.add(sub_node_id)
+                verified_subs.append({
+                    "node_id": sub_node_id,
+                    "signature_verified": True,
+                    "conclusion": str(sub.get("conclusion", "")),
+                    "confidence": float(sub.get("confidence", 0.5)),
+                    "symbolic_verified": bool(sub.get("symbolic_verified", False)),
+                    "evidence": sub.get("evidence", []),
+                })
+
+            policy_quorum = max(2, int(getattr(policy, "min_quorum_size", 2)))
+            eval_res = consensus_mgr.evaluate_submissions(
+                task_id=task_id, submissions=verified_subs, quorum_size=policy_quorum
+            )
+            eval_res["rejected_submissions"] = rejected_count
+            eval_res["enforced_quorum_size"] = policy_quorum
             return {"accepted": True, "consensus": eval_res}
 
         if msg.message_type == GIPMessageType.GIP_SYNC:
@@ -577,12 +692,40 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
             endpoint=clean_ep,
             node_name=req.node_name,
             capabilities=req.capabilities,
+            trust_state=PeerTrustState.TRUSTED,
         )
         blockchain.record_event(
             LedgerEventType.NODE_REGISTERED,
             f"{req.node_id[:16]}|{clean_ep}",
             identity,
-            metadata={"peer_node_id": req.node_id, "endpoint": clean_ep},
+            metadata={"peer_node_id": req.node_id, "endpoint": clean_ep, "trust_state": "TRUSTED"},
+        )
+        return desc.to_dict()
+
+    @router.post("/nodes/{node_id}/trust")
+    def update_peer_trust_state(node_id: str, req: V2PeerTrustRequest, request: Request):
+        """P1 Peer Trust Lifecycle Management (Admin/Operator explicit promotion to TRUSTED or REVOKED)."""
+        rt = get_runtime()
+        auth = rt["auth"]
+        discovery = rt["discovery"]
+        identity = rt["identity"]
+        blockchain = rt["blockchain"]
+        auth.authenticate_request(request, required_capability="network:manage")
+        try:
+            state = PeerTrustState(req.trust_state.upper())
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid trust_state: {req.trust_state}")
+        try:
+            desc = discovery.set_trust_state(node_id, state)
+        except KeyError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        if state == PeerTrustState.REVOKED:
+            identity.revoke_peer(node_id)
+        blockchain.record_event(
+            LedgerEventType.NODE_REGISTERED,
+            f"trust:{node_id[:16]}={state.value}",
+            identity,
+            metadata={"peer_node_id": node_id, "trust_state": state.value},
         )
         return desc.to_dict()
 

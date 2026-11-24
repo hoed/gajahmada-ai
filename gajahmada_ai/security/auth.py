@@ -1,8 +1,11 @@
+from collections import deque
 from enum import Enum
+import hashlib
 import hmac
 import os
 import secrets
-from typing import Dict, Optional, Set
+import time
+from typing import Deque, Dict, Optional, Set, Tuple
 from fastapi import HTTPException, Request
 
 from gajahmada_ai.security.audit import SecurityAuditLogger
@@ -73,6 +76,8 @@ class AuthManager:
         self.audit_logger = audit_logger
         self.admin_key_file = admin_key_file
         self._tokens: Dict[str, Role] = {}
+        self._seen_nonces: Set[Tuple[str, str]] = set()
+        self._nonce_order: Deque[Tuple[str, str]] = deque(maxlen=4096)
         self.admin_api_key = os.environ.get("GAJAHMADA_ADMIN_KEY", "").strip()
         if not self.admin_api_key and admin_key_file and os.path.exists(admin_key_file):
             try:
@@ -151,14 +156,50 @@ class AuthManager:
                         detail=f"Role '{role.value}' lacks required capability '{required_capability}'.",
                     )
 
-        # Also check Ed25519 signed administrative request from local node identity
+        # Hardened Ed25519 signed request auth (opt-in via GAJAHMADA_ALLOW_NODE_SIG_AUTH=1):
+        # Requires domain-separated envelope (method, path, body_hash, timestamp, nonce, audience),
+        # strict timestamp freshness (+/- 60s), replay nonce cache, and NEVER blindly grants ADMIN.
         node_id = request.headers.get("x-node-id", "").strip()
         signature = request.headers.get("x-signature", "").strip()
         timestamp = request.headers.get("x-timestamp", "").strip()
-        if node_id and signature and timestamp and self.identity:
-            msg = f"{request.method}|{request.url.path}|{timestamp}".encode("utf-8")
+        nonce = request.headers.get("x-nonce", "").strip()
+        body_hash = request.headers.get("x-body-sha256", "").strip() or hashlib.sha256(b"").hexdigest()
+        audience = request.headers.get("x-auth-audience", "").strip()
+        if (
+            os.environ.get("GAJAHMADA_ALLOW_NODE_SIG_AUTH") == "1"
+            and node_id
+            and signature
+            and timestamp
+            and nonce
+            and audience == "gajahmada-operator-auth"
+            and self.identity
+        ):
+            try:
+                ts_val = float(timestamp)
+            except ValueError:
+                self._log_denial(request, f"node:{node_id[:12]}", required_capability, "invalid_timestamp")
+                raise HTTPException(status_code=401, detail="Invalid X-Timestamp header.")
+            if abs(time.time() - ts_val) > 60.0:
+                self._log_denial(request, f"node:{node_id[:12]}", required_capability, "stale_timestamp")
+                raise HTTPException(status_code=401, detail="Signed request timestamp expired (>60s skew).")
+            nonce_key = (node_id, nonce)
+            if nonce_key in self._seen_nonces:
+                self._log_denial(request, f"node:{node_id[:12]}", required_capability, "replayed_nonce")
+                raise HTTPException(status_code=401, detail="Signed request nonce replay detected.")
+            msg = f"gajahmada-auth-v2|{request.method}|{request.url.path}|{body_hash}|{timestamp}|{nonce}|{audience}".encode("utf-8")
             if node_id == self.identity.node_id and self.identity.verify_message(msg, signature, node_id):
-                return {"actor": f"node:{node_id[:12]}", "role": Role.ADMIN.value}
+                if len(self._nonce_order) == self._nonce_order.maxlen:
+                    self._seen_nonces.discard(self._nonce_order.popleft())
+                self._nonce_order.append(nonce_key)
+                self._seen_nonces.add(nonce_key)
+                # Bound node-signature auth to OPERATOR capabilities (never automatic full ADMIN)
+                if required_capability in ROLE_CAPABILITIES[Role.OPERATOR]:
+                    return {"actor": f"node:{node_id[:12]}", "role": Role.OPERATOR.value}
+                self._log_denial(request, f"node:{node_id[:12]}", required_capability, "insufficient_capability")
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Node signature auth lacks capability '{required_capability}'.",
+                )
 
         self._log_denial(request, "anonymous", required_capability, "unauthenticated")
         raise HTTPException(

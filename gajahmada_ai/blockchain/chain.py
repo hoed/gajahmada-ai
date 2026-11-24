@@ -242,9 +242,10 @@ class AIBlockchain:
         if not block.signature or block.node_id == "Genesis Node":
             return True
         if block.schema_version >= 2:
-            # Verify full signed envelope first; allow legacy task_hash sig for manually constructed v1-compat blocks
-            if self._verifier.verify_message(block.signable_envelope_bytes(), block.signature, block.node_id):
-                return True
+            # P0 Strict Enforcement: Schema v2 blocks MUST carry a valid full-envelope Ed25519 signature.
+            # Legacy task_hash-only fallback is strictly prohibited on schema_version >= 2.
+            return self._verifier.verify_message(block.signable_envelope_bytes(), block.signature, block.node_id)
+        # Historical schema v1 blocks only
         return self._verifier.verify_message(block.task_hash.encode("utf-8"), block.signature, block.node_id)
 
     def is_chain_valid(self, verify_signatures: bool = True) -> bool:

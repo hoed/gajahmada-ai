@@ -13,7 +13,7 @@
 [![Supabase pgvector](https://img.shields.io/badge/Supabase-pgvector_384d-3ecf8e?style=for-the-badge&logo=supabase&logoColor=white)](supabase/schema.sql)
 [![Cognition](https://img.shields.io/badge/Cognition-14_Stage_Hybrid-818cf8?style=for-the-badge)](gajahmada_ai/cognition/reasoning.py)
 [![Protocol](https://img.shields.io/badge/Protocol-GIP%2F2.0_Ed25519-f59e0b?style=for-the-badge)](gajahmada_ai/network/protocol.py)
-[![Tests](https://img.shields.io/badge/Pytest-26%2F26_Passing-4ade80?style=for-the-badge)](tests/)
+[![Tests](https://img.shields.io/badge/Pytest-29%2F29_Passing-4ade80?style=for-the-badge)](tests/)
 
 </div>
 
