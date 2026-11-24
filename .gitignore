@@ -31,6 +31,7 @@ venv/
 
 # AI Models & Knowledge
 models/*.gguf
+models/**/model.pt
 knowledge_store/
 node_key.pem
 *.pem

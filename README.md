@@ -13,7 +13,7 @@
 [![Supabase pgvector](https://img.shields.io/badge/Supabase-pgvector_384d-3ecf8e?style=for-the-badge&logo=supabase&logoColor=white)](supabase/schema.sql)
 [![Cognition](https://img.shields.io/badge/Cognition-14_Stage_Hybrid-818cf8?style=for-the-badge)](gajahmada_ai/cognition/reasoning.py)
 [![Protocol](https://img.shields.io/badge/Protocol-GIP%2F2.0_Ed25519-f59e0b?style=for-the-badge)](gajahmada_ai/network/protocol.py)
-[![Tests](https://img.shields.io/badge/Pytest-29%2F29_Passing-4ade80?style=for-the-badge)](tests/)
+[![Tests](https://img.shields.io/badge/Pytest-32%2F32_Passing-4ade80?style=for-the-badge)](tests/)
 
 </div>
 
@@ -145,6 +145,13 @@ gajahmada/
 │   │   ├── metacognition.py             # Metacognitive Critic & evaluasi kecukupan bukti
 │   │   ├── decision.py                  # Pemisahan epistemik (verified_facts, unverified_claims, hypotheses, inferences, opinions, unknowns)
 │   │   └── reasoning.py                 # CognitiveReasoningPipeline utama
+│   ├── gnnm/                            # GajahMada Native Neural Model (From-Scratch Decoder-Only Transformer)
+│   │   ├── config.py                    # GNNMConfig & preset GNNM-01-Tiny..GNNM-04-1B
+│   │   ├── tokenizer.py                 # GNNMBPETokenizer (Byte-Level BPE multilingual lossless)
+│   │   ├── dataset.py                   # GNNMCorpusBuilder (SHA-256 deduplication & sequence packing)
+│   │   ├── model.py                     # GNNMTransformer (RMSNorm + RoPE + Causal Attention + SwiGLU)
+│   │   ├── trainer.py                   # GNNMTrainer (AdamW + cosine LR + checkpoint saver)
+│   │   └── inference.py                 # GNNMInferenceEngine (CPU/CUDA autoregressive generator)
 │   ├── neural/                          # Abstraksi Inferensi Neural Independen
 │   │   ├── interfaces.py                # InferenceBackend ABC, ModelCapabilityMetadata, GenerationResult
 │   │   ├── llama_backend.py             # LlamaCppBackend (GGUF) & deterministic 384-d embedder
@@ -285,6 +292,24 @@ Agar knowledge Brain dan audit ledger tersimpan permanen di cloud/Vercel sekalig
 4. **Catatan `DATABASE_URL`:** Jika password PostgreSQL mengandung karakter khusus (seperti `@` atau `#`), gunakan URL-encoding (`@` → `%40`, `#` → `%23`).
 5. Tanpa `.env`, GajahMada tetap berjalan 100% mandiri menggunakan SQLite lokal (*local-first*).
 
+### 4. Melatih GajahMada Native Neural Model (`GNNM-01-Tiny`) dari Nol
+
+GajahMada menyediakan arsitektur Decoder-Only Transformer buatan sendiri (**RMSNorm + RoPE + Causal Self-Attention + SwiGLU**) lengkap dengan *byte-level BPE tokenizer* multilingual di [gajahmada_ai/gnnm/](gajahmada_ai/gnnm/) ([docs/GNNM_ARCHITECTURE.md](docs/GNNM_ARCHITECTURE.md)):
+
+```bash
+uv pip install --python .venv312/bin/python torch --index-url https://download.pytorch.org/whl/cpu
+.venv312/bin/python -c "
+from gajahmada_ai.gnnm import GNNM_PRESETS, GNNMBPETokenizer, GNNMCorpusBuilder
+from gajahmada_ai.gnnm.trainer import GNNMTrainer
+corpus = GNNMCorpusBuilder(); corpus.load_seed_multilingual_corpus()
+tok = GNNMBPETokenizer(); tok.train(corpus.texts(), target_vocab_size=512)
+cfg = GNNM_PRESETS['GNNM-01-Tiny']; cfg.vocab_size = tok.vocab_size
+trainer = GNNMTrainer(cfg, tok)
+print(trainer.train_steps(corpus.pack_token_blocks(tok, seq_len=64), steps=60, batch_size=4))
+trainer.save_checkpoint('./models/gnnm-01-tiny')
+"
+```
+
 ---
 
 ## 💻 Perintah CLI (`gajahmada`)
@@ -385,9 +410,9 @@ python -m gajahmada_ai.cli.main train-model --note "Audit Konsensus V2"
 
 ---
 
-## 🧪 Pengujian & Kriteria Penerimaan (26 Automated Tests)
+## 🧪 Pengujian & Kriteria Penerimaan (32 Automated Tests)
 
-Jalankan seluruh 26 suite pengujian otomatis menggunakan `pytest`:
+Jalankan seluruh 32 suite pengujian otomatis menggunakan `pytest`:
 
 ```bash
 pytest -v
@@ -411,7 +436,8 @@ pytest -v
 | **TEST 14** | Eksperimen pembelajaran yang gagal pada uji regresi otomatis ditolak tanpa memengaruhi model/strategi aktif. | `tests/unit/test_core_and_neural.py` | ✅ **PASSED** |
 | **TEST 15** | Seluruh perilaku API v1 yang ada tetap kompatibel sepenuhnya. | `tests/integration/test_api_compatibility.py` | ✅ **PASSED** |
 | **EXT 16–19** | SSRF & seed guard, Signed Event PoW Ledger, Real Cognitive Benchmarks, & Closed-Loop Experience Strategy Adaptation. | `tests/` | ✅ **PASSED** |
-| **AUDIT P0–P5 (20–26)** | Random/rotatable admin key, Fail-closed v1 auth, `MemoryAuthorizationService` anti-leak, unforgeable human approval, Blockchain v2 canonical metadata hash + `LEDGER_CORRUPTED` recovery, Knowledge Quarantine + GIP/2.0 full handlers, & 3-node restart persistence. | `tests/security/test_audit_remediation.py` | ✅ **PASSED** |
+| **AUDIT P0–P5 (20–29)** | Signing oracle eliminated, Fail-closed v1/v2 auth, `MemoryAuthorizationService` anti-leak, unforgeable approval, Blockchain v2 strict full-envelope + `LEDGER_CORRUPTED` recovery, GIP trust lifecycle + verified consensus, Knowledge Quarantine + source-corroborated promotion, & 3-node restart persistence. | `tests/security/test_audit_remediation.py` | ✅ **PASSED** |
+| **GNNM (30–32)** | `GNNMConfig` parameter estimator, native byte-level BPE multilingual lossless tokenizer, SHA-256 corpus deduplication/packing, & `GNNMTransformer` forward/loss check. | `tests/unit/test_gnnm_foundation.py` | ✅ **PASSED** |
 
 ---
 
