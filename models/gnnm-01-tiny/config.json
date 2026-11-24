@@ -1,0 +1,17 @@
+{
+  "name": "GNNM-01-Tiny",
+  "vocab_size": 512,
+  "d_model": 128,
+  "n_layers": 4,
+  "n_heads": 4,
+  "n_kv_heads": 4,
+  "d_ff": 384,
+  "max_seq_len": 256,
+  "dropout": 0.0,
+  "rope_theta": 10000.0,
+  "norm_eps": 1e-06,
+  "tie_embeddings": true,
+  "language_profile": "multilingual-balanced-id-en",
+  "intelligence_mode": "hybrid-cognitive",
+  "estimated_parameters": 918656
+}
