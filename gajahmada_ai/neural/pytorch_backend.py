@@ -51,6 +51,20 @@ class PyTorchNativeBackend(InferenceBackend):
             self.metadata.model_path = model_path
             self.metadata.model_id = os.path.basename(model_path)
 
+        # Auto-discover trained GNNM checkpoint directory (./models/gnnm-*) only when using default placeholder path
+        if (
+            not os.path.exists(self.model_path)
+            and os.path.normpath(self.model_path) == os.path.normpath("./models/gajahmada_native.gmweights.json")
+            and os.path.isdir("./models")
+        ):
+            for entry in sorted(os.listdir("./models")):
+                cand = os.path.join("./models", entry)
+                if entry.startswith("gnnm-") and os.path.isdir(cand) and os.path.exists(os.path.join(cand, "model.pt")):
+                    self.model_path = cand
+                    self.metadata.model_path = cand
+                    self.metadata.model_id = entry
+                    break
+
         if not os.path.exists(self.model_path):
             self._load_error = f"Native neural weight file not found at '{self.model_path}'"
             self.metadata.is_loaded = False

@@ -7,6 +7,41 @@
 document.addEventListener('DOMContentLoaded', () => {
   const API_URL = window.location.origin;
 
+  // Session-scoped Admin API Key helper (never hardcoded; used for fail-closed mutation endpoints)
+  function getAdminApiKey() {
+    try { return (window.sessionStorage.getItem('gm_admin_api_key') || '').trim(); } catch { return ''; }
+  }
+  function getAuthHeaders(extra = {}) {
+    const h = { ...extra };
+    const k = getAdminApiKey();
+    if (k) h['X-API-Key'] = k;
+    return h;
+  }
+  function updateAuthBtnState() {
+    const btn = document.getElementById('btn-set-api-key');
+    if (!btn) return;
+    const hasKey = Boolean(getAdminApiKey());
+    btn.textContent = hasKey ? '🔑 AUTH ✓' : '🔑 AUTH';
+    btn.style.borderColor = hasKey ? '#4ade80' : '#f59e0b';
+    btn.style.color = hasKey ? '#bbf7d0' : '#fde68a';
+  }
+  updateAuthBtnState();
+  document.getElementById('btn-set-api-key')?.addEventListener('click', () => {
+    const current = getAdminApiKey();
+    const entered = window.prompt(
+      'Masukkan GajahMada Admin API Key (dari knowledge_store/admin_api.key atau GAJAHMADA_ADMIN_KEY).\nKosongkan untuk menghapus dari sesi browser:',
+      current ? '********' : ''
+    );
+    if (entered === null) return;
+    const trimmed = entered.trim();
+    if (trimmed === '********') return;
+    try {
+      if (trimmed) window.sessionStorage.setItem('gm_admin_api_key', trimmed);
+      else window.sessionStorage.removeItem('gm_admin_api_key');
+    } catch { /* ignore */ }
+    updateAuthBtnState();
+  });
+
   // Enforce GajahMada branding & logo in top-left corner even if HTML was cached
   document.title = 'GajahMada — Sovereign Decentralized Node';
   const elBrandBanner = document.getElementById('btn-brand-status') || document.querySelector('.gold-banner');
@@ -187,7 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const clearLogsAction = async () => {
     if (elWatchTerminal) elWatchTerminal.innerHTML = '';
     seenLogIds.clear();
-    try { await fetch(`${API_URL}/node/logs`, { method: 'DELETE' }); } catch { /* ignore */ }
+    try { await fetch(`${API_URL}/node/logs`, { method: 'DELETE', headers: getAuthHeaders() }); } catch { /* ignore */ }
     logWatch('sys', 'System logs cleared.');
   };
   document.getElementById('btn-clear-logs')?.addEventListener('click', clearLogsAction);
@@ -565,9 +600,13 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const res = await fetch(`${API_URL}/node/config`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(patch),
       });
+      if (res.status === 401) {
+        logWatch('err', '401 Unauthorized: klik tombol 🔑 AUTH di header untuk memasukkan Admin API Key.');
+        return;
+      }
       if (res.ok) {
         const data = await res.json();
         const cfg = data.config;
@@ -1082,7 +1121,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const res = await fetch(`${API_URL}/node/broadcast`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ message: msgText }),
       });
       if (res.ok) {
@@ -1124,9 +1163,10 @@ document.addEventListener('DOMContentLoaded', () => {
             'ai',
             `[Ed25519 Cryptographic Self-Test — PASSED]\n` +
             `• Node Public Key: ${data.node_id}\n` +
-            `• Message: "${data.message}"\n` +
+            `• Ephemeral Self-Test Key: ${data.selftest_ephemeral_key_id || data.node_id}\n` +
+            `• Digest SHA-256: ${(data.message_sha256 || '').substring(0, 32)}...\n` +
             `• Signature: ${data.signature.substring(0, 36)}...\n` +
-            `• RFC 8032 Verification: ${data.verified ? 'VALID (TRUE)' : 'FAILED'}`,
+            `• RFC 8032 Verification: ${data.verified ? 'VALID (ORACLE PROTECTED)' : 'FAILED'}`,
             0.002,
             null
           );
@@ -1144,9 +1184,14 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const res = await fetch(`${API_URL}/node/chain/mine`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ note: noteText }),
       });
+      if (res.status === 401) {
+        const chainLog = document.getElementById('chain-status-log');
+        if (chainLog) chainLog.textContent = '✗ 401: Klik 🔑 AUTH di header untuk memasukkan Admin API Key.';
+        return null;
+      }
       if (res.ok) {
         const data = await res.json();
         const b = data.block;
@@ -1895,7 +1940,7 @@ document.addEventListener('DOMContentLoaded', () => {
           elRagDocsList.querySelectorAll('[data-del-doc]').forEach((btn) => {
             btn.addEventListener('click', async () => {
               const idx = btn.dataset.delDoc;
-              await fetch(`${API_URL}/knowledge/docs/${idx}`, { method: 'DELETE' });
+              await fetch(`${API_URL}/knowledge/docs/${idx}`, { method: 'DELETE', headers: getAuthHeaders() });
               refreshKnowledgeStats();
               syncServerLogs();
             });
@@ -1948,7 +1993,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const res = await fetch(`${API_URL}/ai/ingest`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ text }),
       });
       const data = await res.json();
@@ -1975,7 +2020,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const res = await fetch(`${API_URL}/node/sync`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ peers: [url] }),
       });
       const data = await res.json();
