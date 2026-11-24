@@ -76,20 +76,20 @@
 
 ---
 
-## 🧩 8 Modul Antarmuka Interaktif (`/ui`)
+## 🧩 8 Modul Antarmuka Interaktif (`/` Homepage & `/dashboard` Cyberdeck)
 
-Setiap panel pada dashboard [interface/html/index.html](interface/html/index.html) terhubung langsung ke fungsi nyata pada backend:
+Homepage (`/`) menampilkan **Command Center transparan 30% tanpa blur** di atas **3D Network Graph** layar penuh (*edge-to-edge*) yang berputar cepat saat Brain berpikir, dengan tombol **`📊 DASHBOARD`** (desktop & mobile) untuk membuka 8 panel lengkap di `/dashboard` (`/ui`), ditambah tombol **`🔑 AUTH`** (`sessionStorage`) untuk operasi administratif terautentikasi:
 
 | Panel | Nama Modul | Fungsi Nyata & Interaksi |
 | :---: | :--- | :--- |
-| **`01`** | **System Architecture & Knowledge Expansion** | • **Graf 3D Interaktif:** Memetakan 7 klaster paket `gajahmada_ai.*` dalam ruang 3D; klik klaster untuk menguji modul.<br>• **Module Configuration (Kiri):** Klik `node.name`, `ai.max_tokens`, `ai.temperature`, atau `chain.pow_diff` untuk mengubah konfigurasi server secara *live* (`POST /node/config`).<br>• **Web3 Server Arch (Kanan) & 6 Kartu Bawah (`6/6`):** Klik kartu `1. API SERVER`, `2. AI CORE`, `3. KNOWLEDGE`, `4. WEB3 CHAIN`, `5. P2P NETWORK`, `6. SECURITY`, atau `TEST ALL` untuk menjalankan benchmark & diagnostik langsung. |
-| **`02`** | **System Logs** | Menarik *ring-buffer* log telemetri asli dari server (`GET /node/logs`), dilengkapi tombol **`SYNC`**, **`EXPORT`** (unduh file `.log`), dan **`CLEAR`** (`DELETE /node/logs`). |
-| **`03`** | **Command Interface (Hero Console)** | Konsol utama penalaran kognitif (`POST /ai/chat`) dengan *RAG context injection*, pencatatan blok PoW otomatis, bar tombol **`QUICK EXEC`**, mode layar penuh **`⛶ MAX`**, serta dukungan **Slash Commands** (`/status`, `/time`, `/ingest`, `/search`, `/mine`, `/verify`, `/peers`). |
-| **`04`** | **Module Dependencies** | Matriks 3 kolom (`APP MODULES`, `DEPENDENCIES`, `REST / WEB3 API`). Klik sel mana saja untuk memeriksa versi paket Python yang terinstal (`GET /node/dependencies`) atau menguji latensi HTTP endpoint terkait. |
-| **`05`** | **Web3 Server Arch (Consensus Cycle)** | Cincin donat 6 segmen (`ingest` → `embed` → `infer` → `sign` → `mine` → `gossip`). Klik cincin atau tombol **`▶ RUN CYCLE`** untuk mengeksekusi siklus verifikasi 6 tahap secara berurutan ke backend. |
-| **`06`** | **Modular Architecture Matrix** | Grid 4×4 berisi 16 komponen sistem (`AIModelEngine`, `LocalKnowledge`, `AIBlockchain`, `P2PNetwork`, `NodeIdentity`, dll.) dengan kursor pemindai otomatis. Klik komponen mana pun untuk menjalankan *live diagnostic probe*. |
-| **`07`** | **Network Status (P2P Mesh)** | Visualisasi topologi *Hub & Spoke* node aktif. Klik **`⚡ BROADCAST`** untuk mengirim paket `GIP/2.0` bertanda tangan Ed25519 ke seluruh peer (`POST /node/broadcast`) atau **`+ PEER`** untuk mengelola koneksi mesh. |
-| **`08`** | **System Performance & Ledger** | Menampilkan 7 indikator metrik nyata (`CPU USAGE`, `RAM ALLOC`, `DISK I/O READ`, `RAG VECTORS`, `ED25519 KEY`, `POW DIFFICULTY`, `WEB3 LEDGER`), status mode (`FULL·NEURAL` / `FULL·SYM+EV`), tombol **`⛏ MINE BLOCK`**, dan audit **`✓ CHAIN VALID`**. |
+| **`01`** | **System Logs, Module Config & Web3 Pipeline** | • **Module Configuration (Kiri):** Ubah konfigurasi live (`POST /node/config`, *Auth Required*).<br>• **System Logs (Tengah):** *Ring-buffer* log telemetri asli (`GET /node/logs`), tombol **`SYNC`**, **`EXPORT`**, **`CLEAR`** (`DELETE /node/logs`, *Auth Required*).<br>• **6 Kartu Modul (`6/6`):** Uji & diagnostik `API SERVER`, `AI CORE`, `KNOWLEDGE`, `WEB3 CHAIN`, `P2P NETWORK`, `SECURITY`. |
+| **`02`** | **3D Network & Architecture Graph** | Graf 3D interaktif 7 klaster `gajahmada_ai.*` (sekaligus latar belakang layar penuh di Homepage `/` dengan akselerasi rotasi saat Brain memproses). |
+| **`03`** | **Command Interface (Hero Console)** | Konsol utama penalaran kognitif (`POST /ai/chat`) dengan *RAG context injection*, blok PoW Schema v2 otomatis, tombol **`QUICK EXEC`**, serta **Slash Commands** (`/crawl`, `/status`, `/time`, `/ingest`, `/search`, `/mine`, `/verify`, `/peers`). |
+| **`04`** | **Module Dependencies** | Matriks 3 kolom (`APP MODULES`, `DEPENDENCIES`, `REST / WEB3 API`) untuk memeriksa versi paket (`GET /node/dependencies`) dan latensi endpoint. |
+| **`05`** | **Web3 Server Arch (Consensus Cycle)** | Cincin donat 6 segmen (`ingest` → `embed` → `infer` → `sign` → `mine` → `gossip`) dengan tombol **`▶ RUN CYCLE`**. |
+| **`06`** | **Modular Architecture Matrix** | Grid 4×4 berisi 16 komponen sistem (`AIModelEngine`, `LocalKnowledge`, `AIBlockchain`, `P2PNetwork`, `NodeIdentity`, dll.) dengan *live diagnostic probe*. |
+| **`07`** | **Network Status (P2P Mesh)** | Visualisasi topologi *Hub & Spoke* node aktif, tombol **`⚡ BROADCAST`** (`POST /node/broadcast`, *Auth Required*) dan **`+ PEER`** (`POST /node/sync`, *Auth Required*). |
+| **`08`** | **System Performance & Ledger** | 7 metrik nyata (`CPU`, `RAM`, `DISK`, `RAG VECTORS`, `ED25519 KEY`, `POW DIFFICULTY`, `WEB3 LEDGER`), tombol **`⛏ MINE BLOCK`** (*Auth Required*), & **`✓ CHAIN VALID`**. |
 
 ---
 
@@ -97,15 +97,15 @@ Setiap panel pada dashboard [interface/html/index.html](interface/html/index.htm
 
 ```mermaid
 flowchart TD
-    UI["Tactical Cyberdeck UI (/ui) & CLI (gajahmada)"] <--> API["FastAPI Gateway<br/>/api/v2/* & Legacy v1 Routes"]
-    API --> L8["LAYER 8 — INTELLIGENCE GOVERNANCE<br/>RBAC Auth · Execution Policies · Trust Policies · Learning Regression & Rollback"]
+    UI["Homepage Command Center (/) + 8-Panel Dashboard (/dashboard, /ui) & CLI"] <--> API["FastAPI Gateway<br/>/api/v2/* & Legacy v1 Routes (Fail-Closed RBAC + Rate Limit)"]
+    API --> L8["LAYER 8 — INTELLIGENCE GOVERNANCE<br/>RBAC Auth · Execution Policies · Trust Policies · Closed-Loop Learning & Rollback"]
     L8 --> L7["LAYER 7 — COLLECTIVE INTELLIGENCE<br/>Multi-Node Task Negotiation · Delegation · Independent Verification · Quorum Consensus"]
-    L7 --> L6["LAYER 6 — AUTONOMOUS AGENT RUNTIME<br/>Planner · Researcher · Analyst · Verifier · Scheduler · Sandboxed Execution (CREATED..COMPLETED)"]
-    L6 --> L5["LAYER 5 — HYBRID REASONING ENGINE<br/>Neural Backend (llama.cpp / ONNX / PyTorch) + Symbolic Reasoner + Evidence Reasoner + Metacognitive Critic"]
-    L5 --> L4["LAYER 4 — 5-TIER MEMORY & KNOWLEDGE ENGINE<br/>Working · Semantic · Episodic · Procedural · Collective · Contradiction Tracking · Versioning"]
-    L4 --> L3["LAYER 3 — PERCEPTION & KNOWLEDGE INGESTION<br/>Input Normalization · Intent Classification · Entity Extraction · Source Provenance"]
-    L3 --> L2["LAYER 2 — DISTRIBUTED INFRASTRUCTURE (GIP/2.0)<br/>Ed25519 Signed Envelopes · Nonce Replay Protection · SSRF Guard · Capability Discovery"]
-    L2 --> L1["LAYER 1 — SOVEREIGN FOUNDATION<br/>Ed25519 Identity & Key Rotation · PostgreSQL+pgvector / SQLite Storage · Signed Event Ledger"]
+    L7 --> L6["LAYER 6 — AUTONOMOUS AGENT RUNTIME<br/>Planner · Researcher · Analyst · Verifier · Scheduler · Unforgeable Approval"]
+    L6 --> L5["LAYER 5 — HYBRID REASONING ENGINE<br/>Local GGUF + GNNM Native Transformer + AST Symbolic + Evidence + Critic"]
+    L5 --> L4["LAYER 4 — 5-TIER MEMORY & QUARANTINE ENGINE<br/>SQLite + Optional Supabase pgvector (RLS) · MemoryAuthorizationService · Versioning"]
+    L4 --> L3["LAYER 3 — PERCEPTION & OPEN KNOWLEDGE CRAWLER<br/>Input Normalization · Wikipedia · DuckDuckGo · Open-Meteo · Al-Qur'an · Direct URL"]
+    L3 --> L2["LAYER 2 — DISTRIBUTED INFRASTRUCTURE (GIP/2.0)<br/>8 Namespaces · PeerTrustState · Ed25519 Envelopes · Replay Protection · SSRF Guard"]
+    L2 --> L1["LAYER 1 — SOVEREIGN FOUNDATION<br/>Ed25519 Identity & Key Rotation · Schema v2 Canonical PoW Ledger · Atomic Recovery"]
 ```
 
 ### Struktur Direktori Proyek
@@ -127,9 +127,13 @@ gajahmada/
 ├── docs/                                # Dokumentasi Audit & Arsitektur GajahMada 2.0
 │   ├── AUDIT_V2.md                      # Audit lengkap kode sumber & klasifikasi fitur
 │   ├── ARCHITECTURE_V2.md               # Spesifikasi 8 lapisan arsitektur & pipa kognitif 14-tahap
+│   ├── GNNM_ARCHITECTURE.md             # Blueprint GajahMada Native Neural Model (GNNM-01..GNNM-04)
 │   ├── SECURITY_AUDIT.md                # Audit kerentanan keamanan & matriks kontrol keamanan
 │   ├── MIGRATION_PLAN.md                # Rencana migrasi & kontrak kompatibilitas v1 -> v2
 │   └── ROADMAP.md                       # Roadmap fase implementasi & hasil benchmark nyata
+├── scripts/
+│   ├── train_gnnm.py                    # CLI scalable Pretraining + Val Perplexity + SFT untuk GNNM
+│   └── train_gnnm_01_tiny.py            # Quick-start pretraining lokal GNNM-01-Tiny
 ├── gajahmada_ai/
 │   ├── api/
 │   │   ├── server.py                    # FastAPI server (v1 endpoints + mount /api/v2/* + /ui host)
@@ -226,13 +230,15 @@ gajahmada/
 │   │   └── indonesia_corpus.py          # Korpus Sejarah Nusantara & Indonesia Modern
 │   └── cli/
 │       └── main.py                      # CLI commands v1 & v2
-├── interface/html/                      # Tactical Cyberdeck Web UI (disajikan di /ui)
-└── tests/                               # Suite Pengujian Otomatis (18 Test Suites / 15 Acceptance Criteria)
+├── interface/html/                      # Dual-Mode Web UI: Homepage (/) & 8-Panel Dashboard (/dashboard, /ui)
+└── tests/                               # Suite Pengujian Otomatis (33 Automated Tests)
     ├── unit/test_core_and_neural.py
+    ├── unit/test_gnnm_foundation.py
     ├── cognition/test_cognitive_pipeline.py
     ├── memory/test_memory_persistence.py
     ├── network/test_gip_and_collective.py
     ├── security/test_security_and_governance.py
+    ├── security/test_audit_remediation.py
     ├── integration/test_api_compatibility.py
     └── benchmarks/test_benchmarks.py
 ```
@@ -255,7 +261,9 @@ pip install -r requirements.txt
 run.bat
 ```
 
-Buka browser di: **[http://localhost:8000/ui](http://localhost:8000/ui)**
+Buka browser di:
+- **Homepage (Command Center + 3D Network):** **[http://localhost:8000/](http://localhost:8000/)**
+- **Full 8-Panel Dashboard:** **[http://localhost:8000/dashboard](http://localhost:8000/dashboard)** (atau `/ui`)
 
 ---
 
@@ -357,53 +365,53 @@ python -m gajahmada_ai.cli.main train-model --note "Audit Konsensus V2"
 | Metode | Endpoint | Deskripsi |
 | :---: | :--- | :--- |
 | `GET` | `/api/v2/intelligence/diagnose` | Melaporkan secara jujur status backend neural (`llama.cpp`, `onnx`, `gajahmada-native`), mesin simbolik, memori 5-tier, dan agen terdaftar. |
-| `POST` | `/api/v2/intelligence/ask` | Menjalankan pipa penalaran kognitif 14-tahap dan mengembalikan `ReasoningResult` lengkap beserta `EpistemicBreakdown` & bukti. |
+| `POST` | `/api/v2/intelligence/ask` | Menjalankan pipa penalaran kognitif 14-tahap (akses publik bersifat *read-only*; operator terautentikasi menyimpan ke Quarantine `LOCAL`/`MODEL_ASSESSED`). |
 | `GET/POST` | `/api/v2/reasoning` | Mengambil riwayat jejak penalaran atau mengeksekusi penalaran baru. |
 | `GET` | `/api/v2/reasoning/{reasoning_id}` | Menginspeksi detail langkah penalaran, hipotesis, bukti, dan kontradiksi untuk `reasoning_id` tertentu. |
-| `GET` | `/api/v2/memory` | Menginspeksi statistik 5 tingkat memori, daftar rekaman publik/lokal, dan daftar kontradiksi yang terdeteksi. |
+| `GET` | `/api/v2/memory` | Menginspeksi statistik 5 tingkat memori, daftar rekaman, & kontradiksi (terfilter oleh `MemoryAuthorizationService`). |
 | `POST` | `/api/v2/memory` | *(Auth Required)* Menyimpan rekaman memori baru dengan hash integritas SHA-256, provenans, dan deteksi kontradiksi otomatis. |
 | `PUT` | `/api/v2/memory/{record_id}` | *(Auth Required)* Memperbarui/mengoreksi memori sambil menyimpan versi sebelumnya di tabel audit `gm_memory_versions`. |
-| `GET` | `/api/v2/memory/{record_id}/versions` | Mengambil riwayat lengkap seluruh versi rekaman memori. |
+| `GET` | `/api/v2/memory/{record_id}/versions` | Mengambil riwayat versi memori (`403` untuk akses tanpa otorisasi pada record `PRIVATE`). |
 | `POST` | `/api/v2/memory/backup` | *(Auth Required)* Mengekspor *snapshot* memori ke *Content-Addressed Object Store* ber-hash SHA-256. |
 | `GET` | `/api/v2/knowledge` | Mencari relasi entitas & kontradiksi pada *Knowledge Graph* (terfilter oleh `MemoryAuthorizationService`). |
-| `POST` | `/api/v2/knowledge/promote/{record_id}` | *(Auth Required)* Memverifikasi dan mempromosikan knowledge dari Quarantine (`LOCAL`/`UNVERIFIED`) ke `COLLECTIVE`/`VERIFIED` + mencatat `KNOWLEDGE_ACCEPTED`. |
+| `POST` | `/api/v2/knowledge/promote/{record_id}` | *(Auth Required)* Mempromosikan knowledge dari Quarantine ke `SOURCE_CORROBORATED` / `INDEPENDENTLY_VERIFIED` (`COLLECTIVE`) setelah validasi `independent_sources` & cek kontradiksi. |
 | `GET` | `/api/v2/agents` | Menampilkan daftar agen spesialis (`planner`, `researcher`, `analyst`, `verifier`) beserta izin tool dan daftar tugas. |
-| `POST` | `/api/v2/agents/run` | Menjalankan objektif melalui runtime agen otonom (`CREATED` → `PLANNED` → `APPROVED` → `RUNNING` → `COMPLETED`). |
-| `POST` | `/api/v2/agents/tasks/{task_id}/approve` | *(Auth Required)* Memberikan persetujuan operator manusia untuk tugas agen yang berstatus `WAITING`. |
+| `POST` | `/api/v2/agents/run` | *(Auth Required)* Menjalankan objektif melalui runtime agen otonom (`human_approved` selalu `False` saat submit). |
+| `POST` | `/api/v2/agents/tasks/{task_id}/approve` | *(Auth Required)* Memberikan persetujuan operator manusia untuk tugas agen `WAITING` + mencatat event bertanda tangan ke ledger. |
 | `GET` | `/api/v2/network` | Status protokol `GIP/2.0`, daftar URL peer, node yang ditemukan, dan daftar peer yang dicabut (*revoked*). |
-| `POST` | `/api/v2/network/gip` | Endpoint penerima pesan protokol `GIP/2.0` bertanda tangan Ed25519 dengan validasi *nonce replay* & batas waktu. |
-| `GET/POST` | `/api/v2/nodes` / `/api/v2/nodes/register` | Menampilkan identitas node atau mendaftarkan peer GIP baru sebagai `TRUSTED` dengan validasi anti-SSRF. |
+| `POST` | `/api/v2/network/gip` | Endpoint penerima 8 namespace `GIP/2.0` bertanda tangan Ed25519 dengan *PeerTrustState*, SSRF guard, *nonce replay*, & verifikasi per-submission pada `GIP-CONSENSUS`. |
+| `GET/POST` | `/api/v2/nodes` / `/api/v2/nodes/register` | Menampilkan identitas node atau *(Auth Required)* mendaftarkan peer GIP baru sebagai `TRUSTED` dengan validasi anti-SSRF. |
 | `POST` | `/api/v2/nodes/{node_id}/trust` | *(Auth Required)* Mengubah status kepercayaan peer (`PENDING`, `AUTHENTICATED`, `TRUSTED`, `REVOKED`). |
-| `GET` | `/api/v2/system/health` | Laporan kesehatan lengkap: kapabilitas kognitif, penyimpanan relasional, validitas ledger, log audit keamanan, & kebijakan. |
+| `GET` | `/api/v2/system/health` | Laporan kesehatan lengkap: kapabilitas kognitif, penyimpanan relasional, status ledger (`HEALTHY` / `LEDGER_CORRUPTED`), log audit keamanan, & kebijakan. |
 | `POST` | `/api/v2/system/rotate-key` | *(Auth Required)* Merotasi kunci privat Ed25519 node dan menerbitkan sertifikat rotasi bertanda tangan ganda. |
 | `POST` | `/api/v2/system/learning/experiment` | *(Auth Required)* Mengajukan dan mengevaluasi eksperimen pembelajaran terhadap *regression suite* (otomatis menolak eksperimen yang gagal). |
 
-### 2. Endpoint v1 (Tetap Kompatibel 100%)
+### 2. Endpoint v1 (Kompatibel + Fail-Closed RBAC untuk Mutasi)
 
 | Metode | Endpoint | Deskripsi |
 | :---: | :--- | :--- |
-| `GET` | `/` & `/api/status` | Status utama node, mode (`full` / `serverless`), kapabilitas neural/simbolik, dan *uptime*. |
-| `GET` | `/health` | Pemeriksaan kesehatan layanan (*health check*). |
-| `POST` | `/ai/chat` | Eksekusi pertanyaan melalui 14-Stage Cognitive Pipeline dengan konteks RAG 384-d + penambangan blok PoW bertanda tangan Ed25519. |
-| `POST` | `/ai/ingest` | Meng-embed teks dokumen ke vektor 384-d dan menyimpannya ke *Knowledge Store* serta *Layer 4 Semantic Memory*. |
+| `GET` | `/`, `/dashboard`, `/ui`, & `/api/status` | Menyajikan Homepage (`/`), Dashboard (`/dashboard`, `/ui`), atau JSON status node (`/?format=json`, `/api/status`). |
+| `GET` | `/health` | Pemeriksaan kesehatan layanan (*health check*) termasuk status neural & Supabase. |
+| `POST` | `/ai/chat` | Eksekusi pertanyaan melalui 14-Stage Cognitive Pipeline + blok PoW Schema v2 (`record_event()`) + penyimpanan terkarantina. |
+| `POST` | `/ai/ingest` | *(Auth Required)* Meng-embed teks dokumen ke vektor 384-d dan menyimpannya ke *Knowledge Store* serta *Semantic Memory*. |
 | `POST` | `/ai/embedding` | Menghasilkan vektor embedding 384-dimensi yang dinormalisasi dari teks input. |
-| `GET` | `/knowledge/stats` | Menampilkan jumlah dokumen RAG, dimensi vektor, tipe indeks, statistik 5-tier memori, dan pratinjau dokumen. |
+| `GET` | `/knowledge/stats` | Menampilkan jumlah dokumen RAG, dimensi vektor, tipe indeks, statistik 5-tier memori, & status Supabase. |
 | `POST` | `/knowledge/search` | Pencarian semantik *top-k* dokumen berdasarkan jarak vektor L2 384-d. |
-| `POST` | `/knowledge/crawl` | Crawling pengetahuan langsung dari internet (Wikipedia, DuckDuckGo, Cuaca, URL) & asimilasi otomatis ke Brain. |
-| `DELETE` | `/knowledge/docs/{idx}` | Menghapus dokumen tertentu dari *vector store* dan menyinkronkan ulang indeks. |
-| `GET` | `/node/info` | Informasi lengkap node (`node_id` Ed25519, nama node, peer, tinggi blok, status `neural_inference_active`, memori). |
+| `POST` | `/knowledge/crawl` | *(Auth Required)* Crawling pengetahuan dari internet & menyimpannya ke Quarantine (`LOCAL` / `UNVERIFIED`). |
+| `DELETE` | `/knowledge/docs/{idx}` | *(Auth Required)* Menghapus dokumen tertentu dari *vector store* dan menyinkronkan ulang indeks. |
+| `GET` | `/node/info` | Informasi lengkap node (`node_id`, `ledger_status`, `active_neural_backend`, `active_model_id`, `supabase_configured`, memori). |
 | `GET` | `/node/metrics` | Telemetri perangkat keras & sistem (`CPU %`, `RAM %`, `Disk Read MB`, status ledger). |
-| `GET` | `/node/chain` | Mengambil seluruh daftar blok pada ledger Proof-of-Work beserta tipe event dan status validitasnya. |
-| `POST` | `/node/chain/mine` | Menambang blok audit Proof-of-Work baru secara manual dengan tanda tangan Ed25519. |
-| `POST` | `/node/chain/verify` | Mengaudit ulang seluruh hash SHA-256 PoW dan memverifikasi tanda tangan Ed25519 tiap blok. |
-| `POST` | `/security/sign-verify` | Uji mandiri (*self-test*) pembuatan & verifikasi tanda tangan digital Ed25519 (RFC 8032). |
+| `GET` | `/node/chain` | Mengambil seluruh daftar blok pada ledger Proof-of-Work Schema v2 beserta status validitasnya. |
+| `POST` | `/node/chain/mine` | *(Auth Required)* Menambang blok audit Proof-of-Work Schema v2 baru dengan tanda tangan *full-envelope* Ed25519. |
+| `POST` | `/node/chain/verify` | Mengaudit ulang seluruh hash SHA-256 PoW dan memverifikasi tanda tangan *full-envelope* Ed25519 tiap blok. |
+| `POST` | `/security/sign-verify` | Uji mandiri (*oracle-protected*) Ed25519 (RFC 8032) menggunakan *ephemeral self-test keypair* terisolasi + server nonce. |
 | `GET` | `/node/peers` | Daftar peer P2P yang terhubung. |
-| `POST` | `/node/sync` | Mendaftarkan URL node peer baru ke dalam topologi mesh P2P (dilindungi oleh validator anti-SSRF). |
-| `DELETE` | `/node/peers?peer=...` | Memutuskan tautan peer dari daftar mesh P2P. |
-| `POST` | `/node/broadcast` | Menyiarkan pesan protokol `GIP/2.0` bertanda tangan Ed25519 ke seluruh peer aktif. |
-| `GET/POST` | `/node/config` | Membaca atau memperbarui konfigurasi runtime (`node_name`, `pow_difficulty`, `max_tokens`, `temperature`). |
+| `POST` | `/node/sync` | *(Auth Required)* Mendaftarkan URL node peer baru ke topologi mesh P2P (dilindungi validator anti-SSRF). |
+| `DELETE` | `/node/peers?peer=...` | *(Auth Required)* Memutuskan tautan peer dari daftar mesh P2P. |
+| `POST` | `/node/broadcast` | *(Auth Required)* Menyiarkan pesan protokol `GIP/2.0` bertanda tangan Ed25519 ke seluruh peer aktif. |
+| `GET/POST` | `/node/config` | Membaca atau *(Auth Required pada POST)* memperbarui konfigurasi runtime (`node_name`, `pow_difficulty`, `max_tokens`, `temperature`). |
 | `GET` | `/node/dependencies` | Memeriksa versi Python dan status paket pustaka yang terinstal di server. |
-| `GET/DELETE` | `/node/logs` | Mengambil atau membersihkan *ring-buffer* log telemetri server. |
+| `GET/DELETE` | `/node/logs` | Mengambil atau *(Auth Required pada DELETE)* membersihkan *ring-buffer* log telemetri server. |
 
 ---
 
@@ -442,13 +450,13 @@ pytest -v
 
 Selain mengetik pertanyaan bahasa alami atau ekspresi matematika/logika, Anda dapat menjalankan perintah sistem langsung di kotak input **Command Interface**:
 
-- `/crawl <topik atau URL>` — Crawling pengetahuan langsung dari internet & menyimpannya ke memori Brain (lokal + Supabase).
+- `/crawl <topik atau URL>` — *(Auth Required)* Crawling pengetahuan langsung dari internet & menyimpannya ke Quarantine lokal (`LOCAL` / `UNVERIFIED`).
 - `/status` — Menampilkan laporan langsung CPU, RAM, Disk, jumlah dokumen RAG, peer P2P, dan tinggi rantai blok.
 - `/time` — Menampilkan sinkronisasi waktu sistem sekarang (WIB / ISO-8601).
-- `/ingest <teks pengetahuan>` — Langsung meng-embed teks ke vektor 384-d dan menyimpannya ke dalam basis pengetahuan RAG, Semantic Memory, & Supabase.
+- `/ingest <teks pengetahuan>` — *(Auth Required)* Meng-embed teks ke vektor 384-d dan menyimpannya ke basis pengetahuan lokal.
 - `/search <kueri pencarian>` — Mencari dokumen paling relevan secara semantik dari *vector store* 384-d.
-- `/mine <catatan audit>` — Menambang blok Proof-of-Work baru ke dalam Web3 Signed Event Ledger.
-- `/verify` — Menjalankan audit kriptografis penuh terhadap rantai blok SHA-256 dan tanda tangan Ed25519.
+- `/mine <catatan audit>` — *(Auth Required)* Menambang blok Proof-of-Work Schema v2 baru ke dalam Web3 Signed Event Ledger.
+- `/verify` — Menjalankan audit kriptografis penuh terhadap rantai blok SHA-256 Schema v2 dan tanda tangan *full-envelope* Ed25519.
 - `/peers` — Menampilkan daftar node peer P2P yang terhubung.
 
 ---
