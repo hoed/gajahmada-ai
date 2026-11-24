@@ -19,7 +19,7 @@ flowchart TD
     L8["LAYER 8 — INTELLIGENCE GOVERNANCE<br/>RBAC Auth · Execution Policies · Trust Policies · Audit History · Learning Approval & Rollback"]
     L7["LAYER 7 — COLLECTIVE INTELLIGENCE<br/>Multi-Node Task Negotiation · Delegation · Independent Verification · Conflict Resolution"]
     L6["LAYER 6 — AUTONOMOUS AGENT RUNTIME<br/>Planner · Researcher · Analyst · Verifier · Scheduler · Sandboxed Execution (CREATED..COMPLETED)"]
-    L5["LAYER 5 — HYBRID REASONING ENGINE<br/>Neural Backend (llama.cpp/ONNX/PyTorch) · Symbolic Reasoner · Evidence Reasoner · Metacognitive Critic"]
+    L5["LAYER 5 — HYBRID REASONING ENGINE<br/>GNNM Native Transformer (PyTorch/ONNX) · Symbolic Reasoner · Evidence Reasoner · Metacognitive Critic"]
     L4["LAYER 4 — MEMORY & KNOWLEDGE ENGINE<br/>Working · Semantic · Episodic · Procedural · Collective · Provenance · Contradictions · Versioning"]
     L3["LAYER 3 — PERCEPTION & KNOWLEDGE INGESTION<br/>Input Normalization · Intent Classification · Entity & Claim Extraction · Evidence Collection"]
     L2["LAYER 2 — DISTRIBUTED INFRASTRUCTURE (GIP v2.0)<br/>Ed25519 Signed Envelopes · Replay Protection · SSRF Guard · Discovery · Capability Advertisement"]
@@ -36,7 +36,7 @@ flowchart TD
 | :--- | :--- | :--- |
 | **1. Identity & Crypto** | `security/crypto.py`: Ed25519 keygen with hardcoded Vercel fallback seed; no key rotation or peer revocation. | `security/crypto.py`, `auth.py`, `policies.py`: Non-deterministic Ed25519 keygen, key rotation, revocation registry, RBAC token + signature auth. |
 | **2. Audit Ledger** | `blockchain/chain.py`: SHA-256 PoW chain recording raw `task_hash` strings; `is_chain_valid()` ignores signatures. | `blockchain/chain.py`: Signed event & audit ledger verifying Ed25519 signatures for typed events (`NODE_REGISTERED`, `TASK_CREATED`, `EVIDENCE_SUBMITTED`, `RESULT_VERIFIED`, `KNOWLEDGE_ACCEPTED`, `MODEL_VERSION_CHANGED`). |
-| **3. Inference Engine** | `core/engine.py`: Direct `llama_cpp` check + hardcoded regex Indonesian history fallback; `ML_AVAILABLE = True` hardcoded. | `neural/interfaces.py`, `llama_backend.py`, `onnx_backend.py`, `pytorch_backend.py`, `model_registry.py`, `router.py`: Pluggable `InferenceBackend` with hardware-aware loading, honest capability reporting, and zero fake neural claims. |
+| **3. Inference Engine** | `core/engine.py`: Legacy external runtime check + hardcoded regex Indonesian history fallback; `ML_AVAILABLE = True` hardcoded. | `gnnm/` (`GNNMTransformer`, `GNNMBPETokenizer`, `GNNMTrainer`, `GNNMInferenceEngine`) & `neural/` (`interfaces.py`, `pytorch_backend.py`, `onnx_backend.py`, `model_registry.py`, `router.py`): Native **GNNM** pluggable `InferenceBackend` with hardware-aware loading, honest capability reporting, and zero fake neural claims. |
 | **4. Reasoning Pipeline** | Single `engine.generate(prompt, context)` function call. | `cognition/` + `reasoning/`: 14-stage Cognitive Reasoning Pipeline combining Neural, Symbolic (logic rules, constraints, AST math), Evidence (provenance, contradiction detection), and Metacognitive Critic into a structured `ReasoningResult`. |
 | **5. Memory & Knowledge** | `knowledge/rag.py`: Flat JSON array `docs.json` + 384-d vectors; no metadata, versioning, or contradiction tracking. | `memory/` + `storage/`: 5 memory tiers (`working`, `semantic`, `episodic`, `procedural`, `collective`), PostgreSQL (`pgvector`) primary schema + durable SQLite/JSON local store, entity graph relations, provenance, contradiction preservation, versioning, and backup/export. |
 | **6. Autonomous Agents** | None (`models/` and `plugins/` are empty files). | `agents/` + `execution/`: `PlannerAgent`, `ResearcherAgent`, `AnalystAgent`, `VerifierAgent`, `TaskScheduler` with explicit lifecycle states (`CREATED`, `PLANNED`, `APPROVED`, `RUNNING`, `WAITING`, `COMPLETED`, `FAILED`, `CANCELLED`), execution budgets, human approval gates, and sandboxed tools. |
@@ -68,7 +68,7 @@ INPUT
    Forms candidate hypotheses with explicit assumptions and required evidence criteria.
   ↓
 6. PARALLEL HYBRID REASONING
-   ├── A. Neural Reasoning (neural/router.py) -> Local GGUF/ONNX/PyTorch inference (if active & loaded)
+   ├── A. Neural Reasoning (neural/router.py) -> Native GNNM (PyTorch/ONNX) inference (if active & loaded)
    ├── B. Symbolic Reasoning (reasoning/symbolic.py & constraints.py) -> Deterministic math, formal logic rules, deduction
    └── C. Evidence Reasoning (reasoning/evidence.py & contradictions.py) -> Provenance weighting, claim verification, contradiction detection
   ↓
@@ -121,7 +121,7 @@ gajahmada_ai/
 ├── neural/             # Provider-Independent Neural Inference Abstraction
 │   ├── interfaces.py   # InferenceBackend ABC, ModelMetadata, GenerationResult
 │   ├── model_registry.py# Local model registration, capability metadata, version control
-│   ├── llama_backend.py# llama.cpp GGUF backend
+│   ├── gnnm/           # GajahMada Native Neural Model (GNNM) from-scratch PyTorch Transformer & BPE tokenizer
 │   ├── onnx_backend.py # ONNX Runtime backend
 │   ├── pytorch_backend.py# PyTorch native research backend
 │   └── router.py       # Task-based model router & honest capability reporter

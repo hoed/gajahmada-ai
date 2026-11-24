@@ -36,8 +36,8 @@
 5. Fix `indonesia_corpus.py` dynamic timestamp duplication bug and clean duplicate entries on load.
 
 ### PHASE 1: Inference Abstraction & Native Hybrid Cognitive Reasoning
-1. Implement `gajahmada_ai/neural/` (`interfaces.py`, `model_registry.py`, `llama_backend.py`, `onnx_backend.py`, `pytorch_backend.py`, `router.py`).
-2. Ensure honest capability reporting: when no `.gguf`, `.onnx`, or PyTorch model is loaded, `neural_inference_active` is explicitly `False` and `active_backend` is `"none (symbolic+evidence-only)"`.
+1. Implement `gajahmada_ai/gnnm/` (from-scratch **GNNM** Transformer & BPE tokenizer) and `gajahmada_ai/neural/` (`interfaces.py`, `model_registry.py`, `pytorch_backend.py`, `onnx_backend.py`, `router.py`).
+2. Ensure honest capability reporting: when no `GNNM` (`./models/gnnm-*`) or `.onnx` model is loaded, `neural_inference_active` is explicitly `False` and `active_backend` is `"none (symbolic+evidence-only)"`.
 3. Implement `gajahmada_ai/reasoning/` (`symbolic.py`, `constraints.py`, `evidence.py`, `contradictions.py`, `inference.py`, `evaluator.py`).
 4. Implement `gajahmada_ai/cognition/` (`models.py`, `perception.py`, `intent.py`, `decomposition.py`, `hypotheses.py`, `metacognition.py`, `decision.py`, `reasoning.py`).
 

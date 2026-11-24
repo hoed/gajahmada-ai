@@ -6,7 +6,7 @@
 
 ### **Sovereign, Independent, Hybrid, Distributed Intelligence Architecture**
 
-*14-Stage Hybrid Cognitive Pipeline · Provider-Independent Local Neural Inference (`llama.cpp` GGUF · `GNNM` Native Transformer · ONNX) · Deterministic Symbolic & Evidence Reasoning · 5-Tier Persistent Memory (`SQLite` + Optional `Supabase pgvector`) · GIP/2.0 Cryptographic Mesh Protocol · Tamper-Evident Schema v2 Audit Ledger*
+*14-Stage Hybrid Cognitive Pipeline · Sovereign From-Scratch Neural Model (`GNNM` Decoder-Only Transformer · ONNX) · Deterministic Symbolic & Evidence Reasoning · 5-Tier Persistent Memory (`SQLite` + Optional `Supabase pgvector`) · GIP/2.0 Cryptographic Mesh Protocol · Tamper-Evident Schema v2 Audit Ledger*
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-2dd4bf?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-REST_v1_%26_v2-009688?style=for-the-badge&logo=fastapi&logoColor=white)](gajahmada_ai/api/server.py)
@@ -32,7 +32,7 @@
 | :-: | :--- | :--- |
 | **1** | **Independent Cognitive Engine per Node** | Every `SovereignPeerNode` executes its own 14-stage `CognitiveReasoningPipeline` completely offline. |
 | **2** | **Private Persistent Memory per Node** | Local ACID SQLite (`gajahmada_v2.db`) with `PRIVATE`/`LOCAL` isolation enforced via `MemoryAuthorizationService`, GIP/2.0, and Supabase RLS. |
-| **3** | **Active Neural-Symbolic Reasoning** | Combines local GGUF (`llama-cpp-python`), native `GNNM` PyTorch Transformer, AST `SymbolicReasoner`, and `EvidenceReasoner` with honest capability reporting. |
+| **3** | **Active Neural-Symbolic Reasoning** | Combines **GajahMada Native Neural Model (`GNNM`)** (from-scratch PyTorch Decoder-Only Transformer), AST `SymbolicReasoner`, and `EvidenceReasoner` with honest capability reporting. |
 | **4** | **Experience-Based Strategy Adaptation** | Closed-loop `record_outcome_and_adapt()` extracts verified `PROCEDURAL` strategies and tunes `retrieval_top_k` with regression verification and instant rollback. |
 | **5** | **Open Protocol Cooperation (`GIP/2.0`)** | 8-namespace canonical JSON protocol signed with Ed25519, `PeerTrustState` lifecycle, nonce replay cache, and SSRF protection. |
 | **6** | **Independent Cross-Node Verification** | `QuorumConsensusManager` verifies per-submission Ed25519 signatures and `provenance_hash`, enforcing policy `quorum_size >= 2` and rejecting unbacked majority claims. |
@@ -61,9 +61,9 @@
    - Outputs structured `ReasoningResult` objects with `EpistemicBreakdown` separating verified facts, unverified claims, hypotheses, inferences, opinions, and unknown information.
    - **Concise by Default:** Delivers direct 1–3 sentence answers unless the prompt requests detailed elaboration (`detail`, `lengkap`, `rinci`, `step by step`, `in detail`, etc.).
 
-2. **Provider-Independent Local Neural Backends & Native `GNNM` (`gajahmada_ai.neural`, `gnnm`):**
-   - Supports local **GGUF (`LlamaCppBackend`)**, **GajahMada Native Transformer (`PyTorchNativeBackend` auto-discovering `./models/gnnm-*`)**, and **ONNX (`OnnxBackend`)**.
-   - **Honest Capability Reporting:** Reports `neural_inference_active: True` strictly when real model weights are loaded; never masquerades rule-based synthesis as neural inference.
+2. **Sovereign From-Scratch Native Neural Model (`GNNM`) (`gajahmada_ai.gnnm`, `neural`):**
+   - Primary neural execution via **GajahMada Native Neural Model (`GNNM`)** (`PyTorchNativeBackend` auto-discovering `./models/gnnm-*`) and optional **ONNX (`OnnxBackend`)** — zero dependency on third-party model weights.
+   - **Honest Capability Reporting:** Reports `neural_inference_active: True` strictly when real `GNNM` model weights are loaded; never masquerades rule-based synthesis as neural inference.
 
 3. **5-Tier Memory, Knowledge Quarantine & Optional Supabase `pgvector` (`gajahmada_ai.memory`, `storage`):**
    - Five persistent tiers: **Working**, **Semantic**, **Episodic**, **Procedural**, and **Collective**, backed by local SQLite (`gajahmada_v2.db`) with SHA-256 integrity hashes, immutable version history, contradiction preservation, and Knowledge Graph extraction.
@@ -89,7 +89,7 @@ flowchart TD
     API --> L8["LAYER 8 — INTELLIGENCE GOVERNANCE<br/>RBAC Auth · Execution Policies · Trust Policies · Closed-Loop Learning & Rollback"]
     L8 --> L7["LAYER 7 — COLLECTIVE INTELLIGENCE<br/>Multi-Node Task Delegation · Independent Per-Submission Verification · Policy Quorum"]
     L7 --> L6["LAYER 6 — AUTONOMOUS AGENT RUNTIME<br/>Planner · Researcher · Analyst · Verifier · Scheduler · Unforgeable Human Approval"]
-    L6 --> L5["LAYER 5 — HYBRID REASONING ENGINE<br/>Local GGUF + GNNM Native Transformer + AST Symbolic + Evidence + Critic"]
+    L6 --> L5["LAYER 5 — HYBRID REASONING ENGINE<br/>GNNM Native Transformer + AST Symbolic + Evidence + Critic"]
     L5 --> L4["LAYER 4 — 5-TIER MEMORY & QUARANTINE ENGINE<br/>SQLite + Optional Supabase pgvector (RLS) · MemoryAuthorizationService · Versioning"]
     L4 --> L3["LAYER 3 — PERCEPTION & OPEN KNOWLEDGE CRAWLER<br/>Input Normalization · Wikipedia · DuckDuckGo · Open-Meteo · Al-Qur'an · Direct URL"]
     L3 --> L2["LAYER 2 — DISTRIBUTED INFRASTRUCTURE (GIP/2.0)<br/>8 Namespaces · PeerTrustState · Ed25519 Envelopes · Replay Protection · SSRF Guard"]
@@ -101,7 +101,7 @@ flowchart TD
 ```text
 gajahmada/
 ├── main.py                              # Entry point (Localhost Uvicorn & Vercel ASGI)
-├── config.yaml                          # Node, bootstrap peer, & local GGUF configuration
+├── config.yaml                          # Node, bootstrap peer, & native GNNM model configuration
 ├── .env.example                         # Environment template for optional Supabase & auth
 ├── vercel.json                          # Vercel Serverless routing configuration
 ├── LICENSE                              # MIT Open-Source License
@@ -123,7 +123,7 @@ gajahmada/
 │   ├── api/                             # FastAPI server.py (v1 + UI host) & v2_routes.py (/api/v2/*)
 │   ├── cognition/                       # 14-stage CognitiveReasoningPipeline & EpistemicBreakdown
 │   ├── gnnm/                            # From-scratch Decoder-Only Transformer (config, tokenizer, dataset, model, trainer, inference)
-│   ├── neural/                          # ModelRouter, LlamaCppBackend, PyTorchNativeBackend, OnnxBackend
+│   ├── neural/                          # ModelRouter, PyTorchNativeBackend (GNNM), OnnxBackend, InferenceBackend ABC
 │   ├── reasoning/                       # SymbolicReasoner (AST/Logic), EvidenceReasoner, ContradictionDetector
 │   ├── memory/                          # 5-tier MemoryManager, MemoryAuthorizationService, KnowledgeGraph, Versioning
 │   ├── storage/                         # RelationalMemoryStore (SQLite/PG), SupabaseKnowledgeStore, ObjectStore
@@ -155,19 +155,17 @@ Open in your browser:
 
 > **Operator Authentication:** On first boot, a random 256-bit admin key is saved to `knowledge_store/admin_api.key` (permissions `0600`) or read from `GAJAHMADA_ADMIN_KEY`. In the Dashboard, click **`🔑 AUTH`** in the header to store your key in browser `sessionStorage` for protected administrative actions.
 
-### 2. Local GGUF Neural Inference (`llama-cpp-python`)
+### 2. Local Native `GNNM` Neural Runtime (`.venv312` + PyTorch CPU/CUDA)
 
 ```bash
 uv venv --python 3.12 .venv312
 uv pip install --python .venv312/bin/python -r requirements.txt
-uv pip install --python .venv312/bin/python llama-cpp-python \
-  --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+uv pip install --python .venv312/bin/python torch --index-url https://download.pytorch.org/whl/cpu
 
-mkdir -p models
-curl -L -o models/qwen2.5-1.5b-instruct-q4_k_m.gguf \
-  https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf
+# Train your own GNNM-01-Tiny checkpoint from scratch into ./models/gnnm-01-tiny/
+.venv312/bin/python scripts/train_gnnm.py --preset GNNM-01-Tiny --steps 80 --sft-steps 40
 
-# ./run.sh automatically selects .venv312/bin/python and loads models/*.gguf
+# ./run.sh automatically selects .venv312/bin/python and loads ./models/gnnm-01-tiny
 ./run.sh
 ```
 
@@ -228,7 +226,7 @@ python -m gajahmada_ai.cli.main system health
 
 | Method | Endpoint | Auth | Description |
 | :---: | :--- | :---: | :--- |
-| `GET` | `/api/v2/intelligence/diagnose` | Public | Honest capability report (`llama.cpp`, `gajahmada-native`, `onnx`, symbolic, memory, agents). |
+| `GET` | `/api/v2/intelligence/diagnose` | Public | Honest capability report (`gajahmada-native` GNNM, `onnx`, symbolic, memory, agents). |
 | `POST` | `/api/v2/intelligence/ask` | Optional | 14-stage cognitive reasoning (public requests are read-only; authenticated operators persist to `LOCAL` Quarantine). |
 | `GET` | `/api/v2/reasoning/{id}` | Public | Inspect step-by-step reasoning trace, hypotheses, evidence, and contradictions. |
 | `GET` | `/api/v2/memory` | Filtered | Memory stats, records, & contradictions filtered by `MemoryAuthorizationService` (`PRIVATE` hidden from public). |
@@ -270,7 +268,7 @@ pytest -v
 
 | Suite | Coverage | File | Status |
 | :--- | :--- | :--- | :---: |
-| **Core & Neural (Tests 1–3, 14, +2)** | Offline boot without cloud APIs, local GGUF loading, honest unavailability reporting, regression-guarded learning, closed-loop strategy adaptation, signed ledger. | `tests/unit/test_core_and_neural.py` | ✅ **PASSED** |
+| **Core & Neural (Tests 1–3, 14, +2)** | Offline boot without cloud APIs, local native neural loading, honest unavailability reporting, regression-guarded learning, closed-loop strategy adaptation, signed ledger. | `tests/unit/test_core_and_neural.py` | ✅ **PASSED** |
 | **Cognitive Pipeline (Tests 4–6)** | LLM-independent AST math/logic, 14-stage `ReasoningResult` & `EpistemicBreakdown`, evidence provenance references. | `tests/cognition/test_cognitive_pipeline.py` | ✅ **PASSED** |
 | **Memory Persistence (Tests 7–8)** | Restart survival, immutable version history, backup restore, contradiction preservation. | `tests/memory/test_memory_persistence.py` | ✅ **PASSED** |
 | **GIP & Collective (Tests 9–11)** | Offline node operation, 2-node signed GIP/2.0 exchange + replay rejection, 3-node collective quorum. | `tests/network/test_gip_and_collective.py` | ✅ **PASSED** |

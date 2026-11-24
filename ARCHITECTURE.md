@@ -1,13 +1,13 @@
 # GajahMada 2.0 — Sovereign Hybrid Distributed Intelligence Architecture
 
 ## 1. Architectural Vision & 7 Verified Sovereign Principles
-**GajahMada 2.0** is a sovereign, independent, hybrid, distributed intelligence node that runs on **Localhost** (full neural-symbolic mode via `.venv312` + local GGUF) and **Vercel Serverless** (hybrid symbolic + live crawler + persistent Supabase `pgvector`).
+**GajahMada 2.0** is a sovereign, independent, hybrid, distributed intelligence node that runs on **Localhost** (full neural-symbolic mode via `.venv312` + native **GNNM** PyTorch Transformer) and **Vercel Serverless** (hybrid symbolic + live crawler + persistent Supabase `pgvector`).
 
 | # | Sovereign Principle | Implementation |
 | :-: | :--- | :--- |
 | 1 | **Independent Cognitive Engine per Node** | Each `SovereignPeerNode` runs its own 14-stage `CognitiveReasoningPipeline` offline without any central API. |
 | 2 | **Private Persistent Memory per Node** | Local ACID SQLite (`gajahmada_v2.db`) + `PRIVATE`/`LOCAL` visibility isolation enforced across GIP/2.0 & Supabase RLS. |
-| 3 | **Active Neural-Symbolic Reasoning** | Local GGUF (`qwen2.5-1.5b-instruct-q4_k_m.gguf` via `llama-cpp-python`) + deterministic AST Symbolic & Evidence Reasoners. |
+| 3 | **Active Neural-Symbolic Reasoning** | **GajahMada Native Neural Model (`GNNM`)** (from-scratch Decoder-Only Transformer in PyTorch: `RMSNorm` + `RoPE` + `SwiGLU` + Byte-Level BPE) + deterministic AST Symbolic & Evidence Reasoners. |
 | 4 | **Experience-Based Strategy Adaptation** | Closed-loop `record_outcome_and_adapt()` extracts verified `PROCEDURAL` strategies & tunes `retrieval_top_k` with regression testing & rollback. |
 | 5 | **Open Protocol Cooperation (`GIP/2.0`)** | 8-namespace canonical JSON protocol signed with Ed25519, clock-skew guard, nonce replay cache, & SSRF protection. |
 | 6 | **Independent Cross-Node Verification** | `QuorumConsensusManager` verifies Ed25519 signatures & `provenance_hash`, rejecting unbacked majority claims. |
@@ -23,7 +23,7 @@ flowchart TD
     API --> L8["Layer 8: Governance & Closed-Loop Learning (RBAC, Policies, Regression & Rollback)"]
     L8 --> L7["Layer 7: Collective Intelligence (Multi-Node Coordination & Evidence-Weighted Quorum)"]
     L7 --> L6["Layer 6: Autonomous Multi-Agent Runtime (Planner, Researcher, Analyst, Verifier, Sandbox)"]
-    L6 --> L5["Layer 5: Hybrid Reasoning Engine (Local GGUF Neural + AST Symbolic + Evidence + Critic)"]
+    L6 --> L5["Layer 5: Hybrid Reasoning Engine (GNNM Native Transformer + AST Symbolic + Evidence + Critic)"]
     L5 --> L4["Layer 4: 5-Tier Persistent Memory (SQLite + 384-d RAG + Optional Supabase pgvector & RLS)"]
     L4 --> L3["Layer 3: Perception & Open Knowledge Crawler (Wikipedia, DuckDuckGo, Open-Meteo, Al-Qur'an, Direct URL)"]
     L3 --> L2["Layer 2: Distributed Infrastructure (GIP/2.0 Signed Envelopes, Replay Protection, SSRF Guard)"]
@@ -39,7 +39,7 @@ flowchart TD
 | **API Gateway** | `gajahmada_ai/api/server.py`, `v2_routes.py` | FastAPI REST v1 & v2 endpoints, Homepage `/`, Dashboard `/dashboard` & `/ui`, closed-loop chat orchestration |
 | **Cognitive Pipeline** | `gajahmada_ai/cognition/` | 14-stage pipeline (`perception`, `intent`, `decomposition`, `hypotheses`, `metacognition`, `decision`, `reasoning`) |
 | **Native Model (GNNM)** | `gajahmada_ai/gnnm/`, `scripts/train_gnnm.py` | From-scratch Decoder-Only Transformer (`RMSNorm` + `RoPE` + Causal Attention + `SwiGLU`), lossless byte-level BPE tokenizer, `.jsonl`/`.txt` corpus builder, SFT (`-100` prompt masking), validation perplexity, & `GNNMInferenceEngine` (auto-discovered by `PyTorchNativeBackend`) |
-| **Neural Abstraction** | `gajahmada_ai/neural/` | Provider-independent `LlamaCppBackend` (GGUF auto-discovery + concise-by-default prompt), `PyTorchNativeBackend` (auto-discovers `./models/gnnm-*`), `OnnxBackend`, `ModelRouter` |
+| **Neural Abstraction** | `gajahmada_ai/neural/` | Provider-independent `PyTorchNativeBackend` (primary **GNNM** loader auto-discovering `./models/gnnm-*`), `OnnxBackend`, and `ModelRouter` |
 | **Symbolic & Evidence** | `gajahmada_ai/reasoning/` | `SymbolicReasoner` (AST math, forward-chaining, syllogisms), `ContradictionDetector`, `EvidenceReasoner`, `HybridInferenceCombiner` |
 | **5-Tier Memory** | `gajahmada_ai/memory/` | Working, Semantic, Episodic, Procedural, & Collective memory + `MemoryAuthorizationService` (anti-leak PRIVATE gate), Knowledge Graph, Versioning, & Provenance |
 | **Hybrid Storage** | `gajahmada_ai/storage/` | `RelationalMemoryStore` (SQLite/PostgreSQL), `SupabaseKnowledgeStore` (`pgvector` 384-d + `ledger_blocks` + RLS), `ContentAddressedObjectStore` |
