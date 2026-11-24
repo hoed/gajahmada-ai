@@ -36,3 +36,22 @@
    - Primary schema migration is provided at `gajahmada_ai/storage/migrations/001_initial_v2_schema.sql`. When `DATABASE_URL=postgresql://...` points to an active PostgreSQL server with `pgvector`, `RelationalMemoryStore` uses `psycopg` directly; when offline, it transparently persists to transactional SQLite (`knowledge_store/gajahmada_v2.db`).
 3. **Native libp2p & Replicated BFT State Machine:**
    - `TransportBackend` (`gajahmada_ai/network/transport.py`) and `QuorumConsensusManager` (`gajahmada_ai/network/consensus.py`) provide clean abstractions for future `libp2p` QUIC transport and established BFT state replication (e.g., CometBFT) across WAN clusters.
+
+
+---
+
+## 4. Five-Stage Sovereign Strategic Roadmap (Long-Term Evolution)
+
+To maintain strict transparency between **current verified implementation** and **long-term sovereign AI goals**, GajahMada follows a 5-stage evolution plan:
+
+1. **Stage 1 — GajahMada Native Model (`GNNM`)** *(Current: Foundation & `GNNM-01-Tiny` Proven)*
+   - Build and validate an owned Decoder-Only Transformer (`gajahmada_ai/gnnm/`), custom Byte-Level BPE tokenizer, streaming deduplicated pretraining + SFT pipeline (`scripts/train_gnnm.py`), and checkpoint inference (`PyTorchNativeBackend`).
+   - Scale progressively from **10M–50M parameters** (`GNNM-01-25M`) to prove end-to-end training & evaluation quality, then expand to **100M–1B parameters** (`GNNM-02-100M`, `GNNM-03-300M`, `GNNM-04-1B`) as curated corpora and GPU compute grow.
+2. **Stage 2 — Native Cognitive Engine** *(Current: Operational)*
+   - Guarantee that 14-stage reasoning, symbolic logic (`SymbolicReasoner`), evidence scoring (`EvidenceReasoner`), contradiction detection, and 5-tier persistent memory remain 100% operational even when no neural weights are loaded.
+3. **Stage 3 — GIP Distributed Intelligence** *(Current: 3-Node Verified; Next: 10 → 100 Nodes)*
+   - Expand multi-node testing from 3 independent nodes to **10-node** and **100-node** topologies covering security, peer trust lifecycle, replay protection, knowledge sync, quorum consensus, conflict resolution, and crash/partition recovery.
+4. **Stage 4 — Collective Knowledge Network** *(Current: Governance & Isolation Ready)*
+   - Enable universities, research labs, communities, and organizations to run sovereign GajahMada nodes with full ownership over `PRIVATE`/`LOCAL` data while contributing cryptographically attested findings to `COLLECTIVE` knowledge.
+5. **Stage 5 — Independent AI Ecosystem** *(Planned)*
+   - Publish official SDKs, formal GIP/2.0 protocol specifications, public reproducible benchmarks, and open interoperability standards so external developers can build applications on top of the GajahMada network.

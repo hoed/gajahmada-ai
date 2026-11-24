@@ -120,6 +120,8 @@ gajahmada/
 ├── scripts/
 │   ├── train_gnnm.py                    # Scalable CLI Pretraining + Val Perplexity + SFT pipeline
 │   └── train_gnnm_01_tiny.py            # Quick-start local GNNM-01-Tiny pretraining script
+├── models/
+│   └── gnnm-01-tiny/                    # From-scratch GNNM checkpoint metadata (config.json, tokenizer.json, metrics.json; model.pt gitignored)
 ├── gajahmada_ai/
 │   ├── api/                             # FastAPI server.py (v1 + UI host) & v2_routes.py (/api/v2/*)
 │   ├── cognition/                       # 14-stage CognitiveReasoningPipeline & EpistemicBreakdown
@@ -131,12 +133,12 @@ gajahmada/
 │   ├── knowledge/                       # LocalKnowledge (384-d RAG), open_knowledge.py crawler, indonesia_corpus.py
 │   ├── agents/ & execution/             # Planner, Researcher, Analyst, Verifier, Scheduler, SandboxedExecutor
 │   ├── learning/                        # FeedbackCollector, ExperienceExtractor, StrategyAdapter, LearningExperimentManager
-│   ├── network/                         # GIP/2.0 protocol, PeerDiscoveryRegistry (PeerTrustState), CollectiveCoordinator, QuorumConsensus
-│   ├── blockchain/                      # AIBlockchain Schema v2 canonical PoW ledger + atomic recovery
-│   ├── security/                        # NodeIdentity (Ed25519), AuthManager (RBAC), SSRF guard, RateLimiter, AuditLogger
+│   ├── network/                         # GIP/2.0 protocol (SQLite WAL replay store), PeerDiscoveryRegistry, CollectiveCoordinator, QuorumConsensus
+│   ├── blockchain/                      # AIBlockchain Schema v2 tamper-evident local signed event ledger + atomic recovery
+│   ├── security/                        # NodeIdentity (Ed25519, fail-closed key/state persistence), AuthManager (RBAC), SSRF guard, RateLimiter, AuditLogger
 │   └── cli/                             # CLI v1 & v2 (`gajahmada`)
 ├── interface/html/                      # Dual-Mode Web UI: Homepage (/) & 8-Panel Dashboard (/dashboard, /ui)
-└── tests/                               # 33 Automated Tests across unit, cognition, memory, network, security, integration, benchmarks
+└── tests/                               # 39 Automated Tests across unit, cognition, memory, network, security, integration, benchmarks
 ```
 
 ---
@@ -277,6 +279,20 @@ pytest -v
 | **Audit Remediation P0–P5 + Round 3 (16 Tests)** | Signing oracle elimination, fail-closed v1/v2 & internal endpoint auth, explicit visibility matrix (`PRIVATE`/`LOCAL`/`SHARED`/`COLLECTIVE`/`PUBLIC`), cryptographic `node_attestations` promotion, direct Ed25519 consensus + evidence independence, persistent SQLite GIP replay protection, fail-closed key persistence + persisted rotations/revocations, strict non-genesis ledger verification + `LEDGER_CORRUPTED` recovery, & 3-node restart persistence. | `tests/security/test_audit_remediation.py` | ✅ **PASSED** |
 | **GNNM Native Model (4 Tests)** | Parameter estimator, lossless multilingual byte-level BPE, `.jsonl` deduplication, SFT `-100` prompt masking, & Transformer forward/init-loss check. | `tests/unit/test_gnnm_foundation.py` | ✅ **PASSED** |
 | **API Compatibility & Benchmarks** | Full v1/v2 API compatibility & live cognitive benchmark execution. | `tests/integration/`, `tests/benchmarks/` | ✅ **PASSED** |
+
+---
+
+## 🗺️ 5-Stage Sovereign Strategic Roadmap & Honest Maturity Status
+
+GajahMada explicitly separates **verified local pipeline foundations** from **future large-scale milestones** so auditors and partners can inspect exact capabilities directly in code:
+
+| Stage | Milestone | Engineering Scope & Current Verified Status |
+| :---: | :--- | :--- |
+| **Stage 1** | **GajahMada Native Model (`GNNM`)** | **In Progress (Pipeline Proven):** Custom from-scratch Decoder-Only Transformer (`gajahmada_ai/gnnm/`), lossless Byte-Level BPE tokenizer, streaming corpus/SFT trainer (`scripts/train_gnnm.py`), and verified `GNNM-01-Tiny` checkpoint (`models/gnnm-01-tiny/`). *Not yet a large-scale frontier LLM* — next scaling tiers are `GNNM-01-25M` (10M–50M) → `GNNM-02-100M` → `GNNM-03-300M` → `GNNM-04-1B` as compute & curated corpora scale. |
+| **Stage 2** | **Native Cognitive Engine** | **Operational:** 14-stage hybrid reasoning, deterministic `SymbolicReasoner`, `EvidenceReasoner`, `ContradictionDetector`, and 5-tier persistent memory operate fully even when no neural checkpoint is loaded (`neural_inference_active: False`). |
+| **Stage 3** | **GIP Distributed Intelligence** | **3-Node Verified → Scaling to 10 / 100 Nodes:** 8-namespace signed `GIP/2.0`, SQLite WAL replay protection, `PeerTrustState`, direct Ed25519 quorum verification, and 3-node restart persistence are tested; next milestone is 10-node and 100-node WAN stress testing (partition recovery, conflict resolution, and BFT finality). |
+| **Stage 4** | **Collective Knowledge Network** | **Foundation Ready:** Cryptographic `node_attestations`, explicit visibility isolation (`PRIVATE`/`LOCAL`/`SHARED`/`COLLECTIVE`/`PUBLIC`), and per-node Ed25519 identity allow universities, researchers, communities, and organizations to operate sovereign nodes while retaining full local data ownership. |
+| **Stage 5** | **Independent AI Ecosystem** | **Planned:** Public Python/TypeScript SDKs, formal GIP/2.0 RFC specification, open evaluation benchmarks, and third-party interoperability standards. |
 
 ---
 
