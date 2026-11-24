@@ -13,7 +13,7 @@
 [![Supabase pgvector](https://img.shields.io/badge/Supabase-pgvector_384d-3ecf8e?style=for-the-badge&logo=supabase&logoColor=white)](supabase/schema.sql)
 [![Cognition](https://img.shields.io/badge/Cognition-14_Stage_Hybrid-818cf8?style=for-the-badge)](gajahmada_ai/cognition/reasoning.py)
 [![Protocol](https://img.shields.io/badge/Protocol-GIP%2F2.0_Ed25519-f59e0b?style=for-the-badge)](gajahmada_ai/network/protocol.py)
-[![Tests](https://img.shields.io/badge/Pytest-32%2F32_Passing-4ade80?style=for-the-badge)](tests/)
+[![Tests](https://img.shields.io/badge/Pytest-33%2F33_Passing-4ade80?style=for-the-badge)](tests/)
 
 </div>
 
@@ -292,22 +292,18 @@ Agar knowledge Brain dan audit ledger tersimpan permanen di cloud/Vercel sekalig
 4. **Catatan `DATABASE_URL`:** Jika password PostgreSQL mengandung karakter khusus (seperti `@` atau `#`), gunakan URL-encoding (`@` → `%40`, `#` → `%23`).
 5. Tanpa `.env`, GajahMada tetap berjalan 100% mandiri menggunakan SQLite lokal (*local-first*).
 
-### 4. Melatih GajahMada Native Neural Model (`GNNM-01-Tiny`) dari Nol
+### 4. Melatih GajahMada Native Neural Model (`GNNM-01-Tiny` → `GNNM-04-1B`) dari Nol
 
-GajahMada menyediakan arsitektur Decoder-Only Transformer buatan sendiri (**RMSNorm + RoPE + Causal Self-Attention + SwiGLU**) lengkap dengan *byte-level BPE tokenizer* multilingual di [gajahmada_ai/gnnm/](gajahmada_ai/gnnm/) ([docs/GNNM_ARCHITECTURE.md](docs/GNNM_ARCHITECTURE.md)):
+GajahMada menyediakan arsitektur Decoder-Only Transformer buatan sendiri (**RMSNorm + RoPE + Causal Self-Attention + SwiGLU + `std=0.02` init + *repetition penalty***) lengkap dengan *byte-level BPE tokenizer* multilingual, *streaming* `.jsonl`/`.txt` corpus loader, evaluasi *validation perplexity*, serta **Instruction Tuning (SFT)** dengan *prompt loss masking* (`-100`) di [gajahmada_ai/gnnm/](gajahmada_ai/gnnm/) ([docs/GNNM_ARCHITECTURE.md](docs/GNNM_ARCHITECTURE.md)). Checkpoint `./models/gnnm-*` otomatis terdeteksi oleh `PyTorchNativeBackend` & `ModelRouter`.
 
 ```bash
 uv pip install --python .venv312/bin/python torch --index-url https://download.pytorch.org/whl/cpu
-.venv312/bin/python -c "
-from gajahmada_ai.gnnm import GNNM_PRESETS, GNNMBPETokenizer, GNNMCorpusBuilder
-from gajahmada_ai.gnnm.trainer import GNNMTrainer
-corpus = GNNMCorpusBuilder(); corpus.load_seed_multilingual_corpus()
-tok = GNNMBPETokenizer(); tok.train(corpus.texts(), target_vocab_size=512)
-cfg = GNNM_PRESETS['GNNM-01-Tiny']; cfg.vocab_size = tok.vocab_size
-trainer = GNNMTrainer(cfg, tok)
-print(trainer.train_steps(corpus.pack_token_blocks(tok, seq_len=64), steps=60, batch_size=4))
-trainer.save_checkpoint('./models/gnnm-01-tiny')
-"
+
+# Proof-of-Concept lokal cepat (Pretrain + Val Perplexity + SFT + metrics.json)
+.venv312/bin/python scripts/train_gnnm.py --preset GNNM-01-Tiny --steps 80 --sft-steps 40
+
+# Skala GNNM-01-25M dengan korpus .jsonl/.txt multilingual (disarankan GPU CUDA)
+.venv312/bin/python scripts/train_gnnm.py --preset GNNM-01-25M --corpus-dir ./data/corpus --vocab-size 8192 --seq-len 256 --steps 5000 --sft-steps 500
 ```
 
 ---
@@ -376,7 +372,8 @@ python -m gajahmada_ai.cli.main train-model --note "Audit Konsensus V2"
 | `POST` | `/api/v2/agents/tasks/{task_id}/approve` | *(Auth Required)* Memberikan persetujuan operator manusia untuk tugas agen yang berstatus `WAITING`. |
 | `GET` | `/api/v2/network` | Status protokol `GIP/2.0`, daftar URL peer, node yang ditemukan, dan daftar peer yang dicabut (*revoked*). |
 | `POST` | `/api/v2/network/gip` | Endpoint penerima pesan protokol `GIP/2.0` bertanda tangan Ed25519 dengan validasi *nonce replay* & batas waktu. |
-| `GET/POST` | `/api/v2/nodes` / `/api/v2/nodes/register` | Menampilkan identitas node atau mendaftarkan peer GIP baru dengan validasi anti-SSRF. |
+| `GET/POST` | `/api/v2/nodes` / `/api/v2/nodes/register` | Menampilkan identitas node atau mendaftarkan peer GIP baru sebagai `TRUSTED` dengan validasi anti-SSRF. |
+| `POST` | `/api/v2/nodes/{node_id}/trust` | *(Auth Required)* Mengubah status kepercayaan peer (`PENDING`, `AUTHENTICATED`, `TRUSTED`, `REVOKED`). |
 | `GET` | `/api/v2/system/health` | Laporan kesehatan lengkap: kapabilitas kognitif, penyimpanan relasional, validitas ledger, log audit keamanan, & kebijakan. |
 | `POST` | `/api/v2/system/rotate-key` | *(Auth Required)* Merotasi kunci privat Ed25519 node dan menerbitkan sertifikat rotasi bertanda tangan ganda. |
 | `POST` | `/api/v2/system/learning/experiment` | *(Auth Required)* Mengajukan dan mengevaluasi eksperimen pembelajaran terhadap *regression suite* (otomatis menolak eksperimen yang gagal). |
@@ -410,9 +407,9 @@ python -m gajahmada_ai.cli.main train-model --note "Audit Konsensus V2"
 
 ---
 
-## 🧪 Pengujian & Kriteria Penerimaan (32 Automated Tests)
+## 🧪 Pengujian & Kriteria Penerimaan (33 Automated Tests)
 
-Jalankan seluruh 32 suite pengujian otomatis menggunakan `pytest`:
+Jalankan seluruh 33 suite pengujian otomatis menggunakan `pytest`:
 
 ```bash
 pytest -v
@@ -437,7 +434,7 @@ pytest -v
 | **TEST 15** | Seluruh perilaku API v1 yang ada tetap kompatibel sepenuhnya. | `tests/integration/test_api_compatibility.py` | ✅ **PASSED** |
 | **EXT 16–19** | SSRF & seed guard, Signed Event PoW Ledger, Real Cognitive Benchmarks, & Closed-Loop Experience Strategy Adaptation. | `tests/` | ✅ **PASSED** |
 | **AUDIT P0–P5 (20–29)** | Signing oracle eliminated, Fail-closed v1/v2 auth, `MemoryAuthorizationService` anti-leak, unforgeable approval, Blockchain v2 strict full-envelope + `LEDGER_CORRUPTED` recovery, GIP trust lifecycle + verified consensus, Knowledge Quarantine + source-corroborated promotion, & 3-node restart persistence. | `tests/security/test_audit_remediation.py` | ✅ **PASSED** |
-| **GNNM (30–32)** | `GNNMConfig` parameter estimator, native byte-level BPE multilingual lossless tokenizer, SHA-256 corpus deduplication/packing, & `GNNMTransformer` forward/loss check. | `tests/unit/test_gnnm_foundation.py` | ✅ **PASSED** |
+| **GNNM (30–33)** | `GNNMConfig` parameter estimator, native byte-level BPE multilingual lossless tokenizer, `.jsonl` deduplication, SFT `-100` prompt loss masking, & `GNNMTransformer` forward/init-loss check. | `tests/unit/test_gnnm_foundation.py` | ✅ **PASSED** |
 
 ---
 

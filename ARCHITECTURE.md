@@ -38,7 +38,8 @@ flowchart TD
 | :--- | :--- | :--- |
 | **API Gateway** | `gajahmada_ai/api/server.py`, `v2_routes.py` | FastAPI REST v1 & v2 endpoints, Homepage `/`, Dashboard `/dashboard` & `/ui`, closed-loop chat orchestration |
 | **Cognitive Pipeline** | `gajahmada_ai/cognition/` | 14-stage pipeline (`perception`, `intent`, `decomposition`, `hypotheses`, `metacognition`, `decision`, `reasoning`) |
-| **Neural Abstraction** | `gajahmada_ai/neural/` | Provider-independent `LlamaCppBackend` (GGUF auto-discovery + concise-by-default prompt), `OnnxBackend`, `PyTorchNativeBackend`, `ModelRouter` |
+| **Native Model (GNNM)** | `gajahmada_ai/gnnm/`, `scripts/train_gnnm.py` | From-scratch Decoder-Only Transformer (`RMSNorm` + `RoPE` + Causal Attention + `SwiGLU`), lossless byte-level BPE tokenizer, `.jsonl`/`.txt` corpus builder, SFT (`-100` prompt masking), validation perplexity, & `GNNMInferenceEngine` (auto-discovered by `PyTorchNativeBackend`) |
+| **Neural Abstraction** | `gajahmada_ai/neural/` | Provider-independent `LlamaCppBackend` (GGUF auto-discovery + concise-by-default prompt), `PyTorchNativeBackend` (auto-discovers `./models/gnnm-*`), `OnnxBackend`, `ModelRouter` |
 | **Symbolic & Evidence** | `gajahmada_ai/reasoning/` | `SymbolicReasoner` (AST math, forward-chaining, syllogisms), `ContradictionDetector`, `EvidenceReasoner`, `HybridInferenceCombiner` |
 | **5-Tier Memory** | `gajahmada_ai/memory/` | Working, Semantic, Episodic, Procedural, & Collective memory + `MemoryAuthorizationService` (anti-leak PRIVATE gate), Knowledge Graph, Versioning, & Provenance |
 | **Hybrid Storage** | `gajahmada_ai/storage/` | `RelationalMemoryStore` (SQLite/PostgreSQL), `SupabaseKnowledgeStore` (`pgvector` 384-d + `ledger_blocks` + RLS), `ContentAddressedObjectStore` |
@@ -52,10 +53,11 @@ flowchart TD
 ---
 
 ## 4. Security Hardening, Knowledge Quarantine & Blockchain v2 Integrity
-- **Fail-Closed Auth & Rate Limiting:** Admin key is generated as a 256-bit cryptographically random secret (`secrets.token_urlsafe(32)`, rotatable via `rotate_admin_key()`), never derived from `node_id`. All v1/v2 administrative mutation endpoints enforce RBAC (`401`/`403`) by default, protected by active `SlidingWindowRateLimiter` middleware (`429`) and configurable CORS (`GAJAHMADA_ALLOWED_ORIGINS`).
+- **Signing Oracle Eliminated & Fail-Closed Auth:** `POST /security/sign-verify` uses an isolated ephemeral keypair + domain-separated server nonce (`oracle_protected: True`), never exposing the node's private key. Admin key is a 256-bit cryptographically random secret persisted to `admin_api.key` (`0600`, rotatable via `rotate_admin_key()`). All state-mutating v1 & v2 endpoints (`/ai/ingest`, `/knowledge/crawl`, `/node/chain/mine`, `/node/broadcast`, `/node/config`, `/node/sync`, `/node/peers`, `/node/logs`, `/api/v2/agents/run`, etc.) enforce RBAC (`401`/`403`) by default, protected by active `SlidingWindowRateLimiter` middleware (`429`) and configurable CORS (`GAJAHMADA_ALLOWED_ORIGINS`).
 - **Centralized Memory Authorization (`MemoryAuthorizationService`):** Every read path (`/api/v2/memory`, `/api/v2/memory/{id}/versions`, `/api/v2/knowledge`) filters `PRIVATE` records, version histories, entity relations, and contradictions consistently.
-- **4-Stage Knowledge Quarantine Pipeline:** Incoming unverified LLM outputs, web-crawled data (`/knowledge/crawl`), and peer `GIP-KNOWLEDGE` enter `LOCAL` Quarantine (`UNVERIFIED`) first; promotion to `COLLECTIVE` / `VERIFIED` requires independent contradiction checks via authenticated `POST /api/v2/knowledge/promote/{record_id}` (or verified multi-node quorum).
-- **Blockchain Schema v2 (`gajahmada_ai/blockchain/chain.py`):** Uses canonical JSON hashing over all fields (`event_type`, `event_ref`, `metadata`, `timestamp`, `node_id`, `previous_hash`), signs the full event envelope with Ed25519, writes atomically (`tmp + fsync + .bak + os.replace`), and enters `LEDGER_CORRUPTED` (refusing silent overwrites) if tampering is detected while supporting explicit `recover_from_backup()` and backward-compatible v1 block verification.
+- **GIP/2.0 Peer Trust & Cryptographic Consensus:** Explicit `PeerTrustState` lifecycle (`UNKNOWN → PENDING → AUTHENTICATED → TRUSTED → REVOKED`), SSRF validation on discovery endpoints, per-submission Ed25519 signature verification & duplicate-node rejection in `GIP-CONSENSUS`, and policy-enforced `quorum_size >= 2`.
+- **6-State Epistemic Model & Source-Corroborated Promotion:** Uses explicit states (`UNVERIFIED`, `MODEL_ASSESSED`, `SOURCE_CORROBORATED`, `INDEPENDENTLY_VERIFIED`, `DISPUTED`, `REJECTED`). Unverified LLM outputs, web crawls, and peer `GIP-KNOWLEDGE` enter `LOCAL` Quarantine; promotion via `POST /api/v2/knowledge/promote/{record_id}` requires traceable `independent_sources` and contradiction checks.
+- **Blockchain Schema v2 (`gajahmada_ai/blockchain/chain.py`):** All new blocks are created via `record_event()` using canonical JSON hashing over all fields (`event_type`, `event_ref`, `metadata`, `timestamp`, `node_id`, `previous_hash`), strictly enforce full-envelope Ed25519 signatures on `schema_version >= 2` (legacy `task_hash` accepted only for historical v1 blocks), write atomically (`tmp + fsync + .bak + os.replace`), and enter `LEDGER_CORRUPTED` on tampering with explicit `recover_from_backup()`.
 - **Optional Cloud Persistence (`supabase/schema.sql`):**
   - `public.knowledge_records` (`content_hash` PK, `embedding vector(384)`, `signature`, `visibility`), `public.ledger_blocks`, and `public.match_knowledge` RPC.
   - **Row Level Security (RLS):** Enabled on both tables; public keys (`SUPABASE_PUBLISHABLE_KEY`) have read-only access to `visibility = 'COLLECTIVE'` and are blocked (`401 / 42501`) from writes; only backend services holding `SUPABASE_SECRET_KEY` may write.
@@ -63,8 +65,8 @@ flowchart TD
 ---
 
 ## 5. Dual-Mode Web UI Architecture (`interface/html/`)
-- **Homepage (`/` — `body.view-home`):** Fullscreen interactive **3D Network & Architecture Graph** background with a compact, crystal-clear **30%-opacity (no-blur)** floating Command Center in the center (responsive on desktop & mobile). While the Brain processes a query or `/crawl`, the 3D Network accelerates smoothly (~16× angular velocity) with heightened glow and returns smoothly to calm idle rotation once answered.
-- **Dashboard (`/dashboard` & `/ui` — `body.view-dashboard`):** Full 8-panel Tactical Cyberdeck HUD (System Logs & Live Config, 3D Network Graph, Command Interface, Module Dependencies, Web3 Consensus Cycle, Modular Matrix, P2P Mesh, System Performance & Ledger) with instant toggle back to Homepage without losing chat state.
+- **Homepage (`/` — `body.view-home`):** Fullscreen edge-to-edge **3D Network & Architecture Graph** background with a compact, crystal-clear **30%-opacity (no-blur)** floating Command Center in the center (responsive on desktop & mobile with `📊 DASHBOARD` switch). While the Brain processes a query or `/crawl`, the 3D Network accelerates smoothly (~16× angular velocity) with heightened glow and returns smoothly to calm idle rotation once answered.
+- **Dashboard (`/dashboard` & `/ui` — `body.view-dashboard`):** Full 8-panel Tactical Cyberdeck HUD (System Logs & Live Config, 3D Network Graph, Command Interface, Module Dependencies, Web3 Consensus Cycle, Modular Matrix, P2P Mesh, System Performance & Ledger) equipped with a session-scoped **`🔑 AUTH`** button for authenticated administrative actions and instant toggle back to Homepage without losing chat state.
 
 ---
 
@@ -74,6 +76,6 @@ flowchart TD
   - `/api/v2/intelligence/diagnose`, `/api/v2/intelligence/ask`, `/api/v2/reasoning/{id}`
   - `/api/v2/memory` (GET/POST/PUT/versions/backup), `/api/v2/knowledge`, `/api/v2/knowledge/promote/{record_id}`
   - `/api/v2/agents`, `/api/v2/agents/run`, `/api/v2/agents/tasks/{id}/approve`
-  - `/api/v2/network`, `/api/v2/network/gip` (all 8 GIP/2.0 namespaces), `/api/v2/nodes/register`
+  - `/api/v2/network`, `/api/v2/network/gip` (all 8 GIP/2.0 namespaces + trust lifecycle), `/api/v2/nodes/register`, `/api/v2/nodes/{node_id}/trust`
   - `/api/v2/system/health`, `/api/v2/system/rotate-key`, `/api/v2/system/learning/experiment`
 - **v1 Compatible Routes:** `POST /ai/chat`, `POST /ai/ingest`, `POST /ai/embedding`, `GET /knowledge/stats`, `POST /knowledge/search`, `POST /knowledge/crawl`, `GET /node/info`, `GET /node/metrics`, `GET /node/chain`, `POST /node/chain/mine`, `POST /node/chain/verify`, `POST /security/sign-verify`, `GET/POST/DELETE /node/peers`, `POST /node/sync`, `POST /node/broadcast`, `GET/POST /node/config`, `GET/DELETE /node/logs`.
