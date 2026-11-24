@@ -159,7 +159,11 @@ if HAS_TORCH:
             logits = self.lm_head(self.final_norm(x))
             loss = None
             if targets is not None:
-                loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+                loss = F.cross_entropy(
+                    logits.view(-1, logits.size(-1)),
+                    targets.view(-1),
+                    ignore_index=-100,
+                )
             return logits, loss
 
         @torch.no_grad()

@@ -1,0 +1,25 @@
+{
+  "pretrain": {
+    "model_name": "GNNM-01-Tiny",
+    "device": "cpu",
+    "steps": 80,
+    "parameters": 918656,
+    "initial_loss": 6.26882,
+    "final_loss": 5.20625,
+    "elapsed_sec": 5.604
+  },
+  "validation": {
+    "val_loss": 5.42633,
+    "perplexity": 227.314
+  },
+  "sft": {
+    "model_name": "GNNM-01-Tiny",
+    "device": "cpu",
+    "steps": 40,
+    "parameters": 918656,
+    "initial_loss": 6.26882,
+    "final_loss": 3.92386,
+    "elapsed_sec": 2.115,
+    "stage": "sft_instruction_tuning"
+  }
+}

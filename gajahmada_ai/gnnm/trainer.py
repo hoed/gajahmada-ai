@@ -4,6 +4,7 @@ Supports CPU and NVIDIA CUDA with AdamW, cosine learning-rate decay, gradient
 clipping, and reproducible checkpoint serialization (`config.json`, `tokenizer.json`, `model.pt`).
 """
 
+import json
 import math
 import os
 import time
@@ -84,10 +85,53 @@ class GNNMTrainer:
             "elapsed_sec": round(time.perf_counter() - t0, 3),
         }
 
-    def save_checkpoint(self, output_dir: str) -> str:
+    def evaluate_loss(
+        self,
+        val_pairs: List[Tuple[List[int], List[int]]],
+        max_batches: int = 16,
+    ) -> Dict[str, float]:
+        """Compute validation cross-entropy loss and perplexity without updating weights."""
+        if not val_pairs:
+            return {"val_loss": 0.0, "perplexity": 1.0}
+        self.model.eval()
+        total_loss = 0.0
+        count = 0
+        with torch.no_grad():
+            for x, y in val_pairs[:max_batches]:
+                x_t = torch.tensor([x], dtype=torch.long, device=self.device)
+                y_t = torch.tensor([y], dtype=torch.long, device=self.device)
+                _, loss = self.model(x_t, targets=y_t)
+                if loss is not None and not math.isnan(float(loss.item())):
+                    total_loss += float(loss.item())
+                    count += 1
+        avg_loss = total_loss / max(1, count)
+        ppl = math.exp(min(avg_loss, 20.0))
+        return {"val_loss": round(avg_loss, 5), "perplexity": round(ppl, 3)}
+
+    def train_sft(
+        self,
+        sft_pairs: List[Tuple[List[int], List[int]]],
+        steps: int = 40,
+        batch_size: int = 4,
+        sft_lr: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Supervised Fine-Tuning (SFT) stage with lower LR and prompt-masked CE loss (`ignore_index=-100`)."""
+        orig_lr = self.lr
+        self.lr = sft_lr if sft_lr is not None else max(self.lr * 0.25, 1e-4)
+        try:
+            res = self.train_steps(sft_pairs, steps=steps, batch_size=batch_size)
+            res["stage"] = "sft_instruction_tuning"
+            return res
+        finally:
+            self.lr = orig_lr
+
+    def save_checkpoint(self, output_dir: str, metrics: Optional[Dict[str, Any]] = None) -> str:
         os.makedirs(output_dir, exist_ok=True)
         self.cfg.save(os.path.join(output_dir, "config.json"))
         self.tokenizer.save(os.path.join(output_dir, "tokenizer.json"))
         weights_path = os.path.join(output_dir, "model.pt")
         torch.save(self.model.state_dict(), weights_path)
+        if metrics is not None:
+            with open(os.path.join(output_dir, "metrics.json"), "w", encoding="utf-8") as f:
+                json.dump(metrics, f, indent=2)
         return output_dir

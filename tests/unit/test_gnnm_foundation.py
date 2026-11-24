@@ -70,3 +70,28 @@ def test_gnnm_transformer_forward_if_torch_available():
     assert loss is not None and float(loss.item()) > 0
     # Verify proper std=0.02 initialization keeps initial CE loss near ln(vocab_size) (~6.9)
     assert float(loss.item()) < 12.0
+
+
+def test_gnnm_jsonl_corpus_and_sft_prompt_masking():
+    import json
+
+    corpus = GNNMCorpusBuilder()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        jpath = os.path.join(tmpdir, "sample.jsonl")
+        with open(jpath, "w", encoding="utf-8") as f:
+            f.write(json.dumps({"text": "GajahMada menyatukan Nusantara dengan Sumpah Palapa 1336.", "lang": "id"}) + "\n")
+            f.write(json.dumps({"text": "GajahMada menyatukan Nusantara dengan Sumpah Palapa 1336.", "lang": "id"}) + "\n")
+            f.write(json.dumps({"text": "Sovereign distributed AI uses Ed25519 cryptographic identities.", "lang": "en"}) + "\n")
+        added = corpus.load_from_jsonl(jpath)
+        assert added == 2  # duplicate line automatically deduplicated
+
+    tok = GNNMBPETokenizer()
+    tok.train(corpus.texts(), target_vocab_size=300, min_frequency=2)
+    sft_examples = corpus.build_seed_instruction_examples()
+    sft_pairs = corpus.pack_instruction_pairs(tok, sft_examples, seq_len=64)
+    assert len(sft_pairs) == len(sft_examples)
+    x0, y0 = sft_pairs[0]
+    assert len(x0) == 64 and len(y0) == 64
+    # Prompt tokens are masked with -100 while assistant tokens have valid >= 0 targets
+    assert y0[0] == -100
+    assert any(t >= 0 for t in y0)
