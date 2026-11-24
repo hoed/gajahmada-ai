@@ -1,0 +1,50 @@
+# GajahMada Native Neural Model (GNNM) — Architectural Blueprint
+
+## 1. Locked Strategic Direction
+1. **Neural Architecture:** Custom Decoder-Only Transformer built from scratch in PyTorch (**Pre-Norm RMSNorm + Rotary Positional Embeddings (RoPE) + Grouped/Multi-Head Causal Self-Attention + SwiGLU Feed-Forward**).
+2. **Language Identity:** **Multilingual Seimbang** (balanced Bahasa Indonesia, regional Nusantara terms, & international/English technical knowledge) powered by a native byte-level BPE tokenizer (`GNNMBPETokenizer`) with zero `<unk>` drops.
+3. **Intelligence Priority:** **Hybrid Intelligence** — GNNM serves as a compact, sovereign language understanding & concise generation core integrated directly into GajahMada's 14-stage Cognitive, Symbolic, Evidence, Memory, and GIP/2.0 Collective Verification Engine.
+
+---
+
+## 2. Progressive Scaling Roadmap (`GNNM-01` → `GNNM-05`)
+
+| Stage | Preset Key | Target Parameters | `vocab_size` | `d_model` | Layers | Heads (Q/KV) | Context | Goal |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| **PoC Smoke** | `GNNM-01-Tiny` | ~1.5M | 1,024 | 128 | 4 | 4 / 4 | 256 | Instant CPU verification & CI testing |
+| **GNNM-01** | `GNNM-01-25M` | ~18M–25M | 8,192 | 384 | 8 | 6 / 6 | 1,024 | End-to-end from-scratch Proof of Concept |
+| **GNNM-02** | `GNNM-02-100M` | ~105M | 32,000 | 768 | 12 | 12 / 4 | 2,048 | Basic balanced multilingual fluency |
+| **GNNM-03** | `GNNM-03-300M` | ~320M | 32,000 | 1,024 | 20 | 16 / 4 | 4,096 | Strong grounded generation & synthesis |
+| **GNNM-04** | `GNNM-04-1B` | ~1.1B | 48,000 | 2,048 | 22 | 16 / 4 | 4,096 | Independent sovereign general LM |
+
+---
+
+## 3. Implemented Package Structure (`gajahmada_ai/gnnm/`)
+- `config.py`: `GNNMConfig` & `GNNM_PRESETS` with exact analytical parameter counter.
+- `tokenizer.py`: `GNNMBPETokenizer` — pure-Python byte-level BPE trained from scratch (supports Indonesian, English, Arabic, math, & code losslessly).
+- `dataset.py`: `GNNMCorpusBuilder` — text cleaning, SHA-256 deduplication, multilingual seeding, and causal LM sequence packing.
+- `model.py`: `GNNMTransformer` — custom PyTorch Decoder-Only Transformer (`RMSNorm`, `RoPE`, `CausalSelfAttention`, `SwiGLUFeedForward`, autoregressive `generate()`).
+- `trainer.py`: `GNNMTrainer` — AdamW + cosine LR schedule + gradient clipping + checkpoint saver (`config.json`, `tokenizer.json`, `model.pt`).
+- `inference.py`: `GNNMInferenceEngine` — native checkpoint loader & generator for CPU/CUDA.
+
+---
+
+## 4. Quick Start (Training `GNNM-01-Tiny` Proof of Concept)
+```python
+from gajahmada_ai.gnnm import GNNM_PRESETS, GNNMBPETokenizer, GNNMCorpusBuilder
+from gajahmada_ai.gnnm.trainer import GNNMTrainer
+
+corpus = GNNMCorpusBuilder()
+corpus.load_seed_multilingual_corpus()
+
+tok = GNNMBPETokenizer()
+tok.train(corpus.texts(), target_vocab_size=512)
+
+cfg = GNNM_PRESETS["GNNM-01-Tiny"]
+cfg.vocab_size = tok.vocab_size
+
+pairs = corpus.pack_token_blocks(tok, seq_len=64)
+trainer = GNNMTrainer(cfg, tok)
+metrics = trainer.train_steps(pairs, steps=50, batch_size=4)
+trainer.save_checkpoint("./models/gnnm-01-tiny")
+```
