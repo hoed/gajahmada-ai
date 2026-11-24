@@ -54,7 +54,10 @@ class SovereignPeerNode:
             policy=self.policy,
             audit_logger=self.audit_logger,
         )
-        self.validator = GIPProtocolValidator(local_identity=self.identity)
+        self.validator = GIPProtocolValidator(
+            local_identity=self.identity,
+            replay_db_path=f"{self.storage_dir}/gip_replay.db",
+        )
         self.discovery = PeerDiscoveryRegistry()
         self.synchronizer = KnowledgeSynchronizer(self.memory, self.identity)
 
@@ -204,7 +207,7 @@ class CollectiveCoordinator:
                 submissions.append({
                     "node_id": reply_msg.sender_node_id,
                     "node_name": reply_msg.payload.get("node_name", "peer"),
-                    "signature_verified": True,
+                    "gip_message": reply_msg.model_dump(),
                     "conclusion": reply_msg.payload.get("conclusion", ""),
                     "confidence": reply_msg.payload.get("confidence", 0.5),
                     "verification_status": reply_msg.payload.get("verification_status", "UNVERIFIED"),
@@ -212,11 +215,12 @@ class CollectiveCoordinator:
                     "evidence": reply_msg.payload.get("evidence", []),
                 })
 
-        # Step 8-10: Evaluate quorum & evidence independence
+        # Step 8-10: Evaluate quorum & evidence independence (direct Ed25519 verification inside consensus)
         evaluation = self.consensus.evaluate_submissions(
             task_id=task_id,
             submissions=submissions,
             quorum_size=quorum_size,
+            verifier_identity=self.coordinator.identity,
         )
 
         self.coordinator.blockchain.record_event(

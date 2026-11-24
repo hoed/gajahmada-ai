@@ -1,8 +1,10 @@
-from collections import deque
 from enum import Enum
+import os
 import secrets
+import sqlite3
+import threading
 import time
-from typing import Any, Deque, Dict, Optional, Set, Tuple
+from typing import Any, Dict, Optional, Set, Tuple
 import uuid
 from pydantic import BaseModel, Field
 
@@ -49,13 +51,85 @@ class GIPMessage(BaseModel):
         return self
 
 
+class PersistentNonceStore:
+    """
+    Atomic, restart-persistent, multi-worker-safe GIP replay nonce store (Round 3 Remediation).
+    - Uses SQLite WAL mode with PRIMARY KEY (sender_node_id, nonce) and atomic INSERT OR IGNORE
+      so concurrent workers and restarted processes share the exact same replay window.
+    - Automatically evicts expired nonces whose TTL (> 2 * max_clock_skew_sec) has elapsed.
+    - When `db_path` is None, falls back to a thread-safe in-memory TTL store (for ephemeral tests).
+    """
+
+    def __init__(self, db_path: Optional[str] = None):
+        self.db_path = db_path
+        self._lock = threading.Lock()
+        self._mem_nonces: Dict[Tuple[str, str], float] = {}
+        if self.db_path:
+            parent = os.path.dirname(os.path.abspath(self.db_path))
+            os.makedirs(parent, exist_ok=True)
+            with self._connect() as conn:
+                conn.execute("PRAGMA journal_mode=WAL;")
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS gip_replay_nonces (
+                        sender_node_id TEXT NOT NULL,
+                        nonce TEXT NOT NULL,
+                        expires_at REAL NOT NULL,
+                        PRIMARY KEY (sender_node_id, nonce)
+                    )
+                    """
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_gip_nonces_expires ON gip_replay_nonces (expires_at)"
+                )
+
+    def _connect(self) -> sqlite3.Connection:
+        return sqlite3.connect(self.db_path, timeout=10.0, isolation_level=None)
+
+    def check_and_record(self, sender_node_id: str, nonce: str, ttl_seconds: float) -> bool:
+        """
+        Atomically check if (sender_node_id, nonce) has already been seen within the active window.
+        Returns True if the nonce is fresh and was recorded; False if it is a replay.
+        """
+        now = time.time()
+        expires_at = now + max(1.0, float(ttl_seconds))
+
+        if not self.db_path:
+            with self._lock:
+                # Prune expired entries
+                expired = [k for k, exp in self._mem_nonces.items() if exp <= now]
+                for k in expired:
+                    self._mem_nonces.pop(k, None)
+                key = (sender_node_id, nonce)
+                if key in self._mem_nonces:
+                    return False
+                self._mem_nonces[key] = expires_at
+                return True
+
+        with self._lock:
+            with self._connect() as conn:
+                conn.execute("BEGIN IMMEDIATE;")
+                try:
+                    conn.execute("DELETE FROM gip_replay_nonces WHERE expires_at <= ?", (now,))
+                    cur = conn.execute(
+                        "INSERT OR IGNORE INTO gip_replay_nonces (sender_node_id, nonce, expires_at) VALUES (?, ?, ?)",
+                        (sender_node_id, nonce, expires_at),
+                    )
+                    inserted = cur.rowcount == 1
+                    conn.execute("COMMIT;")
+                    return inserted
+                except Exception:
+                    conn.execute("ROLLBACK;")
+                    raise
+
+
 class GIPProtocolValidator:
     """
     Validates incoming GajahMada Intelligence Protocol (GIP/2.0) messages:
     - Verifies protocol version (`GIP/2.0`).
     - Checks peer revocation and optional peer allowlist.
     - Enforces timestamp freshness window (+/- 300 seconds).
-    - Enforces nonce replay protection via a bounded sliding cache.
+    - Enforces restart-persistent, multi-worker-safe atomic nonce replay protection.
     - Verifies Ed25519 signature over canonical message envelope.
     - Rejects any payload attempting command injection or policy override.
     """
@@ -74,11 +148,13 @@ class GIPProtocolValidator:
         local_identity: NodeIdentity,
         max_clock_skew_sec: float = 300.0,
         replay_cache_size: int = 4096,
+        replay_db_path: Optional[str] = None,
+        nonce_store: Optional[PersistentNonceStore] = None,
     ):
         self.local_identity = local_identity
         self.max_clock_skew_sec = max_clock_skew_sec
-        self._seen_nonces: Set[Tuple[str, str]] = set()
-        self._nonce_order: Deque[Tuple[str, str]] = deque(maxlen=replay_cache_size)
+        self.replay_cache_size = replay_cache_size
+        self.nonce_store = nonce_store or PersistentNonceStore(db_path=replay_db_path)
         self.allowed_peers: Optional[Set[str]] = None
 
     def validate(self, msg: GIPMessage) -> Tuple[bool, str]:
@@ -101,11 +177,8 @@ class GIPProtocolValidator:
         if abs(now - msg.timestamp) > self.max_clock_skew_sec:
             return False, f"Message timestamp outside allowed clock skew window ({abs(now - msg.timestamp):.1f}s)"
 
-        nonce_key = (msg.sender_node_id, msg.nonce)
-        if nonce_key in self._seen_nonces:
-            return False, "Replay attack detected: duplicate (sender_node_id, nonce)"
-
-        # Verify Ed25519 signature over canonical envelope
+        # Verify Ed25519 signature over canonical envelope BEFORE consuming nonce slot
+        # (prevents unauthenticated nonce-table flooding)
         if not self.local_identity.verify_message(
             canonical_json_bytes(msg.signable_dict()),
             msg.signature,
@@ -118,10 +191,9 @@ class GIPProtocolValidator:
         if requested_action in self.FORBIDDEN_PAYLOAD_ACTIONS:
             return False, f"Forbidden remote peer action rejected: '{requested_action}'"
 
-        if len(self._nonce_order) == self._nonce_order.maxlen:
-            oldest = self._nonce_order.popleft()
-            self._seen_nonces.discard(oldest)
-        self._nonce_order.append(nonce_key)
-        self._seen_nonces.add(nonce_key)
+        # Atomic, persistent replay check with TTL aligned to clock-skew window
+        nonce_ttl = max(60.0, self.max_clock_skew_sec * 2.0)
+        if not self.nonce_store.check_and_record(msg.sender_node_id, msg.nonce, ttl_seconds=nonce_ttl):
+            return False, "Replay attack detected: duplicate (sender_node_id, nonce)"
 
         return True, "VALID"

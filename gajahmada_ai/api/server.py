@@ -274,7 +274,10 @@ def ensure_initialized():
         record_log("agents.scheduler", "OK", f"AutonomousTaskScheduler ready ({len(agent_scheduler.list_agents())} specialist agents)")
 
     if gip_validator is None:
-        gip_validator = GIPProtocolValidator(local_identity=identity)
+        gip_validator = GIPProtocolValidator(
+            local_identity=identity,
+            replay_db_path=os.path.join(storage_dir, "gip_replay.db"),
+        )
 
     if peer_discovery is None:
         peer_discovery = PeerDiscoveryRegistry()

@@ -149,9 +149,13 @@ class Block:
 
 class AIBlockchain:
     """
-    Tamper-Evident Signed Event & Cryptographic Audit Ledger (P1 Remediated).
+    Tamper-Evident Local Signed Event & Cryptographic Audit Ledger (P1 + Round 3 Remediated).
+    Note: This is a local tamper-evident signed event ledger (hash-chained, Ed25519-signed,
+    lightweight PoW integrity seal), NOT a Byzantine-fault-tolerant public distributed
+    consensus blockchain.
     - Canonical JSON block hashing covering event_type, event_ref, and metadata.
-    - Ed25519 signature over the complete signed event envelope.
+    - Strict Ed25519 signature verification on ALL non-genesis blocks (`index > 0`);
+      unsigned blocks and `Genesis Node` exemptions are strictly forbidden for `index > 0`.
     - Atomic persistence (write temp + fsync + backup + os.replace).
     - Explicit LEDGER_CORRUPTED mode on integrity failure (never silently wipes chain).
     """
@@ -238,9 +242,23 @@ class AIBlockchain:
         block.signature = identity.sign_message(block.signable_envelope_bytes())
         return self.add_block(block)
 
+    def _is_valid_genesis_block(self, block: Block) -> bool:
+        return (
+            block.index == 0
+            and block.node_id == "Genesis Node"
+            and block.previous_hash == "0"
+            and block.event_type == LedgerEventType.GENESIS.value
+            and block.hash == block.calculate_hash()
+        )
+
     def verify_block_signature(self, block: Block) -> bool:
-        if not block.signature or block.node_id == "Genesis Node":
-            return True
+        # Round 3 Hardening: ONLY the authentic genesis block (index == 0) is exempt
+        # from carrying an Ed25519 signature. Non-genesis blocks can NEVER bypass
+        # signature verification via empty signature or spoofed "Genesis Node" node_id.
+        if block.index == 0:
+            return self._is_valid_genesis_block(block)
+        if not block.signature or not block.node_id or block.node_id == "Genesis Node":
+            return False
         if block.schema_version >= 2:
             # P0 Strict Enforcement: Schema v2 blocks MUST carry a valid full-envelope Ed25519 signature.
             # Legacy task_hash-only fallback is strictly prohibited on schema_version >= 2.
@@ -250,6 +268,8 @@ class AIBlockchain:
 
     def is_chain_valid(self, verify_signatures: bool = True) -> bool:
         if self.status == "LEDGER_CORRUPTED" or not self.chain:
+            return False
+        if not self._is_valid_genesis_block(self.chain[0]):
             return False
         target_prefix = "0" * self.difficulty
         for i in range(1, len(self.chain)):

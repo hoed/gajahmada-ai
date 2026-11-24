@@ -58,11 +58,25 @@ class V2LearningExperimentRequest(BaseModel):
     simulate_failure: bool = False
 
 
+class NodeAttestation(BaseModel):
+    """Cryptographically signed independent verifier attestation for knowledge promotion."""
+    node_id: str = Field(..., min_length=16, max_length=128)
+    signature: str = Field(..., min_length=32, max_length=256)
+    evidence_hash: str = Field(..., min_length=8, max_length=128)
+    source_ref: str = Field(..., min_length=4, max_length=512)
+
+
 class V2PromoteKnowledgeRequest(BaseModel):
-    """P2 Remediation: Promotion requires explicit independent sources & verification method."""
+    """
+    P2 + Round 3 Remediation:
+    - Plain `independent_sources` strings can at most promote to `SOURCE_CORROBORATED`.
+    - `INDEPENDENTLY_VERIFIED` strictly requires >= 2 cryptographically verified
+      Ed25519 `node_attestations` from distinct trusted verifiers with distinct evidence hashes.
+    """
     independent_sources: List[str] = Field(..., min_length=1)
     verification_method: str = Field(default="source_corroboration", min_length=3, max_length=64)
     verifier_notes: str = Field(default="", max_length=1024)
+    node_attestations: List[NodeAttestation] = Field(default_factory=list)
 
 
 class V2PeerTrustRequest(BaseModel):
@@ -156,11 +170,13 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
             )
         return result.model_dump()
 
-    # ─── 2. /api/v2/reasoning ─────────────────────────────────────────────────
+    # ─── 2. /api/v2/reasoning (Internal Operational Endpoints — Authenticated) ──
     @router.get("/reasoning")
-    def list_reasoning_history():
+    def list_reasoning_history(request: Request):
         rt = get_runtime()
+        auth = rt["auth"]
         cognition = rt["cognition"]
+        auth.authenticate_request(request, required_capability="reasoning:read")
         items = list(cognition.history.values())[-25:]
         return {
             "count": len(items),
@@ -172,9 +188,11 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
         return intelligence_ask(req, request)
 
     @router.get("/reasoning/{reasoning_id}")
-    def inspect_reasoning(reasoning_id: str):
+    def inspect_reasoning(reasoning_id: str, request: Request):
         rt = get_runtime()
+        auth = rt["auth"]
         cognition = rt["cognition"]
+        auth.authenticate_request(request, required_capability="reasoning:read")
         res = cognition.history.get(reasoning_id)
         if not res:
             raise HTTPException(status_code=404, detail=f"Reasoning trace '{reasoning_id}' not found.")
@@ -327,9 +345,56 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
                 detail=f"Cannot promote record '{record_id}': {len(open_contras)} unresolved contradiction(s).",
             )
 
+        discovery = rt["discovery"]
+        verified_attestations: List[Dict[str, str]] = []
+        seen_verifiers = set()
+        distinct_evidence_hashes = set()
+
+        for att in req.node_attestations:
+            v_node = att.node_id.strip()
+            if v_node in seen_verifiers or identity.is_revoked(v_node):
+                continue
+            # Verifier must be either the local node or an explicitly TRUSTED peer
+            is_trusted_verifier = (
+                v_node == identity.node_id
+                or discovery.get_trust_state(v_node) == PeerTrustState.TRUSTED
+            )
+            if not is_trusted_verifier:
+                continue
+            att_payload = canonical_json_bytes({
+                "record_id": record_id,
+                "record_hash": rec.get("integrity_hash", ""),
+                "evidence_hash": att.evidence_hash.strip(),
+                "source_ref": att.source_ref.strip(),
+                "verifier_node_id": v_node,
+            })
+            if not identity.verify_message(att_payload, att.signature.strip(), v_node):
+                continue
+            seen_verifiers.add(v_node)
+            distinct_evidence_hashes.add(att.evidence_hash.strip())
+            verified_attestations.append({
+                "node_id": v_node,
+                "evidence_hash": att.evidence_hash.strip(),
+                "source_ref": att.source_ref.strip(),
+            })
+
+        has_cryptographic_independence = (
+            len(verified_attestations) >= 2 and len(distinct_evidence_hashes) >= 2
+        )
+
+        if req.verification_method == "independent_node_verification" and not has_cryptographic_independence:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "independent_node_verification requires >= 2 cryptographically verified Ed25519 "
+                    "node_attestations from distinct TRUSTED verifiers with distinct evidence_hash values."
+                ),
+            )
+
+        # Plain text strings can AT MOST produce SOURCE_CORROBORATED, NEVER INDEPENDENTLY_VERIFIED.
         new_status = (
             VerificationStatus.INDEPENDENTLY_VERIFIED.value
-            if len(clean_sources) >= 2 or req.verification_method == "independent_node_verification"
+            if has_cryptographic_independence
             else VerificationStatus.SOURCE_CORROBORATED.value
         )
         rec["verification_status"] = new_status
@@ -338,6 +403,7 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
         if isinstance(prov, dict):
             prov["corroborating_sources"] = clean_sources
             prov["verification_method"] = req.verification_method
+            prov["verified_attestations"] = verified_attestations
             rec["source_provenance"] = prov
         memory.storage.save_record(rec)
         memory.versioning.record_version_snapshot(
@@ -345,22 +411,30 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
         )
         blockchain.record_event(
             LedgerEventType.KNOWLEDGE_ACCEPTED,
-            f"{record_id}|status={new_status}|sources={len(clean_sources)}",
+            f"{record_id}|status={new_status}|attestations={len(verified_attestations)}|sources={len(clean_sources)}",
             identity,
             metadata={
                 "record_id": record_id,
                 "epistemic_status": new_status,
                 "independent_sources": clean_sources,
+                "verified_attestations_count": len(verified_attestations),
                 "verification_method": req.verification_method,
             },
         )
-        return {"status": "promoted", "epistemic_status": new_status, "record": rec}
+        return {
+            "status": "promoted",
+            "epistemic_status": new_status,
+            "verified_attestations": len(verified_attestations),
+            "record": rec,
+        }
 
-    # ─── 4. /api/v2/agents ────────────────────────────────────────────────────
+    # ─── 4. /api/v2/agents (Internal Operational Endpoints — Authenticated) ───
     @router.get("/agents")
-    def get_agents_status():
+    def get_agents_status(request: Request):
         rt = get_runtime()
+        auth = rt["auth"]
         scheduler = rt["scheduler"]
+        auth.authenticate_request(request, required_capability="agent:read")
         return {
             "agents": scheduler.list_agents(),
             "tasks": [t.to_dict() for t in scheduler.tasks.values()],
@@ -503,6 +577,17 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
                 )
                 raise HTTPException(status_code=400, detail=f"GIP endpoint blocked by SSRF guard: {clean_or_reason}")
 
+            # Optional signed peer key rotation certificate propagation (Round 3 Finding E)
+            rot_cert = msg.payload.get("rotation_certificate")
+            rotation_applied = False
+            if isinstance(rot_cert, dict):
+                if not identity.apply_peer_rotation_certificate(rot_cert):
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Invalid dual-signed key rotation certificate.",
+                    )
+                rotation_applied = True
+
             # Discovered peers start in PENDING (never auto-TRUSTED until operator approves)
             desc = discovery.register_peer(
                 node_id=msg.sender_node_id,
@@ -518,11 +603,12 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
                 payload={
                     "status": "registered_pending_trust",
                     "trust_state": desc.trust_state.value,
+                    "rotation_applied": rotation_applied,
                     "in_reply_to": msg.message_id,
                     "capabilities": ["symbolic", "evidence", "verification", "memory"],
                 },
             ).sign(identity)
-            return {"accepted": True, "trust_state": desc.trust_state.value, "ack": ack.model_dump()}
+            return {"accepted": True, "trust_state": desc.trust_state.value, "rotation_applied": rotation_applied, "ack": ack.model_dump()}
 
         if msg.message_type == GIPMessageType.GIP_TASK:
             objective = str(msg.payload.get("objective", "")).strip()
@@ -594,57 +680,22 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
             }
 
         if msg.message_type == GIPMessageType.GIP_CONSENSUS:
-            # P1 Consensus Integrity:
-            # 1. NEVER trust caller-supplied `signature_verified`.
-            # 2. Verify EACH submission's individual Ed25519 signature over its canonical payload.
-            # 3. Reject duplicate node_ids (Sybil / replay inflation).
-            # 4. Enforce quorum_size strictly from local GovernancePolicy (>= 2), NEVER peer payload.
+            # P1 + Round 3 Consensus Integrity:
+            # Cryptographic Ed25519 verification, duplicate-node rejection, revocation check,
+            # policy quorum (>= 2), and evidence independence are enforced directly inside
+            # QuorumConsensusManager.evaluate_submissions().
             task_id = str(msg.payload.get("task_id", msg.message_id))
             raw_subs = msg.payload.get("submissions", [])
             if not isinstance(raw_subs, list):
                 raise HTTPException(status_code=400, detail="GIP-CONSENSUS submissions must be a list.")
 
-            verified_subs: List[Dict[str, Any]] = []
-            seen_nodes = set()
-            rejected_count = 0
-            for sub in raw_subs:
-                if not isinstance(sub, dict):
-                    rejected_count += 1
-                    continue
-                sub_node_id = str(sub.get("node_id", "")).strip()
-                sub_sig = str(sub.get("signature", "")).strip()
-                if not sub_node_id or not sub_sig or sub_node_id in seen_nodes:
-                    rejected_count += 1
-                    continue
-                if identity.is_revoked(sub_node_id):
-                    rejected_count += 1
-                    continue
-                canonical_sub = canonical_json_bytes({
-                    "task_id": task_id,
-                    "node_id": sub_node_id,
-                    "conclusion": str(sub.get("conclusion", "")),
-                    "confidence": float(sub.get("confidence", 0.5)),
-                    "evidence": sub.get("evidence", []),
-                })
-                if not identity.verify_message(canonical_sub, sub_sig, sub_node_id):
-                    rejected_count += 1
-                    continue
-                seen_nodes.add(sub_node_id)
-                verified_subs.append({
-                    "node_id": sub_node_id,
-                    "signature_verified": True,
-                    "conclusion": str(sub.get("conclusion", "")),
-                    "confidence": float(sub.get("confidence", 0.5)),
-                    "symbolic_verified": bool(sub.get("symbolic_verified", False)),
-                    "evidence": sub.get("evidence", []),
-                })
-
             policy_quorum = max(2, int(getattr(policy, "min_quorum_size", 2)))
             eval_res = consensus_mgr.evaluate_submissions(
-                task_id=task_id, submissions=verified_subs, quorum_size=policy_quorum
+                task_id=task_id,
+                submissions=raw_subs,
+                quorum_size=policy_quorum,
+                verifier_identity=identity,
             )
-            eval_res["rejected_submissions"] = rejected_count
-            eval_res["enforced_quorum_size"] = policy_quorum
             return {"accepted": True, "consensus": eval_res}
 
         if msg.message_type == GIPMessageType.GIP_SYNC:
@@ -732,7 +783,7 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
     # ─── 6. /api/v2/system ────────────────────────────────────────────────────
     @router.get("/system")
     @router.get("/system/health")
-    def system_health():
+    def system_health(request: Request):
         rt = get_runtime()
         engine = rt["engine"]
         memory = rt["memory"]
@@ -740,21 +791,29 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
         audit_logger = rt["audit_logger"]
         policy = rt["policy"]
         learning = rt["learning"]
+        auth = rt["auth"]
+        actor = auth.resolve_optional_actor(request)
+        is_privileged = actor["role"] in ("admin", "operator")
+
+        audit_summary: Dict[str, Any] = {
+            "events_count": len(audit_logger.events),
+            "integrity_verified": audit_logger.verify_integrity(),
+        }
+        if is_privileged:
+            audit_summary["recent_events"] = audit_logger.get_recent(limit=10)
+
         return {
             "status": "healthy" if blockchain.status == "HEALTHY" else blockchain.status,
             "version": "2.0.0",
             "capabilities": engine.capability_status(),
             "storage": memory.storage.health(),
             "ledger": {
+                "type": "tamper_evident_local_signed_event_ledger",
                 "status": blockchain.status,
                 "height": len(blockchain.chain),
                 "valid": blockchain.is_chain_valid(),
             },
-            "security_audit": {
-                "events_count": len(audit_logger.events),
-                "integrity_verified": audit_logger.verify_integrity(),
-                "recent_events": audit_logger.get_recent(limit=10),
-            },
+            "security_audit": audit_summary,
             "governance_policy": policy.to_dict(),
             "learning": {
                 "active_strategy": learning.adapter.active_strategy,

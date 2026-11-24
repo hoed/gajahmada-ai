@@ -253,17 +253,64 @@ def test_p2_and_p3_gip_full_handlers_and_knowledge_quarantine():
         json={"independent_sources": []},
     ).status_code == 422
 
-    # Promotion WITH 2 independent sources succeeds as INDEPENDENTLY_VERIFIED
-    r_prom = client.post(
+    # Round 3 Finding A: independent_node_verification WITHOUT cryptographic attestations MUST fail (400)
+    assert client.post(
         f"/api/v2/knowledge/promote/{q_rec_id}",
         headers={"X-API-Key": admin_key},
         json={
             "independent_sources": ["https://bmkg.go.id/buoy-07", "node:verifier-gamma"],
             "verification_method": "independent_node_verification",
         },
+    ).status_code == 400
+
+    # Plain strings alone can AT MOST achieve SOURCE_CORROBORATED (NEVER INDEPENDENTLY_VERIFIED)
+    r_corrob = client.post(
+        f"/api/v2/knowledge/promote/{q_rec_id}",
+        headers={"X-API-Key": admin_key},
+        json={
+            "independent_sources": ["https://bmkg.go.id/buoy-07", "https://noaa.gov/buoy-07"],
+            "verification_method": "source_corroboration",
+        },
+    )
+    assert r_corrob.status_code == 200
+    assert r_corrob.json()["epistemic_status"] == "SOURCE_CORROBORATED"
+
+    # Promotion WITH >= 2 cryptographically signed Ed25519 attestations from distinct TRUSTED verifiers
+    # and distinct evidence hashes achieves INDEPENDENTLY_VERIFIED
+    from gajahmada_ai.security.crypto import canonical_json_bytes
+    local_ident = rt["identity"]
+    rec_hash = rt["memory"].storage.get_record(q_rec_id)["integrity_hash"]
+
+    def make_attestation(verifier_ident, ev_hash, src_ref):
+        payload = canonical_json_bytes({
+            "record_id": q_rec_id,
+            "record_hash": rec_hash,
+            "evidence_hash": ev_hash,
+            "source_ref": src_ref,
+            "verifier_node_id": verifier_ident.node_id,
+        })
+        return {
+            "node_id": verifier_ident.node_id,
+            "signature": verifier_ident.sign_message(payload),
+            "evidence_hash": ev_hash,
+            "source_ref": src_ref,
+        }
+
+    r_prom = client.post(
+        f"/api/v2/knowledge/promote/{q_rec_id}",
+        headers={"X-API-Key": admin_key},
+        json={
+            "independent_sources": ["https://bmkg.go.id/buoy-07", "https://noaa.gov/buoy-07"],
+            "verification_method": "independent_node_verification",
+            "node_attestations": [
+                make_attestation(local_ident, "sha256-bmkg-sensor-07", "https://bmkg.go.id/buoy-07"),
+                make_attestation(peer_id, "sha256-noaa-buoy-07", "https://noaa.gov/buoy-07"),
+            ],
+        },
     )
     assert r_prom.status_code == 200
     assert r_prom.json()["epistemic_status"] == "INDEPENDENTLY_VERIFIED"
+    assert r_prom.json()["verified_attestations"] == 2
     assert r_prom.json()["record"]["visibility_policy"] == "COLLECTIVE"
 
 
@@ -449,3 +496,230 @@ def test_p5_three_independent_nodes_end_to_end_and_restart_consistency():
         assert len(node_b2.blockchain.chain) >= h_b
         assert len(node_c2.blockchain.chain) >= h_c
         assert node_a2.memory.storage.get_record(outcome["collective_memory_record_id"]) is not None
+
+
+# ─── Round 3 Audit Remediation Regression Tests (Findings A, B, C, D, E, F) ───
+
+def test_round3_a_consensus_verifies_signatures_directly_and_checks_evidence_independence():
+    """Finding A: QuorumConsensusManager ignores signature_verified=True and downgrades single-source echoes."""
+    from gajahmada_ai.network.consensus import QuorumConsensusManager
+    from gajahmada_ai.security.crypto import canonical_json_bytes
+
+    mgr = QuorumConsensusManager()
+    id_a = NodeIdentity(key_path=None)
+    id_b = NodeIdentity(key_path=None)
+
+    # 1. Spoofed signature_verified=True without real Ed25519 signature MUST be rejected
+    res_spoof = mgr.evaluate_submissions(
+        task_id="r3-a-01",
+        submissions=[
+            {"node_id": id_a.node_id, "signature_verified": True, "conclusion": "fake", "confidence": 0.99},
+            {"node_id": id_b.node_id, "signature_verified": True, "conclusion": "fake", "confidence": 0.99},
+        ],
+        quorum_size=2,
+    )
+    assert res_spoof["quorum_reached"] is False
+    assert res_spoof["rejected_submissions"] == 2
+    assert res_spoof["status"] == "INSUFFICIENT_VERIFIED_SUBMISSIONS"
+
+    # 2. Two signed nodes echoing the exact same single provenance hash cannot reach VERIFIED_BY_EVIDENCE_AND_QUORUM
+    def sign_sub(ident, task_id, conclusion, ev):
+        sig = ident.sign_message(canonical_json_bytes({
+            "task_id": task_id,
+            "node_id": ident.node_id,
+            "conclusion": conclusion,
+            "confidence": 0.9,
+            "evidence": ev,
+        }))
+        return {
+            "node_id": ident.node_id,
+            "conclusion": conclusion,
+            "confidence": 0.9,
+            "evidence": ev,
+            "signature": sig,
+        }
+
+    same_ev = [{"provenance_hash": "shared-single-source-hash"}]
+    res_single = mgr.evaluate_submissions(
+        task_id="r3-a-02",
+        submissions=[
+            sign_sub(id_a, "r3-a-02", "Result X", same_ev),
+            sign_sub(id_b, "r3-a-02", "Result X", same_ev),
+        ],
+        quorum_size=2,
+    )
+    assert res_single["quorum_reached"] is True
+    assert res_single["independent_corroboration"] is False
+    assert res_single["status"] == "CORROBORATED_SINGLE_SOURCE"
+
+    # 3. Two signed nodes with DISTINCT provenance hashes reach VERIFIED_BY_EVIDENCE_AND_QUORUM
+    res_indep = mgr.evaluate_submissions(
+        task_id="r3-a-03",
+        submissions=[
+            sign_sub(id_a, "r3-a-03", "Result X", [{"provenance_hash": "source-hash-1"}]),
+            sign_sub(id_b, "r3-a-03", "Result X", [{"provenance_hash": "source-hash-2"}]),
+        ],
+        quorum_size=2,
+    )
+    assert res_indep["quorum_reached"] is True
+    assert res_indep["independent_corroboration"] is True
+    assert res_indep["status"] == "VERIFIED_BY_EVIDENCE_AND_QUORUM"
+
+
+def test_round3_b_local_and_shared_visibility_isolated_from_anonymous():
+    """Finding B: LOCAL is restricted to admin/operator; SHARED requires auth; only COLLECTIVE/PUBLIC are anonymous-readable."""
+    from gajahmada_ai.memory.authorization import MemoryAuthorizationService
+
+    authz = MemoryAuthorizationService()
+    assert authz.can_read_visibility("PRIVATE", "anonymous") is False
+    assert authz.can_read_visibility("LOCAL", "anonymous") is False
+    assert authz.can_read_visibility("LOCAL", "peer") is False
+    assert authz.can_read_visibility("LOCAL", "operator") is True
+    assert authz.can_read_visibility("LOCAL", "admin") is True
+    assert authz.can_read_visibility("SHARED", "anonymous") is False
+    assert authz.can_read_visibility("SHARED", "peer") is True
+    assert authz.can_read_visibility("COLLECTIVE", "anonymous") is True
+    assert authz.can_read_visibility("PUBLIC", "anonymous") is True
+    assert authz.can_read_visibility("UNKNOWN_POLICY", "admin") is False
+
+    # End-to-end API check: LOCAL record created by admin must NOT leak to anonymous /api/v2/memory or /versions
+    client = TestClient(app)
+    rt = get_runtime_context()
+    admin_key = rt["auth"].admin_api_key
+    r_create = client.post(
+        "/api/v2/memory",
+        headers={"X-API-Key": admin_key},
+        json={
+            "content": "Internal node-local quarantine note 445566.",
+            "visibility_policy": "LOCAL",
+        },
+    )
+    assert r_create.status_code == 200
+    local_id = r_create.json()["record_id"]
+
+    r_anon = client.get("/api/v2/memory")
+    assert r_anon.status_code == 200
+    assert local_id not in {r["record_id"] for r in r_anon.json()["records"]}
+    assert client.get(f"/api/v2/memory/{local_id}/versions").status_code == 403
+
+    r_adm = client.get("/api/v2/memory", headers={"X-API-Key": admin_key})
+    assert local_id in {r["record_id"] for r in r_adm.json()["records"]}
+
+
+def test_round3_c_internal_reasoning_and_agent_endpoints_require_auth():
+    """Finding C: /api/v2/reasoning, /api/v2/reasoning/{id}, /api/v2/agents require auth; health hides recent_events."""
+    client = TestClient(app)
+    rt = get_runtime_context()
+    admin_key = rt["auth"].admin_api_key
+
+    assert client.get("/api/v2/reasoning").status_code == 401
+    assert client.get("/api/v2/reasoning/nonexistent-id").status_code == 401
+    assert client.get("/api/v2/agents").status_code == 401
+
+    # Authenticated admin can read internal operational endpoints
+    assert client.get("/api/v2/reasoning", headers={"X-API-Key": admin_key}).status_code == 200
+    assert client.get("/api/v2/agents", headers={"X-API-Key": admin_key}).status_code == 200
+
+    # Public /api/v2/system/health omits detailed security_audit.recent_events
+    r_pub_health = client.get("/api/v2/system/health")
+    assert r_pub_health.status_code == 200
+    assert "recent_events" not in r_pub_health.json()["security_audit"]
+    assert r_pub_health.json()["ledger"]["type"] == "tamper_evident_local_signed_event_ledger"
+
+    r_adm_health = client.get("/api/v2/system/health", headers={"X-API-Key": admin_key})
+    assert "recent_events" in r_adm_health.json()["security_audit"]
+
+
+def test_round3_d_gip_replay_protection_persists_across_restarts():
+    """Finding D: GIP nonce replay protection is SQLite-backed and survives process restart / multiple validators."""
+    from gajahmada_ai.network.protocol import GIPProtocolValidator
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "gip_replay.db")
+        local_id = NodeIdentity(key_path=os.path.join(tmpdir, "local.pem"))
+        peer_id = NodeIdentity(key_path=None)
+
+        msg = GIPMessage(
+            message_type=GIPMessageType.GIP_PING if hasattr(GIPMessageType, "GIP_PING") else GIPMessageType.GIP_CAPABILITY,
+            sender_node_id=peer_id.node_id,
+            recipient_node_id=local_id.node_id,
+            payload={"endpoint": "http://127.0.0.1:9999"},
+        ).sign(peer_id)
+
+        v1 = GIPProtocolValidator(local_identity=local_id, replay_db_path=db_path)
+        ok1, reason1 = v1.validate(msg)
+        assert ok1 is True and reason1 == "VALID"
+
+        # Simulate process restart / second worker reading the same replay DB
+        v2 = GIPProtocolValidator(local_identity=local_id, replay_db_path=db_path)
+        ok2, reason2 = v2.validate(msg)
+        assert ok2 is False
+        assert "Replay attack" in reason2
+
+
+def test_round3_e_key_persistence_fails_closed_and_persists_rotations_and_revocations():
+    """Finding E: Key write failure raises KeyPersistenceError; rotations & revocations persist across restarts."""
+    from gajahmada_ai.security.crypto import KeyPersistenceError
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # 1. Unwritable path (directory path used as file) MUST raise KeyPersistenceError (fail-closed)
+        bad_path = os.path.join(tmpdir, "as_dir")
+        os.makedirs(bad_path, exist_ok=True)
+        with pytest.raises(KeyPersistenceError):
+            NodeIdentity(key_path=bad_path)
+
+        # 2. Rotation certificates & peer revocations persist across restarts and verify dual signatures
+        key_path = os.path.join(tmpdir, "node_key.pem")
+        ident1 = NodeIdentity(key_path=key_path)
+        orig_id = ident1.node_id
+        revoked_peer = NodeIdentity(key_path=None).node_id
+
+        ident1.revoke_peer(revoked_peer, reason="compromised_key")
+        cert = ident1.rotate_key()
+        assert NodeIdentity.verify_rotation_certificate(cert) is True
+        assert ident1.node_id != orig_id
+
+        # Reload from disk (restart simulation)
+        ident2 = NodeIdentity(key_path=key_path)
+        assert ident2.node_id == ident1.node_id
+        assert ident2.key_version == 2
+        assert ident2.is_revoked(orig_id) is True
+        assert ident2.is_revoked(revoked_peer) is True
+        assert len(ident2.rotation_history) == 1
+        assert len(ident2.revocation_records) == 1
+
+        # Independent peer can verify & apply the dual-signed rotation certificate
+        peer_ident = NodeIdentity(key_path=os.path.join(tmpdir, "peer.pem"))
+        assert peer_ident.apply_peer_rotation_certificate(cert) is True
+        assert peer_ident.is_revoked(orig_id) is True
+
+
+def test_round3_f_ledger_rejects_unsigned_or_spoofed_genesis_non_genesis_blocks():
+    """Finding F: Non-genesis blocks can NEVER bypass Ed25519 verification via empty signature or Genesis Node ID."""
+    from gajahmada_ai.blockchain.chain import Block
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        chain = AIBlockchain(storage_path=os.path.join(tmpdir, "chain.json"))
+        prev_hash = chain.get_latest_block().hash
+
+        unsigned_blk = Block(
+            index=1,
+            timestamp=1700000001.0,
+            task_hash="unsigned-attempt",
+            node_id="some-node-id",
+            previous_hash=prev_hash,
+            signature="",
+            schema_version=2,
+        )
+        assert chain.verify_block_signature(unsigned_blk) is False
+
+        spoofed_genesis_blk = Block(
+            index=1,
+            timestamp=1700000002.0,
+            task_hash="spoofed-genesis",
+            node_id="Genesis Node",
+            previous_hash=prev_hash,
+            signature="",
+            schema_version=2,
+        )
+        assert chain.verify_block_signature(spoofed_genesis_blk) is False

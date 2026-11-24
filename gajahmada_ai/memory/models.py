@@ -33,6 +33,7 @@ class VisibilityPolicy(str, Enum):
     LOCAL = "LOCAL"
     SHARED = "SHARED"
     COLLECTIVE = "COLLECTIVE"
+    PUBLIC = "PUBLIC"
 
 
 class SourceProvenance(BaseModel):
