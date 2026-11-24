@@ -134,6 +134,19 @@ if HAS_TORCH:
             cos, sin = build_rope_cache(cfg.max_seq_len, cfg.head_dim, cfg.rope_theta)
             self.register_buffer("rope_cos", cos, persistent=False)
             self.register_buffer("rope_sin", sin, persistent=False)
+            self._init_weights()
+
+        def _init_weights(self) -> None:
+            """LLaMA/GPT-style weight initialization so initial CE loss starts near ln(vocab_size)."""
+            resid_std = 0.02 / ((2 * self.cfg.n_layers) ** 0.5)
+            for name, module in self.named_modules():
+                if isinstance(module, nn.Linear):
+                    std = resid_std if name.endswith(("w_o", "w_down")) else 0.02
+                    nn.init.normal_(module.weight, mean=0.0, std=std)
+                    if module.bias is not None:
+                        nn.init.zeros_(module.bias)
+                elif isinstance(module, nn.Embedding):
+                    nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
         def forward(
             self,
@@ -156,6 +169,7 @@ if HAS_TORCH:
             max_new_tokens: int = 64,
             temperature: float = 0.7,
             top_k: int = 40,
+            repetition_penalty: float = 1.15,
             eos_id: Optional[int] = None,
         ) -> "torch.Tensor":
             self.eval()
@@ -163,7 +177,16 @@ if HAS_TORCH:
             for _ in range(max_new_tokens):
                 ctx = out[:, -self.cfg.max_seq_len :]
                 logits, _ = self.forward(ctx)
-                next_logits = logits[:, -1, :] / max(temperature, 1e-4)
+                next_logits = logits[:, -1, :]
+                if repetition_penalty > 1.0:
+                    for b in range(out.size(0)):
+                        recent = set(out[b, -32:].tolist())
+                        for tok_id in recent:
+                            if next_logits[b, tok_id] > 0:
+                                next_logits[b, tok_id] /= repetition_penalty
+                            else:
+                                next_logits[b, tok_id] *= repetition_penalty
+                next_logits = next_logits / max(temperature, 1e-4)
                 if top_k > 0:
                     v, _ = torch.topk(next_logits, min(top_k, next_logits.size(-1)))
                     next_logits[next_logits < v[:, [-1]]] = -float("inf")

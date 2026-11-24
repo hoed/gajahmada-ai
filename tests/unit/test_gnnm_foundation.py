@@ -68,3 +68,5 @@ def test_gnnm_transformer_forward_if_torch_available():
     logits, loss = model(x, targets=y)
     assert logits.shape == (2, 16, cfg.vocab_size)
     assert loss is not None and float(loss.item()) > 0
+    # Verify proper std=0.02 initialization keeps initial CE loss near ln(vocab_size) (~6.9)
+    assert float(loss.item()) < 12.0

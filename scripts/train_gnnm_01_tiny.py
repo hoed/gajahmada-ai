@@ -40,19 +40,23 @@ def main():
     print("=== 4. Initializing & Pretraining GNNM-01-Tiny From Scratch ===")
     cfg = GNNM_PRESETS["GNNM-01-Tiny"]
     cfg.vocab_size = tok.vocab_size
-    trainer = GNNMTrainer(cfg, tok, lr=1e-3)
-    metrics = trainer.train_steps(pairs, steps=60, batch_size=4)
+    trainer = GNNMTrainer(cfg, tok, lr=2e-3)
+    metrics = trainer.train_steps(pairs, steps=150, batch_size=8)
     print(f"Training complete: {metrics}")
 
     saved = trainer.save_checkpoint(output_dir)
     print(f"Checkpoint saved to: {saved}")
 
-    print("=== 5. Verifying Native Autoregressive Inference ===")
-    engine = GNNMInferenceEngine(output_dir)
-    sample_id = engine.generate("GajahMada adalah", max_new_tokens=28, temperature=0.7)
-    sample_en = engine.generate("GajahMada is a sovereign", max_new_tokens=28, temperature=0.7)
-    print(f"[ID Sample] GajahMada adalah -> {sample_id}")
-    print(f"[EN Sample] GajahMada is a sovereign -> {sample_en}")
+    print("=== 5. Verifying Native Autoregressive Inference & PyTorchNativeBackend Integration ===")
+    from gajahmada_ai.neural.pytorch_backend import PyTorchNativeBackend
+
+    backend = PyTorchNativeBackend(model_path=output_dir)
+    assert backend.load_model(), f"Backend load failed: {backend.health()}"
+    res_id = backend.generate("GajahMada", max_tokens=24, temperature=0.5)
+    res_en = backend.generate("GajahMada is", max_tokens=24, temperature=0.5)
+    print(f"Backend Health: {backend.health()}")
+    print(f"[ID Sample] GajahMada -> {res_id.text}")
+    print(f"[EN Sample] GajahMada is -> {res_en.text}")
 
 
 if __name__ == "__main__":

@@ -34,6 +34,7 @@ class PyTorchNativeBackend(InferenceBackend):
         self._torch = _try_import("torch")
         self._np = _try_import("numpy")
         self._weights: Optional[Dict[str, Any]] = None
+        self._gnnm_engine: Optional[Any] = None
         self._load_error: Optional[str] = None
         self.metadata = ModelCapabilityMetadata(
             model_id=os.path.basename(model_path),
@@ -56,6 +57,22 @@ class PyTorchNativeBackend(InferenceBackend):
             return False
 
         try:
+            # Support loading a trained GNNM checkpoint directory (config.json + tokenizer.json + model.pt)
+            if os.path.isdir(self.model_path) and os.path.exists(os.path.join(self.model_path, "model.pt")):
+                if self._torch is None:
+                    self._load_error = "PyTorch package is not installed for GNNM checkpoint loading"
+                    self.metadata.is_loaded = False
+                    return False
+                from gajahmada_ai.gnnm.inference import GNNMInferenceEngine
+
+                self._gnnm_engine = GNNMInferenceEngine(self.model_path)
+                self._weights = {"type": "gnnm_transformer", "name": self._gnnm_engine.cfg.name}
+                self.metadata.model_id = self._gnnm_engine.cfg.name
+                self.metadata.context_window = self._gnnm_engine.cfg.max_seq_len
+                self.metadata.quantization = "FP32-GNNM-Native"
+                self.metadata.is_loaded = True
+                self._load_error = None
+                return True
             if self.model_path.endswith(".json"):
                 with open(self.model_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
@@ -97,6 +114,24 @@ class PyTorchNativeBackend(InferenceBackend):
                 tokens_generated=0,
                 latency_ms=round((time.perf_counter() - t0) * 1000, 3),
                 warning=self._load_error or "Native neural weights not loaded.",
+            )
+
+        if self._gnnm_engine is not None:
+            full_prompt = f"{context[:240]}\n{prompt}" if context else prompt
+            text = self._gnnm_engine.generate(
+                full_prompt,
+                max_new_tokens=min(max_tokens, 96),
+                temperature=min(max(temperature, 0.2), 1.0),
+            )
+            elapsed_ms = round((time.perf_counter() - t0) * 1000, 3)
+            return GenerationResult(
+                text=text,
+                backend_name="gajahmada-native",
+                model_id=self.metadata.model_id,
+                neural_used=True,
+                tokens_generated=len(text.split()),
+                latency_ms=elapsed_ms,
+                metadata={"architecture": "GNNM-DecoderOnly-Transformer", "version": self.metadata.version},
             )
 
         # Forward pass over 384-d input embedding using loaded projection weights
