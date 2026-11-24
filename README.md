@@ -103,6 +103,7 @@ flowchart TD
 gajahmada/
 ├── main.py                              # Entry point (Localhost Uvicorn & Vercel ASGI)
 ├── config.yaml                          # Node, bootstrap peer, & native GNNM model configuration
+├── config.federation.example.yaml       # Stage 4 multi-organization sovereign node template
 ├── .env.example                         # Environment template for optional Supabase & auth
 ├── vercel.json                          # Vercel Serverless routing configuration
 ├── LICENSE                              # MIT Open-Source License
@@ -113,17 +114,24 @@ gajahmada/
 ├── docs/
 │   ├── ARCHITECTURE_V2.md               # 8-layer & 14-stage cognitive specification
 │   ├── GNNM_ARCHITECTURE.md             # GajahMada Native Neural Model (GNNM-01..04) blueprint
+│   ├── GIP_2_0_RFC.md                   # Stage 5 formal GIP/2.0 wire & interoperability RFC
+│   ├── BENCHMARK_REPORT.json            # Stage 5 reproducible ecosystem benchmark report
 │   ├── AUDIT_V2.md                      # Source code audit & capability classification
-│   ├── SECURITY_AUDIT.md                # Security controls & threat mitigation matrix
+│   ├── SECURITY_AUDIT.md                # Security controls & Round 1-3 remediation matrix
 │   ├── MIGRATION_PLAN.md                # v1 -> v2 compatibility contract
-│   └── ROADMAP.md                       # Phased roadmap & benchmark results
+│   └── ROADMAP.md                       # 5-stage sovereign roadmap & benchmark results
 ├── scripts/
 │   ├── train_gnnm.py                    # Scalable CLI Pretraining + Val Perplexity + SFT pipeline
-│   └── train_gnnm_01_tiny.py            # Quick-start local GNNM-01-Tiny pretraining script
+│   ├── train_gnnm_01_tiny.py            # Quick-start local GNNM-01-Tiny pretraining script
+│   ├── run_gip_network_simulation.py    # Stage 3 3 -> 10 -> 100-node GIP stress & recovery harness
+│   └── run_ecosystem_benchmarks.py      # Stage 5 open reproducible benchmark runner
+├── sdk/
+│   └── gajahmada_sdk/                   # Stage 5 official Python SDK (GajahMadaClient, NodeKeyPair, GIP helpers)
 ├── models/
-│   └── gnnm-01-tiny/                    # From-scratch GNNM checkpoint metadata (config.json, tokenizer.json, metrics.json; model.pt gitignored)
+│   ├── gnnm-01-tiny/                    # From-scratch GNNM-01-Tiny checkpoint metadata (918K params; model.pt gitignored)
+│   └── gnnm-01-12m/                     # Stage 1 GNNM-01-12M checkpoint metadata (11.24M params; model.pt gitignored)
 ├── gajahmada_ai/
-│   ├── api/                             # FastAPI server.py (v1 + UI host) & v2_routes.py (/api/v2/*)
+│   ├── api/                             # FastAPI server.py (v1 + UI host) & v2_routes.py (/api/v2/* + /federation)
 │   ├── cognition/                       # 14-stage CognitiveReasoningPipeline & EpistemicBreakdown
 │   ├── gnnm/                            # From-scratch Decoder-Only Transformer (config, tokenizer, dataset, model, trainer, inference)
 │   ├── neural/                          # ModelRouter, PyTorchNativeBackend (GNNM), OnnxBackend, InferenceBackend ABC
@@ -133,12 +141,12 @@ gajahmada/
 │   ├── knowledge/                       # LocalKnowledge (384-d RAG), open_knowledge.py crawler, indonesia_corpus.py
 │   ├── agents/ & execution/             # Planner, Researcher, Analyst, Verifier, Scheduler, SandboxedExecutor
 │   ├── learning/                        # FeedbackCollector, ExperienceExtractor, StrategyAdapter, LearningExperimentManager
-│   ├── network/                         # GIP/2.0 protocol (SQLite WAL replay store), PeerDiscoveryRegistry, CollectiveCoordinator, QuorumConsensus
+│   ├── network/                         # GIP/2.0 protocol (SQLite WAL replay store), FederationRegistry, PeerDiscoveryRegistry, CollectiveCoordinator, QuorumConsensus
 │   ├── blockchain/                      # AIBlockchain Schema v2 tamper-evident local signed event ledger + atomic recovery
 │   ├── security/                        # NodeIdentity (Ed25519, fail-closed key/state persistence), AuthManager (RBAC), SSRF guard, RateLimiter, AuditLogger
 │   └── cli/                             # CLI v1 & v2 (`gajahmada`)
 ├── interface/html/                      # Dual-Mode Web UI: Homepage (/) & 8-Panel Dashboard (/dashboard, /ui)
-└── tests/                               # 39 Automated Tests across unit, cognition, memory, network, security, integration, benchmarks
+└── tests/                               # 45 Automated Tests across unit, cognition, memory, network, security, integration, benchmarks
 ```
 
 ---
@@ -278,7 +286,8 @@ pytest -v
 | **Security & Governance (Tests 12–13, +1)** | Unauthenticated admin rejection (`401`), malicious peer command/memory isolation, SSRF & predictable seed prevention. | `tests/security/test_security_and_governance.py` | ✅ **PASSED** |
 | **Audit Remediation P0–P5 + Round 3 (16 Tests)** | Signing oracle elimination, fail-closed v1/v2 & internal endpoint auth, explicit visibility matrix (`PRIVATE`/`LOCAL`/`SHARED`/`COLLECTIVE`/`PUBLIC`), cryptographic `node_attestations` promotion, direct Ed25519 consensus + evidence independence, persistent SQLite GIP replay protection, fail-closed key persistence + persisted rotations/revocations, strict non-genesis ledger verification + `LEDGER_CORRUPTED` recovery, & 3-node restart persistence. | `tests/security/test_audit_remediation.py` | ✅ **PASSED** |
 | **GNNM Native Model (4 Tests)** | Parameter estimator, lossless multilingual byte-level BPE, `.jsonl` deduplication, SFT `-100` prompt masking, & Transformer forward/init-loss check. | `tests/unit/test_gnnm_foundation.py` | ✅ **PASSED** |
-| **API Compatibility & Benchmarks** | Full v1/v2 API compatibility & live cognitive benchmark execution. | `tests/integration/`, `tests/benchmarks/` | ✅ **PASSED** |
+| **Roadmap Stages 2–5 (6 Tests)** | Stage 2 neural-off cognition (`model_router=None`), Stage 3 3/10/100-node GIP stress/Sybil/revocation tests, Stage 4 4-org sovereign federation + Ed25519 `node_attestations`, Stage 5 official Python SDK & GIP/2.0 interoperability. | `tests/cognition/test_stage2_*`, `tests/network/test_stage3_*`, `test_stage4_*`, `tests/integration/test_stage5_*` | ✅ **PASSED** |
+| **API Compatibility & Benchmarks** | Full v1/v2 API compatibility & live ecosystem benchmark suite (`docs/BENCHMARK_REPORT.json`). | `tests/integration/`, `tests/benchmarks/` | ✅ **PASSED** |
 
 ---
 
@@ -288,11 +297,11 @@ GajahMada explicitly separates **verified local pipeline foundations** from **fu
 
 | Stage | Milestone | Engineering Scope & Current Verified Status |
 | :---: | :--- | :--- |
-| **Stage 1** | **GajahMada Native Model (`GNNM`)** | **In Progress (Pipeline Proven):** Custom from-scratch Decoder-Only Transformer (`gajahmada_ai/gnnm/`), lossless Byte-Level BPE tokenizer, streaming corpus/SFT trainer (`scripts/train_gnnm.py`), and verified `GNNM-01-Tiny` checkpoint (`models/gnnm-01-tiny/`). *Not yet a large-scale frontier LLM* — next scaling tiers are `GNNM-01-25M` (10M–50M) → `GNNM-02-100M` → `GNNM-03-300M` → `GNNM-04-1B` as compute & curated corpora scale. |
-| **Stage 2** | **Native Cognitive Engine** | **Operational:** 14-stage hybrid reasoning, deterministic `SymbolicReasoner`, `EvidenceReasoner`, `ContradictionDetector`, and 5-tier persistent memory operate fully even when no neural checkpoint is loaded (`neural_inference_active: False`). |
-| **Stage 3** | **GIP Distributed Intelligence** | **3-Node Verified → Scaling to 10 / 100 Nodes:** 8-namespace signed `GIP/2.0`, SQLite WAL replay protection, `PeerTrustState`, direct Ed25519 quorum verification, and 3-node restart persistence are tested; next milestone is 10-node and 100-node WAN stress testing (partition recovery, conflict resolution, and BFT finality). |
-| **Stage 4** | **Collective Knowledge Network** | **Foundation Ready:** Cryptographic `node_attestations`, explicit visibility isolation (`PRIVATE`/`LOCAL`/`SHARED`/`COLLECTIVE`/`PUBLIC`), and per-node Ed25519 identity allow universities, researchers, communities, and organizations to operate sovereign nodes while retaining full local data ownership. |
-| **Stage 5** | **Independent AI Ecosystem** | **Planned:** Public Python/TypeScript SDKs, formal GIP/2.0 RFC specification, open evaluation benchmarks, and third-party interoperability standards. |
+| **Stage 1** | **GajahMada Native Model (`GNNM`)** | **11.24M-Param Checkpoint Proven:** Custom Decoder-Only Transformer (`gajahmada_ai/gnnm/`), lossless Byte-Level BPE tokenizer, streaming corpus/SFT trainer (`scripts/train_gnnm.py`), and verified from-scratch checkpoints at `models/gnnm-01-tiny/` (`918K` params) and `models/gnnm-01-12m/` (**`11,243,520` params**, 10M–50M tier). *Scaling to 100M–1B (`GNNM-02-100M`..`GNNM-04-1B`) requires larger GPU compute & corpora.* |
+| **Stage 2** | **Native Cognitive Engine** | **Verified Operational (Neural-Off 100%):** 14-stage hybrid reasoning, deterministic `SymbolicReasoner`, `EvidenceReasoner`, `ContradictionDetector`, and 5-tier persistent memory verified via `tests/cognition/test_stage2_native_cognition.py` with zero neural weights loaded. |
+| **Stage 3** | **GIP Distributed Intelligence** | **3, 10, & 100-Node Verified:** `scripts/run_gip_network_simulation.py` + `tests/network/test_stage3_distributed_scale.py` verify 3-node restart recovery, 10-node mesh handshakes/replay/revocation blocking, and 100-node cryptographic quorum (rejecting forged/revoked/Sybil submissions & unbacked majorities). |
+| **Stage 4** | **Collective Knowledge Network** | **Federation Implemented & Verified:** `gajahmada_ai/network/federation.py`, `/api/v2/federation`, `config.federation.example.yaml`, and `tests/network/test_stage4_collective_federation.py` prove strict local ownership of `PRIVATE`/`LOCAL` data across 4 independent organizations (University, Research Lab, Community, Organization) with Ed25519 `node_attestations` for `COLLECTIVE` promotion. |
+| **Stage 5** | **Independent AI Ecosystem** | **SDK, RFC & Open Benchmarks Shipped:** Official Python SDK (`sdk/gajahmada_sdk/`), formal GIP/2.0 RFC specification (`docs/GIP_2_0_RFC.md`), reproducible benchmark runner (`scripts/run_ecosystem_benchmarks.py` → `docs/BENCHMARK_REPORT.json`), and SDK integration tests (`tests/integration/test_stage5_sdk_and_ecosystem.py`). |
 
 ---
 

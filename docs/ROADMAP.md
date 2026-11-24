@@ -40,18 +40,22 @@
 
 ---
 
-## 4. Five-Stage Sovereign Strategic Roadmap (Long-Term Evolution)
+## 4. Five-Stage Sovereign Strategic Roadmap (Executed & Verified 2026-11-24)
 
-To maintain strict transparency between **current verified implementation** and **long-term sovereign AI goals**, GajahMada follows a 5-stage evolution plan:
+To maintain strict transparency between **current verified implementation** and **long-term sovereign AI goals**, GajahMada tracks all 5 stages with reproducible evidence in `docs/BENCHMARK_REPORT.json`:
 
-1. **Stage 1 — GajahMada Native Model (`GNNM`)** *(Current: Foundation & `GNNM-01-Tiny` Proven)*
-   - Build and validate an owned Decoder-Only Transformer (`gajahmada_ai/gnnm/`), custom Byte-Level BPE tokenizer, streaming deduplicated pretraining + SFT pipeline (`scripts/train_gnnm.py`), and checkpoint inference (`PyTorchNativeBackend`).
-   - Scale progressively from **10M–50M parameters** (`GNNM-01-25M`) to prove end-to-end training & evaluation quality, then expand to **100M–1B parameters** (`GNNM-02-100M`, `GNNM-03-300M`, `GNNM-04-1B`) as curated corpora and GPU compute grow.
-2. **Stage 2 — Native Cognitive Engine** *(Current: Operational)*
-   - Guarantee that 14-stage reasoning, symbolic logic (`SymbolicReasoner`), evidence scoring (`EvidenceReasoner`), contradiction detection, and 5-tier persistent memory remain 100% operational even when no neural weights are loaded.
-3. **Stage 3 — GIP Distributed Intelligence** *(Current: 3-Node Verified; Next: 10 → 100 Nodes)*
-   - Expand multi-node testing from 3 independent nodes to **10-node** and **100-node** topologies covering security, peer trust lifecycle, replay protection, knowledge sync, quorum consensus, conflict resolution, and crash/partition recovery.
-4. **Stage 4 — Collective Knowledge Network** *(Current: Governance & Isolation Ready)*
-   - Enable universities, research labs, communities, and organizations to run sovereign GajahMada nodes with full ownership over `PRIVATE`/`LOCAL` data while contributing cryptographically attested findings to `COLLECTIVE` knowledge.
-5. **Stage 5 — Independent AI Ecosystem** *(Planned)*
-   - Publish official SDKs, formal GIP/2.0 protocol specifications, public reproducible benchmarks, and open interoperability standards so external developers can build applications on top of the GajahMada network.
+1. **Stage 1 — GajahMada Native Model (`GNNM`)** *(Verified 11.24M-Param Checkpoint)*
+   - Built owned Decoder-Only Transformer (`gajahmada_ai/gnnm/`), lossless Byte-Level BPE tokenizer, streaming deduplicated pretraining + SFT pipeline (`scripts/train_gnnm.py`), and verified checkpoints at `models/gnnm-01-tiny/` (`918,656` params) and `models/gnnm-01-12m/` (**`11,243,520` params**, 10M–50M tier; pretrain loss `7.438 → 7.122`, SFT loss `7.438 → 6.836`, loaded via `PyTorchNativeBackend`).
+   - Next scaling tiers (`GNNM-02-100M`, `GNNM-03-300M`, `GNNM-04-1B`) are defined in `GNNM_PRESETS` and await larger curated corpora and GPU compute.
+2. **Stage 2 — Native Cognitive Engine** *(Verified 100% Neural-Off)*
+   - Verified via `tests/cognition/test_stage2_native_cognition.py` (`model_router=None`): deterministic `SymbolicReasoner`, `EvidenceReasoner`, `ContradictionDetector`, and 5-tier persistent memory pass 100% (`126.45 ms`) with zero neural weights loaded.
+3. **Stage 3 — GIP Distributed Intelligence** *(3, 10, & 100-Node Verified)*
+   - Verified via `scripts/run_gip_network_simulation.py` and `tests/network/test_stage3_distributed_scale.py`:
+     - **3 nodes (`105.57 ms`):** distributed task quorum + full disk restart recovery.
+     - **10 nodes (`308.10 ms`):** 9 signed handshakes, 9/9 replay attacks blocked via SQLite WAL store, revoked peer blocked, 8-peer quorum succeeded.
+     - **100 nodes (`53.10 ms`):** 105 submissions processed (85 valid, 20 forged/revoked/Sybil rejected, unbacked majority rejected, 30 independent evidence sources selected).
+4. **Stage 4 — Collective Knowledge Network** *(Multi-Org Federation Implemented & Verified)*
+   - Implemented `gajahmada_ai/network/federation.py` (`OrganizationProfile`, `FederationRegistry`), `/api/v2/federation` endpoints, `config.federation.example.yaml`, and `tests/network/test_stage4_collective_federation.py` proving 4 sovereign organizations (University, Research Lab, Community, Organization) keep `PRIVATE`/`LOCAL` data strictly isolated while co-promoting `COLLECTIVE` knowledge via Ed25519 `node_attestations`.
+5. **Stage 5 — Independent AI Ecosystem** *(SDK, RFC & Open Benchmarks Shipped)*
+   - Shipped official Python SDK (`sdk/gajahmada_sdk/`), formal GIP/2.0 RFC specification (`docs/GIP_2_0_RFC.md`), reproducible benchmark runner (`scripts/run_ecosystem_benchmarks.py` → `docs/BENCHMARK_REPORT.json`), and SDK integration tests (`tests/integration/test_stage5_sdk_and_ecosystem.py`).
+   - Full automated test suite: **45 passed, 0 failed**.

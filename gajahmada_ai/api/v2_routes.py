@@ -7,6 +7,7 @@ from gajahmada_ai.memory.authorization import MemoryAuthorizationService
 from gajahmada_ai.memory.models import MemoryType, VerificationStatus, VisibilityPolicy
 from gajahmada_ai.network.consensus import QuorumConsensusManager
 from gajahmada_ai.network.discovery import PeerTrustState
+from gajahmada_ai.network.federation import OrganizationProfile
 from gajahmada_ai.network.protocol import GIPMessage, GIPMessageType
 from gajahmada_ai.security.crypto import canonical_json_bytes
 from gajahmada_ai.security.ssrf import validate_peer_url
@@ -780,7 +781,40 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
         )
         return desc.to_dict()
 
-    # ─── 6. /api/v2/system ────────────────────────────────────────────────────
+    # ─── 6. /api/v2/federation (Stage 4 Collective Knowledge Network) ─────────
+    @router.get("/federation")
+    def list_federation_organizations():
+        rt = get_runtime()
+        federation = rt["federation"]
+        return {
+            "count": len(federation.list_organizations()),
+            "organizations": federation.list_organizations(),
+        }
+
+    @router.post("/federation/organizations")
+    def register_federation_organization(profile: OrganizationProfile, request: Request):
+        rt = get_runtime()
+        auth = rt["auth"]
+        federation = rt["federation"]
+        blockchain = rt["blockchain"]
+        identity = rt["identity"]
+        policy = rt["policy"]
+
+        auth.authenticate_request(request, required_capability="network:manage")
+        ok_ep, clean_ep = validate_peer_url(profile.endpoint, allow_local=policy.allow_local_peers)
+        if not ok_ep:
+            raise HTTPException(status_code=400, detail=f"Federation endpoint blocked by SSRF guard: {clean_ep}")
+        profile.endpoint = clean_ep
+        saved = federation.register_organization(profile)
+        blockchain.record_event(
+            LedgerEventType.NODE_REGISTERED,
+            f"org:{saved.org_id}|{saved.org_type}|{saved.node_id[:12]}",
+            identity,
+            metadata={"org_id": saved.org_id, "org_type": saved.org_type, "node_id": saved.node_id},
+        )
+        return saved.model_dump()
+
+    # ─── 7. /api/v2/system ────────────────────────────────────────────────────
     @router.get("/system")
     @router.get("/system/health")
     def system_health(request: Request):

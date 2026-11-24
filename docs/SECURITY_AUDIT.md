@@ -95,3 +95,17 @@
 | **Malicious Peer Isolation (No RCE / Memory Tampering)** | `gajahmada_ai/network/coordinator.py` & `security/policies.py` | `tests/security/test_security.py::test_malicious_peer_rejected` (TEST 13) |
 | **Sandboxed Tool Execution & Human Approval Gates** | `gajahmada_ai/execution/sandbox.py` | `tests/security/test_security.py::test_sandbox_blocks_unrestricted_access` |
 | **Rate Limiting & Payload Size Bounds** | `gajahmada_ai/security/rate_limit.py` | `tests/security/test_security.py::test_rate_limiting_and_input_validation` |
+
+
+---
+
+## 3. Round 3 Audit Remediation Matrix (2026-11-24 — Findings A–F)
+
+| Finding | Severity | Remediation Implemented | Verification Test |
+| :--- | :---: | :--- | :--- |
+| **A. Collective Verification & Promotion Over-Grant** | **CRITICAL** | `QuorumConsensusManager.evaluate_submissions()` ignores caller `signature_verified`, verifies Ed25519 directly, rejects duplicates/revoked peers, and requires independent evidence hashes. `POST /api/v2/knowledge/promote/{id}` caps plain strings at `SOURCE_CORROBORATED` and requires `>= 2` Ed25519 `node_attestations` from distinct `TRUSTED` verifiers with distinct `evidence_hash` values for `INDEPENDENTLY_VERIFIED`. | `test_round3_a_consensus_verifies_signatures_directly_and_checks_evidence_independence` |
+| **B. `LOCAL` Memory Isolation** | **CRITICAL** | Explicit fail-closed `VISIBILITY_ACCESS_MATRIX` in `MemoryAuthorizationService` (`PRIVATE`/`LOCAL` → `admin`/`operator` only; `SHARED` → authenticated roles; `COLLECTIVE`/`PUBLIC` → public read). | `test_round3_b_local_and_shared_visibility_isolated_from_anonymous` |
+| **C. Internal Operational Endpoints** | **HIGH** | `GET /api/v2/reasoning`, `GET /api/v2/reasoning/{id}`, and `GET /api/v2/agents` require authenticated `reasoning:read` / `agent:read`; `GET /api/v2/system/health` omits `security_audit.recent_events` for unauthenticated callers. | `test_round3_c_internal_reasoning_and_agent_endpoints_require_auth` |
+| **D. Persistent GIP Replay Protection** | **HIGH** | `PersistentNonceStore` backed by SQLite WAL (`gip_replay.db`) with atomic `BEGIN IMMEDIATE` + `INSERT OR IGNORE` and TTL aligned to `max_clock_skew_sec`. | `test_round3_d_gip_replay_protection_persists_across_restarts` |
+| **E. Fail-Closed Key Persistence & Rotation/Revocation State** | **HIGH** | Atomic `0600` key writing raising `KeyPersistenceError` on failure; persistent `<key_path>.state.json` storing `key_version`, dual-signed `rotation_history`, and `revocation_records` with peer sync via `GIP-IDENTITY`. | `test_round3_e_key_persistence_fails_closed_and_persists_rotations_and_revocations` |
+| **F. Non-Genesis Ledger Validation & Terminology** | **HIGH** | Strict genesis-only (`index == 0`) signature exemption in `AIBlockchain.verify_block_signature()` (rejects unsigned or spoofed `"Genesis Node"` non-genesis blocks); clarified as `tamper_evident_local_signed_event_ledger`. | `test_round3_f_ledger_rejects_unsigned_or_spoofed_genesis_non_genesis_blocks` |

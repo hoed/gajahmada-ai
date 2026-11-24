@@ -26,6 +26,7 @@ from gajahmada_ai.learning.experiments import LearningExperimentManager
 from gajahmada_ai.memory.manager import MemoryManager
 from gajahmada_ai.memory.models import MemoryType, VerificationStatus, VisibilityPolicy
 from gajahmada_ai.network.discovery import PeerDiscoveryRegistry
+from gajahmada_ai.network.federation import FederationRegistry
 from gajahmada_ai.network.p2p import P2PNetwork
 from gajahmada_ai.network.protocol import GIPMessage, GIPMessageType, GIPProtocolValidator
 from gajahmada_ai.network.synchronization import KnowledgeSynchronizer
@@ -109,6 +110,7 @@ governance_policy: Optional[GovernancePolicy] = None
 rate_limiter: Optional[SlidingWindowRateLimiter] = None
 gip_validator: Optional[GIPProtocolValidator] = None
 peer_discovery: Optional[PeerDiscoveryRegistry] = None
+federation_registry: Optional[FederationRegistry] = None
 knowledge_sync: Optional[KnowledgeSynchronizer] = None
 learning_manager: Optional[LearningExperimentManager] = None
 supabase_store: Optional[SupabaseKnowledgeStore] = None
@@ -147,7 +149,7 @@ def ensure_initialized():
     global blockchain, identity, engine, rag, p2p, runtime_config
     global memory_manager, cognitive_pipeline, agent_scheduler
     global audit_logger, auth_manager, governance_policy, rate_limiter
-    global gip_validator, peer_discovery, knowledge_sync, learning_manager, supabase_store
+    global gip_validator, peer_discovery, federation_registry, knowledge_sync, learning_manager, supabase_store
 
     if yaml is not None and os.path.exists(CONFIG_PATH):
         try:
@@ -282,6 +284,9 @@ def ensure_initialized():
     if peer_discovery is None:
         peer_discovery = PeerDiscoveryRegistry()
 
+    if federation_registry is None:
+        federation_registry = FederationRegistry(storage_path=os.path.join(storage_dir, "federation.json"))
+
     if knowledge_sync is None:
         knowledge_sync = KnowledgeSynchronizer(memory=memory_manager, identity=identity)
 
@@ -312,6 +317,7 @@ def get_runtime_context() -> Dict[str, Any]:
         "policy": governance_policy,
         "gip_validator": gip_validator,
         "discovery": peer_discovery,
+        "federation": federation_registry,
         "synchronizer": knowledge_sync,
         "learning": learning_manager,
         "supabase": supabase_store,

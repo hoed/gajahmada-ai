@@ -1,0 +1,17 @@
+{
+  "name": "GNNM-01-12M",
+  "vocab_size": 1619,
+  "d_model": 384,
+  "n_layers": 6,
+  "n_heads": 6,
+  "n_kv_heads": 6,
+  "d_ff": 1024,
+  "max_seq_len": 512,
+  "dropout": 0.0,
+  "rope_theta": 10000.0,
+  "norm_eps": 1e-06,
+  "tie_embeddings": true,
+  "language_profile": "multilingual-balanced-id-en",
+  "intelligence_mode": "hybrid-cognitive",
+  "estimated_parameters": 11243520
+}

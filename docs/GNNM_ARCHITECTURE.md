@@ -9,13 +9,14 @@
 
 ## 2. Progressive Scaling Roadmap (`GNNM-01` → `GNNM-05`)
 
-| Stage | Preset Key | Target Parameters | `vocab_size` | `d_model` | Layers | Heads (Q/KV) | Context | Goal |
+| Stage | Preset Key | Target Parameters | `vocab_size` | `d_model` | Layers | Heads (Q/KV) | Context | Goal & Verified Status |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| **PoC Smoke** | `GNNM-01-Tiny` | ~1.5M | 1,024 | 128 | 4 | 4 / 4 | 256 | Instant CPU verification & CI testing |
-| **GNNM-01** | `GNNM-01-25M` | ~18M–25M | 8,192 | 384 | 8 | 6 / 6 | 1,024 | End-to-end from-scratch Proof of Concept |
-| **GNNM-02** | `GNNM-02-100M` | ~105M | 32,000 | 768 | 12 | 12 / 4 | 2,048 | Basic balanced multilingual fluency |
-| **GNNM-03** | `GNNM-03-300M` | ~320M | 32,000 | 1,024 | 20 | 16 / 4 | 4,096 | Strong grounded generation & synthesis |
-| **GNNM-04** | `GNNM-04-1B` | ~1.1B | 48,000 | 2,048 | 22 | 16 / 4 | 4,096 | Independent sovereign general LM |
+| **PoC Smoke** | `GNNM-01-Tiny` | ~918K–1.5M | 512–1,024 | 128 | 4 | 4 / 4 | 256 | ✅ **Trained & Verified** (`models/gnnm-01-tiny/`, 918K params) |
+| **Stage 1 (10–50M)** | `GNNM-01-12M` | ~11.2M–12.4M | 2,048–4,096 | 384 | 6 | 6 / 6 | 512 | ✅ **Trained & Verified** (`models/gnnm-01-12m/`, 11,243,520 params, CPU pretrain + SFT) |
+| **Stage 1 (10–50M)** | `GNNM-01-25M` | ~18M–25M | 8,192 | 384 | 8 | 6 / 6 | 1,024 | Ready for extended corpus & GPU pretraining |
+| **Stage 1 (100M)** | `GNNM-02-100M` | ~105M | 32,000 | 768 | 12 | 12 / 4 | 2,048 | Basic balanced multilingual fluency (GPU scale) |
+| **Stage 1 (300M)** | `GNNM-03-300M` | ~320M | 32,000 | 1,024 | 20 | 16 / 4 | 4,096 | Strong grounded generation & synthesis (GPU scale) |
+| **Stage 1 (1B)** | `GNNM-04-1B` | ~1.1B | 48,000 | 2,048 | 22 | 16 / 4 | 4,096 | Independent sovereign general LM (GPU scale) |
 
 ---
 

@@ -74,9 +74,13 @@ class GNNMConfig:
 
 
 GNNM_PRESETS: Dict[str, GNNMConfig] = {
-    # Ultra-fast CPU smoke-test / unit-test preset (~1.5M params)
+    # Ultra-fast CPU smoke-test / unit-test preset (~1.0M params)
     "GNNM-01-Tiny": GNNMConfig(
         name="GNNM-01-Tiny", vocab_size=1024, d_model=128, n_layers=4, n_heads=4, n_kv_heads=4, d_ff=384, max_seq_len=256
+    ),
+    # Stage 1 10M-50M Entry Proof-of-Concept (~12.4M params, CPU-trainable checkpoint proof)
+    "GNNM-01-12M": GNNMConfig(
+        name="GNNM-01-12M", vocab_size=4096, d_model=384, n_layers=6, n_heads=6, n_kv_heads=6, d_ff=1024, max_seq_len=512
     ),
     # Stage 1 Proof-of-Concept (~18M params)
     "GNNM-01-25M": GNNMConfig(

@@ -1,0 +1,25 @@
+{
+  "pretrain": {
+    "model_name": "GNNM-01-12M",
+    "device": "cpu",
+    "steps": 12,
+    "parameters": 11243520,
+    "initial_loss": 7.43839,
+    "final_loss": 7.12155,
+    "elapsed_sec": 2.669
+  },
+  "validation": {
+    "val_loss": 7.29394,
+    "perplexity": 1471.363
+  },
+  "sft": {
+    "model_name": "GNNM-01-12M",
+    "device": "cpu",
+    "steps": 6,
+    "parameters": 11243520,
+    "initial_loss": 7.43839,
+    "final_loss": 6.83636,
+    "elapsed_sec": 1.902,
+    "stage": "sft_instruction_tuning"
+  }
+}

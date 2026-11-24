@@ -1,0 +1,112 @@
+{
+  "benchmark_suite": "GajahMada 2.0 Open Ecosystem Benchmark (Stages 1-5)",
+  "generated_at_epoch": 1795514416.225,
+  "total_elapsed_ms": 1002.81,
+  "stage_1_gnnm_checkpoints": {
+    "gnnm-01-12m": {
+      "estimated_parameters": 11243520,
+      "vocab_size": 1619,
+      "n_layers": 6,
+      "d_model": 384,
+      "metrics": {
+        "pretrain": {
+          "model_name": "GNNM-01-12M",
+          "device": "cpu",
+          "steps": 12,
+          "parameters": 11243520,
+          "initial_loss": 7.43839,
+          "final_loss": 7.12155,
+          "elapsed_sec": 2.669
+        },
+        "validation": {
+          "val_loss": 7.29394,
+          "perplexity": 1471.363
+        },
+        "sft": {
+          "model_name": "GNNM-01-12M",
+          "device": "cpu",
+          "steps": 6,
+          "parameters": 11243520,
+          "initial_loss": 7.43839,
+          "final_loss": 6.83636,
+          "elapsed_sec": 1.902,
+          "stage": "sft_instruction_tuning"
+        }
+      }
+    },
+    "gnnm-01-tiny": {
+      "estimated_parameters": 918656,
+      "vocab_size": 512,
+      "n_layers": 4,
+      "d_model": 128,
+      "metrics": {
+        "pretrain": {
+          "model_name": "GNNM-01-Tiny",
+          "device": "cpu",
+          "steps": 80,
+          "parameters": 918656,
+          "initial_loss": 6.26882,
+          "final_loss": 5.20625,
+          "elapsed_sec": 5.604
+        },
+        "validation": {
+          "val_loss": 5.42633,
+          "perplexity": 227.314
+        },
+        "sft": {
+          "model_name": "GNNM-01-Tiny",
+          "device": "cpu",
+          "steps": 40,
+          "parameters": 918656,
+          "initial_loss": 6.26882,
+          "final_loss": 3.92386,
+          "elapsed_sec": 2.115,
+          "stage": "sft_instruction_tuning"
+        }
+      }
+    }
+  },
+  "stage_2_neural_off_cognition": {
+    "passed": 3,
+    "total": 3,
+    "accuracy": 1.0,
+    "elapsed_ms": 126.45
+  },
+  "stage_3_gip_distributed_intelligence": {
+    "3_nodes": {
+      "tier": "3_nodes",
+      "status": "PASSED",
+      "participating_nodes": 2,
+      "quorum_reached": true,
+      "restart_recovery": true,
+      "elapsed_ms": 105.57
+    },
+    "10_nodes": {
+      "tier": "10_nodes",
+      "status": "PASSED",
+      "total_nodes": 10,
+      "handshakes_verified": 9,
+      "replays_blocked": 9,
+      "revoked_peer_blocked": true,
+      "quorum_participating": 8,
+      "elapsed_ms": 308.1
+    },
+    "100_nodes": {
+      "tier": "100_nodes",
+      "status": "PASSED",
+      "total_identities": 100,
+      "total_submissions_processed": 105,
+      "valid_participating_nodes": 85,
+      "rejected_forged_revoked_sybil": 20,
+      "independent_evidence_sources": 30,
+      "unverified_majority_rejected": true,
+      "elapsed_ms": 53.1
+    }
+  },
+  "stage_5_sdk_interoperability": {
+    "health_status": "healthy",
+    "ledger_type": "tamper_evident_local_signed_event_ledger",
+    "ask_verified": true,
+    "elapsed_ms": 388.32
+  }
+}

@@ -46,7 +46,8 @@ flowchart TD
 | **Open Knowledge** | `gajahmada_ai/knowledge/` | `LocalKnowledge` (FAISS/L2 384-d RAG), `open_knowledge.py` (multi-source crawler into Quarantine + live weather + 114-Surah Al-Qur'an), `indonesia_corpus.py` |
 | **Autonomous Agents** | `gajahmada_ai/agents/`, `execution/` | `PlannerAgent`, `ResearcherAgent`, `AnalystAgent`, `VerifierAgent`, `AutonomousTaskScheduler`, `SandboxedExecutor` (unforgeable authenticated human approval) |
 | **Closed-Loop Learning** | `gajahmada_ai/learning/` | `FeedbackCollector`, `ExperienceExtractor`, `StrategyAdapter` (versioned + rollback), `LearningExperimentManager` |
-| **P2P & Collective** | `gajahmada_ai/network/` | Full 8-namespace `GIP/2.0` protocol + peer authorization, `SovereignPeerNode`, `CollectiveCoordinator`, `KnowledgeSynchronizer`, `QuorumConsensusManager` |
+| **P2P & Collective** | `gajahmada_ai/network/` | Full 8-namespace `GIP/2.0` protocol (SQLite WAL replay store), `FederationRegistry` (multi-org sovereign nodes), `SovereignPeerNode`, `CollectiveCoordinator`, `KnowledgeSynchronizer`, `QuorumConsensusManager` (direct Ed25519 verification + evidence independence) |
+| **SDK & Ecosystem** | `sdk/gajahmada_sdk/`, `docs/GIP_2_0_RFC.md` | Official Python SDK (`GajahMadaClient`, `NodeKeyPair`, `build_signed_gip_message`), formal GIP/2.0 interoperability RFC, and open benchmark suite (`scripts/run_ecosystem_benchmarks.py` → `docs/BENCHMARK_REPORT.json`) |
 | **Security & Ledger** | `gajahmada_ai/security/`, `blockchain/` | Ed25519 (RFC 8032) `NodeIdentity`, random/rotatable admin key `AuthManager` (fail-closed v1/v2), active rate-limit middleware, SSRF guard, `AIBlockchain` v2 canonical-hash full-envelope ledger + atomic persistence + `LEDGER_CORRUPTED` recovery |
 | **CLI & Web Interface** | `gajahmada_ai/cli/main.py`, `interface/html/` | CLI v1/v2 + Dual-mode Web UI: Homepage Command Center over fullscreen 3D Network (turbo spin while Brain thinks) & 8-panel Cyberdeck Dashboard |
 

@@ -169,16 +169,17 @@ gajahmada_ai/
 │   └── datasets.py     # Curated verification & regression datasets
 ├── network/            # GajahMada Intelligence Protocol (GIP v2.0) & Collective Intelligence
 │   ├── p2p.py          # Backward-compatible P2PNetwork enhanced with SSRF guard
-│   ├── protocol.py     # GIP-IDENTITY, DISCOVERY, CAPABILITY, TASK, KNOWLEDGE, VERIFY, CONSENSUS, SYNC schemas
+│   ├── protocol.py     # GIP-IDENTITY..SYNC schemas + atomic SQLite WAL PersistentNonceStore
 │   ├── transport.py    # Authenticated HTTP/HTTPS transport & libp2p abstraction
-│   ├── discovery.py    # Peer discovery, capability exchange, allowlist/revocation
+│   ├── discovery.py    # Peer discovery, explicit PeerTrustState lifecycle, capability exchange
+│   ├── federation.py   # Stage 4 multi-organization sovereign federation registry & Ed25519 attestations
 │   ├── coordinator.py  # Distributed task negotiation, delegation, & independent verification
 │   ├── synchronization.py# Permission-aware collective memory synchronization
-│   └── consensus.py    # Quorum acknowledgement & evidence-weighted conflict resolution
-├── blockchain/         # Signed Event & Cryptographic Audit Ledger
-│   └── chain.py        # AIBlockchain evolved with typed LedgerEvents & Ed25519 signature verification
+│   └── consensus.py    # Direct Ed25519 quorum verification & independent evidence conflict resolution
+├── blockchain/         # Tamper-Evident Local Signed Event & Cryptographic Audit Ledger
+│   └── chain.py        # AIBlockchain Schema v2 canonical hashing, strict non-genesis Ed25519 verification, & atomic recovery
 ├── security/           # Sovereign Security Layer
-│   ├── crypto.py       # Hardened Ed25519 NodeIdentity, key rotation, revocation
+│   ├── crypto.py       # Fail-closed Ed25519 NodeIdentity, atomic key persistence, persistent rotation/revocation state
 │   ├── auth.py         # API key, Bearer token, & Ed25519 signature authentication + RBAC
 │   ├── policies.py     # Execution, memory trust, and permission boundary policies
 │   ├── ssrf.py         # SSRF URL/IP validator
@@ -186,7 +187,10 @@ gajahmada_ai/
 │   └── audit.py        # Persistent security event logger
 ├── api/                # REST & Web3 Gateway
 │   ├── server.py       # Preserves all v1 routes + mounts /api/v2/* routers
-│   └── v2_routes.py    # /api/v2/{intelligence,reasoning,memory,agents,network,nodes,knowledge,system}
+│   └── v2_routes.py    # /api/v2/{intelligence,reasoning,memory,agents,network,nodes,federation,knowledge,system}
 └── cli/                # Sovereign Node CLI
     └── main.py         # Preserves v1 commands + adds v2 commands (init, node, intelligence, reasoning, memory, network, agent, system)
+sdk/gajahmada_sdk/      # Stage 5 official Python SDK (GajahMadaClient, NodeKeyPair, GIP helpers)
+docs/GIP_2_0_RFC.md     # Stage 5 formal GIP/2.0 wire & interoperability RFC specification
+docs/BENCHMARK_REPORT.json # Stage 5 reproducible ecosystem benchmark report (Stages 1-5)
 ```

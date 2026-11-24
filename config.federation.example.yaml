@@ -1,0 +1,32 @@
+# Stage 4 — Collective Knowledge Network Multi-Organization Node Template
+# Copy to config.yaml on each University / Research Lab / Community / Organization node.
+
+node:
+  host: "0.0.0.0"
+  port: 8000
+  name: "univ-nusantara-node-01"
+
+federation:
+  org_id: "univ-nusantara"
+  org_name: "Universitas Nusantara Research Node"
+  org_type: "university" # university | research | community | organization
+  data_sovereignty_policy: "STRICT_LOCAL_OWNERSHIP"
+  allowed_shared_domains:
+    - "science"
+    - "history"
+    - "climate"
+    - "open-knowledge"
+
+network:
+  bootstrap_peers:
+    - "https://peer-research-lab.example.org"
+    - "https://peer-community.example.org"
+
+ai:
+  model_path: "./models/gnnm-01-12m"
+  embedding_model: "all-MiniLM-L6-v2"
+  max_tokens: 512
+  temperature: 0.7
+
+blockchain:
+  difficulty: 2
