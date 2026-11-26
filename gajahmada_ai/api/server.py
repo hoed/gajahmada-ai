@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from gajahmada_ai.agents.scheduler import AutonomousTaskScheduler
+from gajahmada_ai.api.observatory_routes import create_observatory_router
 from gajahmada_ai.api.v2_routes import create_v2_router
 from gajahmada_ai.blockchain.chain import AIBlockchain, Block, LedgerEventType
 from gajahmada_ai.cognition.reasoning import CognitiveReasoningPipeline
@@ -402,6 +403,7 @@ def get_runtime_context() -> Dict[str, Any]:
 
 
 app.include_router(create_v2_router(get_runtime_context))
+app.include_router(create_observatory_router(get_runtime_context))
 
 
 # ─── Request models (v1 Backward Compatible with Input Bounds) ────────────
@@ -508,6 +510,7 @@ def robots_txt():
         "User-agent: *\n"
         "Allow: /\n"
         "Allow: /dashboard\n"
+        "Allow: /brain\n"
         "Allow: /ui\n"
         "Allow: /docs\n"
         "Disallow: /api/v2/reasoning\n"
@@ -534,6 +537,12 @@ def sitemap_xml():
   </url>
   <url>
     <loc>https://gajahmada.vercel.app/dashboard</loc>
+    <lastmod>{today}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://gajahmada.vercel.app/brain</loc>
     <lastmod>{today}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
@@ -1273,6 +1282,15 @@ def serve_root_js():
         os.path.join(UI_PATH, "app.js"),
         media_type="application/javascript",
         headers={"Cache-Control": "no-store, max-age=0"},
+    )
+
+
+@app.get("/brain", include_in_schema=False)
+@app.get("/brain/", include_in_schema=False)
+def serve_brain_observatory():
+    return FileResponse(
+        os.path.join(UI_PATH, "brain.html"),
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
     )
 
 

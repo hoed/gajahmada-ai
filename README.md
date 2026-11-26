@@ -10,7 +10,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-blue.svg)](https://www.python.org/)
-[![Tests: 64 Passed](https://img.shields.io/badge/Tests-64%20Passed-brightgreen.svg)](#automated-verification--benchmarks)
+[![Tests: 70 Passed](https://img.shields.io/badge/Tests-70%20Passed-brightgreen.svg)](#automated-verification--benchmarks)
 [![Offline First](https://img.shields.io/badge/Mode-Offline--First%20Sovereign-orange.svg)](#installation--quick-start)
 [![Live Demo](https://img.shields.io/badge/Live-gajahmada.vercel.app-teal.svg)](https://gajahmada.vercel.app/)
 
@@ -35,6 +35,7 @@ Coordinating all three systems is the **Hybrid Knowledge Controller** (`HybridKn
 > **Live Web Interface ([gajahmada.vercel.app](https://gajahmada.vercel.app/)):**
 > - **Homepage (`/`):** Focus Command Center floating over an interactive full-viewport 3D Network Graph with real-time neural thinking acceleration.
 > - **Tactical Cyberdeck Dashboard (`/dashboard` & `/ui`):** 8-panel operational HUD (System Logs & Live Config, 3D Network Graph, Command Interface, Module Dependencies, Consensus Cycle, Architecture Matrix, P2P Mesh, and System Performance & Ledger) with a session-scoped **`🔑 AUTH`** control for authenticated operator actions.
+> - **Brain & Knowledge Observatory (`/brain`):** Interactive dark neural observability console connected 100% to live backend telemetry (`/api/v2/observatory/*` + SSE `/api/v2/observatory/stream`) across 7 views: Brain Overview, Cognitive Activity, Knowledge Universe, Memory Explorer, Learning Observatory, Agent Network, and Distributed Nodes.
 
 ---
 

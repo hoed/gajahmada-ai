@@ -1,6 +1,7 @@
 User-agent: *
 Allow: /
 Allow: /dashboard
+Allow: /brain
 Allow: /ui
 Allow: /docs
 Disallow: /api/v2/reasoning

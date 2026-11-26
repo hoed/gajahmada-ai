@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GajahMada Brain &amp; Knowledge Observatory</title>
+  <meta name="description" content="Real-time interactive observatory of GajahMada AI's cognitive reasoning pipeline, hybrid knowledge graph, 5-tier memory, GNNM learning lifecycle, autonomous agents, and distributed GIP/2.0 node network." />
+  <link rel="canonical" href="https://gajahmada.vercel.app/brain" />
+  <link rel="icon" type="image/png" href="/ui/logo.png?v=9.0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/ui/brain.css?v=1.0" />
+</head>
+<body>
+  <div class="obs-shell">
+    <!-- TOP CONSISTENT OBSERVATORY HEADER -->
+    <header class="obs-header">
+      <div class="obs-brand">
+        <img src="/ui/logo.png?v=9.0" alt="GajahMada AI Official Logo" class="obs-logo" />
+        <div class="obs-title-wrap">
+          <div class="obs-title">GAJAHMADA BRAIN &amp; KNOWLEDGE OBSERVATORY</div>
+          <div class="obs-subtitle" id="obs-node-subtitle">INITIALIZING TELEMETRY...</div>
+        </div>
+      </div>
+      <div class="obs-meta-bar">
+        <span class="obs-pill live" id="pill-live"><span class="obs-dot"></span><span id="txt-live-state">LIVE</span></span>
+        <span class="obs-pill" id="pill-model" title="Actual runtime active model">MODEL: <b id="txt-active-model">CHECKING...</b></span>
+        <span class="obs-pill" id="pill-sync" title="Last backend synchronization">SYNC: <b id="txt-last-sync">--:--:--</b></span>
+        <button class="obs-btn auth" id="btn-obs-auth" title="Set session Admin API Key for protected traces &amp; private scopes">🔑 AUTH</button>
+        <a class="obs-btn" href="/">🏠 HOME</a>
+        <a class="obs-btn accent" href="/dashboard">📊 DASHBOARD</a>
+      </div>
+    </header>
+
+    <!-- 7-TAB MAIN OBSERVATORY NAVIGATION -->
+    <nav class="obs-nav" role="tablist">
+      <button class="obs-tab active" data-tab="brain-overview">1. Brain Overview</button>
+      <button class="obs-tab" data-tab="cognitive-activity">2. Cognitive Activity</button>
+      <button class="obs-tab" data-tab="knowledge-universe">3. Knowledge Universe</button>
+      <button class="obs-tab" data-tab="memory-explorer">4. Memory Explorer</button>
+      <button class="obs-tab" data-tab="learning-observatory">5. Learning Observatory</button>
+      <button class="obs-tab" data-tab="agent-network">6. Agent Network</button>
+      <button class="obs-tab" data-tab="distributed-nodes">7. Distributed Nodes</button>
+    </nav>
+
+    <!-- MAIN CONTENT WORKSPACE -->
+    <main class="obs-main">
+      <!-- TAB 1: BRAIN OVERVIEW -->
+      <section class="obs-view active" id="view-brain-overview">
+        <div class="canvas-stage-wrap">
+          <div class="stage-toolbar">
+            <div class="toolbar-group">
+              <input type="text" class="obs-input" id="brain-search" placeholder="Search subsystem node..." style="width:170px" />
+              <select class="obs-select" id="brain-group-filter">
+                <option value="">All 6 Subsystems</option>
+                <option value="GNNM_CORE">A. GNNM Core</option>
+                <option value="COGNITIVE_ENGINE">B. Cognitive Engine</option>
+                <option value="KNOWLEDGE_SYSTEM">C. Knowledge System</option>
+                <option value="MEMORY_SYSTEM">D. Memory System</option>
+                <option value="LEARNING_SYSTEM">E. Learning System</option>
+                <option value="DISTRIBUTED_NETWORK">F. Distributed Network</option>
+              </select>
+            </div>
+            <div class="toolbar-group">
+              <button class="obs-btn" id="brain-zoom-in" title="Zoom In">＋</button>
+              <button class="obs-btn" id="brain-zoom-out" title="Zoom Out">－</button>
+              <button class="obs-btn" id="brain-fit" title="Fit Graph">FIT</button>
+              <button class="obs-btn" id="brain-reset" title="Reset View">RESET</button>
+              <button class="obs-btn" id="brain-refresh" title="Refresh Live Data">↻ SYNC</button>
+            </div>
+          </div>
+          <canvas class="obs-canvas" id="canvas-brain"></canvas>
+          <div class="stage-metrics-strip" id="brain-kpi-strip">
+            <div class="kpi-chip"><div class="kpi-lbl">Memory (Accessible)</div><div class="kpi-val" id="kpi-mem">--</div></div>
+            <div class="kpi-chip"><div class="kpi-lbl">External Chunks</div><div class="kpi-val" id="kpi-ext">--</div></div>
+            <div class="kpi-chip"><div class="kpi-lbl">KG Relations</div><div class="kpi-val" id="kpi-kg">--</div></div>
+            <div class="kpi-chip"><div class="kpi-lbl">Agents (Run / Reg)</div><div class="kpi-val orange" id="kpi-agents">--</div></div>
+            <div class="kpi-chip"><div class="kpi-lbl">Peers (Trust / Reg)</div><div class="kpi-val" id="kpi-peers">--</div></div>
+            <div class="kpi-chip"><div class="kpi-lbl">Ledger Blocks</div><div class="kpi-val" id="kpi-ledger">--</div></div>
+          </div>
+        </div>
+        <aside class="obs-inspector" id="brain-inspector">
+          <div class="insp-header">Neural Node Inspector</div>
+          <div class="insp-card" id="brain-node-detail">
+            Click any node in the neural architecture map to inspect real live status, metrics, and active data flows. Inactive connections are never artificially animated.
+          </div>
+          <div class="insp-header">Subsystem Health Matrix</div>
+          <div id="brain-health-list" style="display:flex;flex-direction:column;gap:6px"></div>
+        </aside>
+      </section>
+
+      <!-- TAB 2: COGNITIVE ACTIVITY -->
+      <section class="obs-view" id="view-cognitive-activity">
+        <div class="obs-scroll-pane">
+          <div class="insp-card" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input type="text" class="obs-input" id="cog-live-query" placeholder="Execute a real query through CognitiveReasoningPipeline (POST /api/v2/intelligence/ask)..." style="flex:1;min-width:240px" />
+            <button class="obs-btn accent" id="btn-cog-run">⚡ RUN LIVE TRACE</button>
+            <button class="obs-btn" id="btn-cog-refresh">↻ REFRESH</button>
+          </div>
+          <div class="insp-header">Actual CognitiveReasoningPipeline Stages (Execution Order)</div>
+          <div class="pipeline-flow" id="cog-stages-flow"></div>
+          <div class="insp-header">Recorded Execution Traces (Click a trace to inspect executed stages)</div>
+          <div id="cog-traces-list" class="section-grid"></div>
+        </div>
+      </section>
+
+      <!-- TAB 3: KNOWLEDGE UNIVERSE -->
+      <section class="obs-view" id="view-knowledge-universe">
+        <div class="canvas-stage-wrap">
+          <div class="stage-toolbar">
+            <div class="toolbar-group">
+              <input type="text" class="obs-input" id="kg-search" placeholder="Search knowledge nodes..." style="width:160px" />
+              <select class="obs-select" id="kg-ver-filter">
+                <option value="">All Verification States</option>
+                <option value="VERIFIED">VERIFIED</option>
+                <option value="INDEPENDENTLY_VERIFIED">INDEPENDENTLY_VERIFIED</option>
+                <option value="SOURCE_CORROBORATED">SOURCE_CORROBORATED</option>
+                <option value="UNVERIFIED">UNVERIFIED</option>
+                <option value="DISPUTED">DISPUTED</option>
+              </select>
+              <button class="obs-btn" id="btn-kg-apply">FILTER</button>
+            </div>
+            <div class="toolbar-group">
+              <button class="obs-btn" id="kg-prev">◀ PREV</button>
+              <span class="obs-pill" id="kg-page-info" style="padding:3px 8px">0 / 0</span>
+              <button class="obs-btn" id="kg-next">NEXT ▶</button>
+              <button class="obs-btn" id="kg-zoom-in">＋</button>
+              <button class="obs-btn" id="kg-zoom-out">－</button>
+              <button class="obs-btn" id="kg-reset">RESET</button>
+            </div>
+          </div>
+          <canvas class="obs-canvas" id="canvas-kg"></canvas>
+        </div>
+        <aside class="obs-inspector">
+          <div class="insp-header">Knowledge Node Provenance</div>
+          <div class="insp-card" id="kg-node-detail">
+            Click any node in the Knowledge Universe graph to inspect its content preview, verification status, provenance, access scope, and connected edges.
+          </div>
+        </aside>
+      </section>
+
+      <!-- TAB 4: MEMORY EXPLORER -->
+      <section class="obs-view" id="view-memory-explorer">
+        <div class="obs-scroll-pane">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <input type="text" class="obs-input" id="mem-search" placeholder="Search authorized memory..." style="width:220px" />
+            <div id="mem-scope-pills" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+            <button class="obs-btn" id="btn-mem-refresh">↻ REFRESH</button>
+          </div>
+          <div class="insp-card" id="mem-auth-banner" style="font-family:var(--font-mono);font-size:11px;color:var(--txt-dim)">
+            Loading authorized memory records...
+          </div>
+          <div id="mem-records-grid" class="section-grid"></div>
+        </div>
+      </section>
+
+      <!-- TAB 5: LEARNING OBSERVATORY -->
+      <section class="obs-view" id="view-learning-observatory">
+        <div class="obs-scroll-pane">
+          <div class="insp-header">Mandatory Knowledge State Distinction</div>
+          <div class="section-grid" id="learn-states-grid"></div>
+          <div class="insp-header">9-Stage GNNM Learning Lifecycle</div>
+          <div class="pipeline-flow" id="learn-lifecycle-flow"></div>
+          <div class="insp-header">GNNM Model Version Timeline &amp; Registry</div>
+          <div id="learn-versions-grid" class="section-grid"></div>
+          <div class="insp-header">Recorded Temporal Learning Events</div>
+          <div id="learn-events-list" class="section-grid"></div>
+        </div>
+      </section>
+
+      <!-- TAB 6: AGENT NETWORK -->
+      <section class="obs-view" id="view-agent-network">
+        <div class="obs-scroll-pane">
+          <div class="insp-header">Registered Autonomous Agents (Registered vs. Running)</div>
+          <div id="agents-grid" class="section-grid"></div>
+          <div class="insp-header">Task Execution History</div>
+          <div id="agent-tasks-grid" class="section-grid"></div>
+        </div>
+      </section>
+
+      <!-- TAB 7: DISTRIBUTED NODES -->
+      <section class="obs-view" id="view-distributed-nodes">
+        <div class="canvas-stage-wrap">
+          <div class="stage-toolbar">
+            <div class="toolbar-group">
+              <span class="obs-pill" id="dist-summary-pill">LOCAL NODE + PEERS</span>
+              <button class="obs-btn" id="btn-dist-refresh">↻ REFRESH PEERS</button>
+            </div>
+          </div>
+          <canvas class="obs-canvas" id="canvas-nodes"></canvas>
+        </div>
+        <aside class="obs-inspector">
+          <div class="insp-header">Distributed Node Inspector</div>
+          <div class="insp-card" id="dist-node-detail">
+            Connectivity never implies trust. Click any node to inspect Ed25519 key fingerprint, trust state (TRUSTED / PENDING / REVOKED), and organization identity.
+          </div>
+          <div class="insp-header">Federation Organizations</div>
+          <div id="dist-orgs-list" style="display:flex;flex-direction:column;gap:6px"></div>
+        </aside>
+      </section>
+    </main>
+
+    <!-- LIVE EVENT STREAM BOTTOM BAR -->
+    <section class="obs-stream-bar" id="obs-stream-bar">
+      <div class="stream-hdr">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="color:var(--cyan);font-weight:700">⚡ LIVE TELEMETRY STREAM</span>
+          <span id="stream-count" style="color:var(--txt-dim)">0 events</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <select class="obs-select" id="stream-sub-filter" style="padding:2px 6px;font-size:10px">
+            <option value="">All Subsystems</option>
+            <option value="knowledge">Knowledge</option>
+            <option value="learning">Learning</option>
+            <option value="ledger">Ledger</option>
+            <option value="security">Security</option>
+          </select>
+          <input type="text" class="obs-input" id="stream-search" placeholder="Filter events..." style="width:130px;padding:2px 6px;font-size:10px" />
+          <button class="obs-btn" id="btn-stream-pause" style="padding:2px 8px;font-size:10px">⏸ PAUSE</button>
+          <button class="obs-btn" id="btn-stream-toggle" style="padding:2px 8px;font-size:10px">▼ MINIMIZE</button>
+        </div>
+      </div>
+      <div class="stream-feed" id="stream-feed"></div>
+    </section>
+  </div>
+
+  <div class="canvas-tooltip" id="canvas-tooltip"></div>
+  <script src="/ui/brain.js?v=1.0"></script>
+</body>
+</html>
