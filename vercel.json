@@ -2,6 +2,14 @@
   "version": 2,
   "builds": [
     {
+      "src": "interface/html/sitemap.xml",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "interface/html/robots.txt",
+      "use": "@vercel/static"
+    },
+    {
       "src": "main.py",
       "use": "@vercel/python",
       "config": {
@@ -21,15 +29,24 @@
       "dest": "/_vercel/$1"
     },
     {
-      "src": "/google911ef45bbcb1db67.html",
-      "dest": "main.py"
+      "src": "/sitemap.xml",
+      "headers": {
+        "Content-Type": "application/xml; charset=utf-8",
+        "Cache-Control": "public, max-age=3600",
+        "X-Robots-Tag": "all"
+      },
+      "dest": "/interface/html/sitemap.xml"
     },
     {
       "src": "/robots.txt",
-      "dest": "main.py"
+      "headers": {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "public, max-age=3600"
+      },
+      "dest": "/interface/html/robots.txt"
     },
     {
-      "src": "/sitemap.xml",
+      "src": "/google911ef45bbcb1db67.html",
       "dest": "main.py"
     },
     {

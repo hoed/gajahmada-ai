@@ -502,7 +502,7 @@ def google_site_verification():
     )
 
 
-@app.get("/robots.txt", include_in_schema=False)
+@app.api_route("/robots.txt", methods=["GET", "HEAD"], include_in_schema=False)
 def robots_txt():
     content = (
         "User-agent: *\n"
@@ -521,7 +521,7 @@ def robots_txt():
     return PlainTextResponse(content, headers={"Cache-Control": "public, max-age=3600"})
 
 
-@app.get("/sitemap.xml", include_in_schema=False)
+@app.api_route("/sitemap.xml", methods=["GET", "HEAD"], include_in_schema=False)
 def sitemap_xml():
     today = datetime.now(WIB_TZ).strftime("%Y-%m-%d")
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>

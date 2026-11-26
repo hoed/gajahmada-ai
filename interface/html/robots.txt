@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Allow: /dashboard
+Allow: /ui
+Allow: /docs
+Disallow: /api/v2/reasoning
+Disallow: /api/v2/agents
+Disallow: /api/v2/learning/
+Disallow: /node/config
+Disallow: /node/logs
+
+Sitemap: https://gajahmada.vercel.app/sitemap.xml

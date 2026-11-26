@@ -314,6 +314,8 @@ def test_seo_sitemap_and_robots_valid_for_gsc():
     import xml.etree.ElementTree as ET
 
     client = TestClient(app)
+    assert client.head("/sitemap.xml").status_code == 200
+    assert client.head("/robots.txt").status_code == 200
     r_sm = client.get("/sitemap.xml")
     assert r_sm.status_code == 200
     assert "application/xml" in r_sm.headers["content-type"]
