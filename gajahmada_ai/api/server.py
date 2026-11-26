@@ -342,7 +342,8 @@ def ensure_initialized():
 
     if gnnm_model_registry is None:
         gnnm_model_registry = GNNMModelRegistry(
-            storage_path=os.path.join(storage_dir, "gnnm_model_registry.json")
+            storage_path=os.path.join(storage_dir, "gnnm_model_registry.json"),
+            runtime_router=engine.router if engine else None,
         )
 
     if training_pipeline is None:

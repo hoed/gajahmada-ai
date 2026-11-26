@@ -262,11 +262,20 @@ class HybridKnowledgeRetriever(KnowledgeRetriever):
                 return False
         return True
 
-    def _collect_memory_records(self, query: str, top_k: int) -> List[KnowledgeRecord]:
+    def _collect_memory_records(
+        self,
+        query: str,
+        top_k: int,
+        access_context: Optional[KnowledgeAccessContext] = None,
+    ) -> List[KnowledgeRecord]:
         if self.memory_manager is None:
             return []
         try:
-            raw_recs = self.memory_manager.retrieve(query=query, top_k=max(top_k * 2, 6))
+            raw_recs = self.memory_manager.retrieve(
+                query=query,
+                top_k=max(top_k * 2, 6),
+                access_context=access_context,
+            )
         except Exception:
             return []
 
@@ -353,7 +362,7 @@ class HybridKnowledgeRetriever(KnowledgeRetriever):
         if self.config.external_retrieval and access_context.include_external:
             candidates.extend(self._external_records.values())
         if access_context.include_memory:
-            candidates.extend(self._collect_memory_records(query, top_k=top_k))
+            candidates.extend(self._collect_memory_records(query, top_k=top_k, access_context=access_context))
         if (
             self.config.enable_distributed_sources
             and access_context.include_distributed

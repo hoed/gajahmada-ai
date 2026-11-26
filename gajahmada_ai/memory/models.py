@@ -30,10 +30,14 @@ class VerificationStatus(str, Enum):
 
 class VisibilityPolicy(str, Enum):
     PRIVATE = "PRIVATE"
+    SESSION = "SESSION"
+    AGENT = "AGENT"
+    ORGANIZATION = "ORGANIZATION"
     LOCAL = "LOCAL"
     SHARED = "SHARED"
     COLLECTIVE = "COLLECTIVE"
     PUBLIC = "PUBLIC"
+    DISTRIBUTED_SHARED = "DISTRIBUTED_SHARED"
 
 
 class SourceProvenance(BaseModel):

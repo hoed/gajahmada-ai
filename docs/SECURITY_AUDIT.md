@@ -109,3 +109,17 @@
 | **D. Persistent GIP Replay Protection** | **HIGH** | `PersistentNonceStore` backed by SQLite WAL (`gip_replay.db`) with atomic `BEGIN IMMEDIATE` + `INSERT OR IGNORE` and TTL aligned to `max_clock_skew_sec`. | `test_round3_d_gip_replay_protection_persists_across_restarts` |
 | **E. Fail-Closed Key Persistence & Rotation/Revocation State** | **HIGH** | Atomic `0600` key writing raising `KeyPersistenceError` on failure; persistent `<key_path>.state.json` storing `key_version`, dual-signed `rotation_history`, and `revocation_records` with peer sync via `GIP-IDENTITY`. | `test_round3_e_key_persistence_fails_closed_and_persists_rotations_and_revocations` |
 | **F. Non-Genesis Ledger Validation & Terminology** | **HIGH** | Strict genesis-only (`index == 0`) signature exemption in `AIBlockchain.verify_block_signature()` (rejects unsigned or spoofed `"Genesis Node"` non-genesis blocks); clarified as `tamper_evident_local_signed_event_ledger`. | `test_round3_f_ledger_rejects_unsigned_or_spoofed_genesis_non_genesis_blocks` |
+
+
+---
+
+## 4. Master Engineering Hardening Matrix (2026-11-26 — Phases 1–5)
+
+| Control | Severity | Implementation | Verification Test |
+| :--- | :---: | :--- | :--- |
+| **Strict P0 Training Integrity (`TRAINING_NOT_EXECUTED`, SHA-256, Smoke Check)** | **P0 CRITICAL** | `gajahmada_ai/learning/training_pipeline.py` & `model_registry.py` | `test_evaluation_gate_model_registry_promotion_and_rollback` + `.venv312` live PyTorch E2E |
+| **Direct `MemoryManager` 9-Scope Authorization & Canonical `AccessContext`** | **P0 CRITICAL** | `gajahmada_ai/security/context.py`, `memory/authorization.py`, `memory/manager.py` | `test_phase1_direct_memory_manager_enforces_cross_user_session_agent_org_isolation` |
+| **Concurrent Immutable Per-Request Context Budget & Honest Embedding Metadata** | **P1 HIGH** | `gajahmada_ai/knowledge/controller.py`, `context_builder.py`, `embedding.py` | `test_phase2_embedding_honesty_and_concurrent_immutable_context_budget` |
+| **6-Dimension `ModelEvaluationGate` + Dataset Leakage Detection + Runtime Registry Coupling** | **P1 HIGH** | `gajahmada_ai/learning/evaluation_gate.py`, `model_registry.py`, `api/server.py` | `test_evaluation_gate_model_registry_promotion_and_rollback` |
+| **`SignedKnowledgeEnvelope` & Organizational Independence** | **P2** | `gajahmada_ai/network/signed_knowledge.py` | `test_phase4_signed_knowledge_envelope_and_organization_independence` |
+| **Privacy-Safe Observability & 9-Subsystem Health Endpoint** | **P2** | `gajahmada_ai/security/observability.py`, `GET /api/v2/system/health/subsystems` | `test_phase5_observability_privacy_and_subsystem_health_endpoint` |

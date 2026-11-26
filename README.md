@@ -8,11 +8,11 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-blue.svg)](https://www.python.org/)
-[![Tests: 57 Passed](https://img.shields.io/badge/Tests-57%20Passed-brightgreen.svg)](#automated-verification--benchmarks)
+[![Tests: 61 Passed](https://img.shields.io/badge/Tests-61%20Passed-brightgreen.svg)](#automated-verification--benchmarks)
 [![Offline First](https://img.shields.io/badge/Mode-Offline--First%20Sovereign-orange.svg)](#quick-start)
 [![Live Demo](https://img.shields.io/badge/Live-gajahmada.vercel.app-teal.svg)](https://gajahmada.vercel.app/)
 
-[Live Node](https://gajahmada.vercel.app/) · [Architecture Reference](ARCHITECTURE.md) · [GNNM Blueprint](docs/GNNM_ARCHITECTURE.md) · [GIP/2.0 RFC](docs/GIP_2_0_RFC.md) · [Security Audit](docs/SECURITY_AUDIT.md) · [Roadmap](docs/ROADMAP.md)
+[Live Node](https://gajahmada.vercel.app/) · [Architecture](ARCHITECTURE.md) · [Hybrid Knowledge](docs/HYBRID_KNOWLEDGE_ARCHITECTURE.md) · [Learning Pipeline](docs/GNNM_LEARNING_PIPELINE.md) · [Memory Security](docs/MEMORY_SECURITY_MODEL.md) · [Embeddings](docs/EMBEDDING_ARCHITECTURE.md) · [Evaluation](docs/EVALUATION_FRAMEWORK.md) · [Model Registry](docs/MODEL_REGISTRY_AND_PROMOTION.md) · [Distributed Trust](docs/DISTRIBUTED_KNOWLEDGE_TRUST.md) · [GIP/2.0 RFC](docs/GIP_2_0_RFC.md)
 
 </div>
 
@@ -43,25 +43,26 @@ Coordinating all three systems is the **Hybrid Knowledge Controller** (`HybridKn
    - Verified from-scratch checkpoints trained locally on CPU: `GNNM-01-Tiny` (`918,656` params) and `GNNM-01-12M` (**`11,243,520` params**, 10M–50M tier), with scaling presets up to `GNNM-04-1B` (`~1.1B` params).
    - `PyTorchNativeBackend` enforces exact token-budget context allocation against each checkpoint's `max_seq_len` (zero arbitrary character truncation). When no neural checkpoint is loaded, `ModelRouter` honestly reports `neural_inference_active: False` while the deterministic Cognitive Engine stays 100% operational.
 
-2. **Hybrid External Knowledge & Pluggable Offline Embeddings (`gajahmada_ai/knowledge/`):**
+2. **Hybrid External Knowledge & Pluggable Offline Embeddings (`gajahmada_ai/knowledge/` — see [HYBRID_KNOWLEDGE_ARCHITECTURE.md](docs/HYBRID_KNOWLEDGE_ARCHITECTURE.md) & [EMBEDDING_ARCHITECTURE.md](docs/EMBEDDING_ARCHITECTURE.md)):**
    - **10-Step Ingestion (`KnowledgeIngestionPipeline`):** Parse → Normalize → Validate → SHA-256 Deduplicate → Extract Metadata → Structure/Token-Aware Chunking (`DocumentChunker`) → Embed → Persist in `SQLite WAL` (`external_knowledge.db`) → Track Lineage (`SourceRegistry`) → Log Status.
-   - **Pluggable Embeddings (`embedding.py`):** Preserves `HashEmbeddingProvider` (`deterministic-hash-384d`) as default offline fallback, adds `NativeSemanticEmbeddingProvider` (`gajahmada-native-semantic-384d` bilingual ID/EN offline semantic encoder), enforces strict encoder compatibility checks before vector similarity comparisons, and supports incremental, reversible re-embedding (`EmbeddingMigrationManager`).
-   - **Hybrid Retrieval & Safe Context:** Combines cosine vector similarity, Okapi BM25 lexical ranking, Knowledge Graph entity boosts, and Persistent Memory retrieval under fail-closed `KnowledgeAccessPolicy`. Retrieved chunks are wrapped in `<untrusted_retrieved_data>` delimiters with prompt-injection sanitization inside `TokenBudgetContextBuilder`.
+   - **Honest Offline Embeddings (`embedding.py`):** Preserves `HashEmbeddingProvider` (`deterministic-hash-384d`) as default offline fallback, adds `NativeSemanticEmbeddingProvider` (explicitly classified as `heuristic_semantic_projection`, `is_learned_model: False`), provides fail-closed `LocalLearnedEmbeddingProvider` / `FutureGNNMEmbeddingProvider` interfaces for future trained encoders, enforces strict encoder compatibility before cosine similarity, and supports reversible `EmbeddingMigrationManager` re-embedding.
+   - **Concurrency-Safe Retrieval & Safe Context:** Combines cosine vector similarity, Okapi BM25, Knowledge Graph boosts, and Persistent Memory under fail-closed `KnowledgeAccessPolicy`. `GNNMKnowledgeAdapter` constructs an **immutable per-request** `TokenBudgetContextBuilder` (zero shared-state mutation across concurrent requests), isolating retrieved text in `<untrusted_retrieved_data>` delimiters with prompt-injection sanitization.
 
-3. **Isolated Knowledge-to-Model Learning Pipeline (`gajahmada_ai/learning/`):**
+3. **Strict-Integrity Knowledge-to-Model Learning Pipeline (`gajahmada_ai/learning/` — see [GNNM_LEARNING_PIPELINE.md](docs/GNNM_LEARNING_PIPELINE.md), [EVALUATION_FRAMEWORK.md](docs/EVALUATION_FRAMEWORK.md), & [MODEL_REGISTRY_AND_PROMOTION.md](docs/MODEL_REGISTRY_AND_PROMOTION.md)):**
    - Completely decoupled from production inference and ingestion.
    - **`TrainingKnowledgeFilter`** rejects `UNVERIFIED`, `DISPUTED`, `REJECTED`, prompt-injection payloads, missing/restricted licenses, low-quality OCR, duplicates, and untrusted peer/agent inputs.
-   - **`KnowledgeDatasetBuilder`** generates separate versioned JSONL manifests for **Continued Pretraining** vs. **Supervised Fine-Tuning (SFT)**.
-   - **`KnowledgeToModelPipeline`** trains from an isolated copy of the base checkpoint with reproducible seeds, evaluates candidates through **`ModelEvaluationGate`** (ID/EN quality, grounded faithfulness, citation accuracy, hallucination rate, perplexity ratio, prompt-injection resilience), and manages lifecycle states (`DEVELOPMENT` → `TRAINING` → `EVALUATING` → `APPROVED` → `ACTIVE` / `REJECTED` / `ARCHIVED`) in **`GNNMModelRegistry`** with explicit operator-approved promotion and instant rollback.
+   - **`KnowledgeDatasetBuilder`** generates separate SHA-256 JSONL manifests for **Continued Pretraining** vs. **Supervised Fine-Tuning (SFT)**.
+   - **`KnowledgeToModelPipeline`** enforces strict P0 training statuses (`CHECKPOINT_MISSING`, `TRAINING_NOT_EXECUTED`, `TRAINING_FAILED`, `CHECKPOINT_INVALID`, `EVALUATION_FAILED`, `APPROVED`): a candidate can enter `EVALUATING` **only** after real PyTorch training, SHA-256 checkpoint integrity verification, and real `GNNMInferenceEngine` smoke inference succeed (missing PyTorch returns `TRAINING_NOT_EXECUTED`, never `APPROVED`).
+   - **6-Dimension `ModelEvaluationGate` (`gm-eval-v2.1`):** Evaluates functional stability, Indonesian/English/mixed language, grounded faithfulness & citation accuracy, abstention on unknown queries, reasoning, prompt-injection resilience, train/val leakage detection, and baseline regression deltas.
+   - **Runtime-Coupled `GNNMModelRegistry`:** Enforces strict lifecycle transitions (`DEVELOPMENT` → `TRAINING` → `EVALUATING` → `APPROVED` → `ACTIVE` / `REJECTED` / `ARCHIVED`), verifies live on-disk SHA-256 before promotion, stages & smoke-tests candidates on a fresh `PyTorchNativeBackend`, and switches `ModelRouter` atomically with instant rollback.
 
-4. **Security Hardening & Tamper-Evident Local Signed Event Ledger (`gajahmada_ai/security/`, `blockchain/`):**
-   - **Zero Signing Oracle & Fail-Closed Auth:** `/security/sign-verify` uses an isolated ephemeral keypair + domain-separated nonce; 256-bit rotatable admin key (`admin_api.key`, `0600`); fail-closed RBAC (`401`/`403`) on all state-mutating v1/v2 endpoints and internal operational endpoints (`/api/v2/reasoning`, `/api/v2/agents`, `/api/v2/learning/*`); active `SlidingWindowRateLimiter` (`429`) and configurable CORS.
-   - **Explicit Visibility Access Matrix (`MemoryAuthorizationService` & `KnowledgeAccessPolicy`):** `PRIVATE` & `LOCAL` restricted to `admin`/`operator` (with cross-agent and cross-node isolation); `SHARED` requires authentication; only `COLLECTIVE`/`PUBLIC` are publicly readable.
-   - **Fail-Closed Key Management:** Atomic `0600` private-key persistence (`KeyPersistenceError` on failure) and restart-persistent dual-signed rotation certificates & revocation lists (`node_key.pem.state.json`).
-   - **Tamper-Evident Local Signed Event Ledger (Schema v2):** Local hash-chained, Ed25519-signed audit ledger (not a public BFT distributed consensus blockchain) with canonical JSON hashing over every field, strict full-envelope Ed25519 verification on every non-genesis block (`index > 0`), atomic writes (`tmp + fsync + .bak + os.replace`), and explicit `LEDGER_CORRUPTED` halt + `recover_from_backup()`.
+4. **Security Hardening, Direct Memory Authorization & Tamper-Evident Ledger (`gajahmada_ai/security/`, `memory/`, `blockchain/` — see [MEMORY_SECURITY_MODEL.md](docs/MEMORY_SECURITY_MODEL.md) & [SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md)):**
+   - **Canonical `AccessContext` & Direct Memory Enforcement:** Immutable `AccessContext` (`actor_id`, `actor_role`, `organization_id`, `agent_id`, `session_id`, `request_id`) propagates from API → `CognitiveReasoningPipeline` → `HybridKnowledgeController` → `MemoryManager.retrieve()`, enforcing all 9 scopes (`PRIVATE`, `SESSION`, `AGENT`, `ORGANIZATION`, `LOCAL`, `SHARED`, `DISTRIBUTED_SHARED`, `COLLECTIVE`, `PUBLIC`) fail-closed and recording privacy-safe `MEMORY_ACCESS_DENIED` audit events without leaking private content.
+   - **Zero Signing Oracle, Fail-Closed Auth & Observability:** `/security/sign-verify` uses an isolated ephemeral keypair; 256-bit rotatable admin key (`admin_api.key`, `0600`); fail-closed RBAC (`401`/`403`) on all mutating & internal endpoints; `LifecycleObservabilityLogger` (scrubbing prompts & hashing actor IDs) + honest per-subsystem health (`GET /api/v2/system/health/subsystems` reporting `HEALTHY | DEGRADED | UNAVAILABLE | NOT_CONFIGURED`).
+   - **Fail-Closed Key Management & Tamper-Evident Local Signed Event Ledger (Schema v2):** Atomic `0600` private-key persistence (`KeyPersistenceError` on failure), persistent dual-signed rotation/revocation state (`node_key.pem.state.json`), and local hash-chained Ed25519 audit ledger (strict non-genesis verification, atomic writes, `LEDGER_CORRUPTED` halt + `recover_from_backup()`).
 
-5. **GIP/2.0 Cryptographic Mesh, Collective Federation & Ecosystem SDK (`gajahmada_ai/network/`, `sdk/`):**
-   - Full 8-namespace `GIP/2.0` protocol (`docs/GIP_2_0_RFC.md`) backed by an atomic SQLite WAL replay nonce store (`gip_replay.db`), explicit `PeerTrustState` lifecycle, SSRF validation, direct Ed25519 quorum verification (`QuorumConsensusManager`), and multi-organization sovereign federation (`FederationRegistry`, `config.federation.example.yaml`).
+5. **GIP/2.0 Cryptographic Mesh, Organizational Trust & Ecosystem SDK (`gajahmada_ai/network/`, `sdk/` — see [DISTRIBUTED_KNOWLEDGE_TRUST.md](docs/DISTRIBUTED_KNOWLEDGE_TRUST.md) & [GIP_2_0_RFC.md](docs/GIP_2_0_RFC.md)):**
+   - Full 8-namespace `GIP/2.0` protocol backed by an atomic SQLite WAL replay nonce store (`gip_replay.db`), explicit `PeerTrustState` lifecycle, SSRF guard, direct Ed25519 quorum verification (`QuorumConsensusManager`), multi-organization `FederationRegistry`, and `SignedKnowledgeEnvelope` (`count_independent_operators` deduplicating same-organization keys).
    - Official Python SDK (`sdk/gajahmada_sdk/`) with `GajahMadaClient`, `NodeKeyPair`, and `build_signed_gip_message`.
 
 ---
@@ -102,10 +103,17 @@ gajahmada/
 ├── supabase/
 │   └── schema.sql                       # PostgreSQL + pgvector schema, match_knowledge RPC, & RLS
 ├── docs/
+│   ├── HYBRID_KNOWLEDGE_ARCHITECTURE.md # Three-system hybrid knowledge design & maturity status
+│   ├── GNNM_LEARNING_PIPELINE.md        # Strict P0 training integrity, filtering, & checkpoint checks
+│   ├── MEMORY_SECURITY_MODEL.md         # Canonical AccessContext & 9-scope direct memory authorization
+│   ├── EMBEDDING_ARCHITECTURE.md        # Hash/heuristic/learned embedding providers & migration
+│   ├── MODEL_REGISTRY_AND_PROMOTION.md  # State machine, SHA-256 verification, & atomic runtime switch
+│   ├── EVALUATION_FRAMEWORK.md          # 6-dimension EvaluationGate (gm-eval-v2.1) & leakage checks
+│   ├── DISTRIBUTED_KNOWLEDGE_TRUST.md   # SignedKnowledgeEnvelope & org-level independence
 │   ├── GNNM_ARCHITECTURE.md             # GNNM-01..04 Transformer blueprint & training status
 │   ├── GIP_2_0_RFC.md                   # Formal GIP/2.0 wire protocol & interoperability RFC
 │   ├── BENCHMARK_REPORT.json            # Reproducible ecosystem benchmark report (Stages 1-5)
-│   ├── SECURITY_AUDIT.md                # Security controls & Round 1-3 remediation matrix
+│   ├── SECURITY_AUDIT.md                # Security controls & Round 1-3 + Master Hardening matrix
 │   ├── ARCHITECTURE_V2.md               # 8-layer & 14-stage cognitive specification
 │   ├── AUDIT_V2.md                      # Source code audit & capability classification
 │   ├── MIGRATION_PLAN.md                # v1 -> v2 compatibility contract
@@ -132,13 +140,13 @@ gajahmada/
 │   ├── cognition/ & reasoning/          # 14-stage CognitiveReasoningPipeline, SymbolicReasoner, EvidenceReasoner, Contradictions
 │   ├── storage/                         # RelationalMemoryStore (SQLite/PG), SupabaseKnowledgeStore, ObjectStore
 │   ├── agents/ & execution/             # Planner, Researcher, Analyst, Verifier, Scheduler, SandboxedExecutor
-│   ├── network/                         # GIP/2.0 (SQLite WAL replay), FederationRegistry, PeerDiscovery, QuorumConsensus
+│   ├── network/                         # GIP/2.0 (SQLite WAL replay), SignedKnowledgeEnvelope, FederationRegistry, PeerDiscovery, QuorumConsensus
 │   ├── blockchain/                      # AIBlockchain Schema v2 tamper-evident local signed event ledger + atomic recovery
-│   ├── security/                        # NodeIdentity (fail-closed Ed25519), AuthManager (RBAC), SSRF, RateLimiter, AuditLogger
+│   ├── security/                        # AccessContext, LifecycleObservabilityLogger, NodeIdentity (fail-closed Ed25519), AuthManager, SSRF, RateLimiter
 │   ├── api/                             # FastAPI server.py (v1, UI, SEO/sitemap.xml) & v2_routes.py (/api/v2/*)
 │   └── cli/                             # Sovereign Node CLI v1 & v2
-├── interface/html/                      # Dual-Mode Web UI (/, /dashboard, /ui), SEO JSON-LD, & sitemap.xml
-└── tests/                               # 57 Automated Tests across unit, knowledge, learning, cognition, memory, network, security, integration
+├── interface/html/                      # Dual-Mode Web UI (/, /dashboard, /ui), Hybrid Knowledge & GNNM Lab Modals, SEO JSON-LD, & sitemap.xml
+└── tests/                               # 61 Automated Tests across unit, knowledge, learning, cognition, memory, network, security, integration
 ```
 
 ---
@@ -212,7 +220,7 @@ GM_KNOWLEDGE_ENABLE_DISTRIBUTED_SOURCES=false
 | `GET` / `POST` | `/api/v2/agents`, `/agents/run`, `/tasks/{id}/approve` | **Required** | Bounded autonomous agents with unforgeable human approval gates. |
 | `POST` | `/api/v2/network/gip` | Ed25519 + Trust | 8-namespace GIP/2.0 receiver (SQLite WAL replay store, `PeerTrustState`, direct Ed25519 consensus). |
 | `GET` / `POST` | `/api/v2/federation`, `/federation/organizations` | Read: Public / Write: **Required** | Multi-organization sovereign federation registry. |
-| `GET` | `/api/v2/system/health` | Public (redacted) | Node health, `tamper_evident_local_signed_event_ledger` status, & audit integrity. |
+| `GET` | `/api/v2/system/health`, `/health/subsystems` | Public (redacted) | Node health, honest 9-subsystem status (`HEALTHY \| DEGRADED \| UNAVAILABLE \| NOT_CONFIGURED`), & ledger integrity. |
 | `GET` | `/sitemap.xml`, `/robots.txt`, `/manifest.json` | Public | Google Search Console sitemap, crawler directives, and PWA manifest for `https://gajahmada.vercel.app`. |
 
 *All legacy v1 endpoints (`/ai/chat`, `/ai/embedding`, `/ai/ingest`, `/knowledge/search`, `/knowledge/stats`, `/node/info`, `/node/chain`, `/security/sign-verify`, etc.) remain 100% compatible with fail-closed RBAC on state-mutating routes.*
@@ -236,10 +244,10 @@ python3 scripts/run_ecosystem_benchmarks.py
 | **Knowledge-to-Model Learning (4)** | `TrainingKnowledgeFilter` (unverified/disputed/injection/license/OCR), Pretraining vs. SFT datasets, `ModelEvaluationGate`, `GNNMModelRegistry` promotion & rollback, & `/api/v2/learning/*` RBAC. | `tests/learning/test_knowledge_learning_pipeline.py` | ✅ **PASSED** |
 | **Cognitive & Memory (6)** | 14-stage pipeline, Stage 2 neural-off 100% accuracy, restart survival, versioning, contradiction preservation. | `tests/cognition/`, `tests/memory/` | ✅ **PASSED** |
 | **GIP, Federation & Scale (7)** | 2/3/10/100-node GIP stress/Sybil/revocation tests, 4-org sovereign federation + Ed25519 `node_attestations`. | `tests/network/` | ✅ **PASSED** |
-| **Security & Audit Rounds 1–3 (19)** | Signing oracle removal, fail-closed RBAC, visibility matrix, persistent SQLite replay guard, fail-closed key persistence, non-genesis ledger validation, `LEDGER_CORRUPTED` recovery. | `tests/security/` | ✅ **PASSED** |
+| **Security, Audit Rounds 1–3 & Master Hardening (23)** | Signing oracle removal, fail-closed RBAC, direct `MemoryManager` 9-scope cross-user/session/agent/org isolation, canonical `AccessContext`, concurrent immutable context budgets, `SignedKnowledgeEnvelope` org independence, privacy-safe observability, persistent SQLite replay guard, fail-closed key persistence, & non-genesis ledger validation. | `tests/security/` | ✅ **PASSED** |
 | **API Compatibility, SDK & Benchmarks (3)** | Full v1/v2 compatibility, official Python SDK lifecycle, live cognitive benchmarks. | `tests/integration/`, `tests/benchmarks/` | ✅ **PASSED** |
 
-**Total:** **57 passed, 0 failed** (`docs/BENCHMARK_REPORT.json` verified).
+**Total:** **61 passed, 0 failed** on Python 3.14 (`python3 -m pytest -q`) + live PyTorch E2E training, SHA-256 verification, evaluation gate, and atomic `ModelRouter` promotion/rollback verified on `.venv312` (`docs/BENCHMARK_REPORT.json`).
 
 ---
 

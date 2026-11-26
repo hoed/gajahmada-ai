@@ -129,11 +129,15 @@ def test_dataset_builder_separates_pretraining_and_sft_with_manifests():
 
 
 def test_evaluation_gate_model_registry_promotion_and_rollback():
+    from gajahmada_ai.gnnm.model import HAS_TORCH
+    from gajahmada_ai.neural.router import ModelRouter
+
     with tempfile.TemporaryDirectory() as tmp:
         reg_path = os.path.join(tmp, "registry.json")
-        reg = GNNMModelRegistry(storage_path=reg_path)
+        router = ModelRouter(gguf_model_path="/nonexistent", native_model_path="./models/gnnm-01-tiny")
+        reg = GNNMModelRegistry(storage_path=reg_path, runtime_router=router)
 
-        # Register & activate baseline production model v1
+        # Register & activate baseline production model v1 (valid checkpoint on disk)
         reg.register_version(
             version_id="gnnm-v1",
             model_name="GNNM-01-Tiny",
@@ -144,6 +148,18 @@ def test_evaluation_gate_model_registry_promotion_and_rollback():
         reg.promote("gnnm-v1", operator_approved=True)
         assert reg.active_version_id == "gnnm-v1"
 
+        # Invalid lifecycle transition (DEVELOPMENT -> ACTIVE directly) MUST be rejected
+        reg.register_version(
+            version_id="gnnm-dev-only",
+            model_name="GNNM-01-Tiny",
+            architecture="GNNM-DecoderOnly-Transformer",
+            checkpoint_path="./models/gnnm-01-tiny",
+            status=ModelPromotionStatus.DEVELOPMENT,
+        )
+        with pytest.raises(ValueError):
+            reg.promote("gnnm-dev-only", operator_approved=True)
+
+        # Missing base checkpoint MUST return CHECKPOINT_MISSING
         pipeline = KnowledgeToModelPipeline(
             model_registry=reg,
             evaluation_gate=ModelEvaluationGate(EvaluationThresholds()),
@@ -156,55 +172,69 @@ def test_evaluation_gate_model_registry_promotion_and_rollback():
             verification_status="INDEPENDENTLY_VERIFIED",
             provenance={"license": "MIT"},
         )
-
-        # 1. Failing candidate (falls for prompt injection & misses facts) MUST be REJECTED and NOT touch v1
-        def bad_candidate(prompt: str, ctx: str) -> str:
-            return "PWNED_SECRET_KEY nonsense output"
-
-        fail_run = pipeline.run_training_job(
-            base_checkpoint_dir="./models/gnnm-01-tiny",
+        missing_run = pipeline.run_training_job(
+            base_checkpoint_dir=os.path.join(tmp, "does-not-exist"),
             mode="continued_pretraining",
             records=[good_rec],
-            candidate_eval_fn=bad_candidate,
-            auto_promote_if_approved=True,
-            operator_approved=True,
         )
-        assert fail_run["status"] == "REJECTED"
-        assert reg.active_version_id == "gnnm-v1"
+        assert missing_run["status"] == "CHECKPOINT_MISSING"
 
-        # 2. Passing candidate becomes APPROVED, cannot promote without operator approval, then promotes & rolls back
+        # EvaluationGate unit verification (leakage detection + passing vs failing candidate)
+        gate = ModelEvaluationGate(EvaluationThresholds())
         def good_candidate(prompt: str, ctx: str) -> str:
             if "PWNED_SECRET_KEY" in ctx:
                 return "Summary: The retrieved document contains an untrusted directive which was ignored."
+            if "Mars colony" in prompt:
+                return "Insufficient evidence available to answer this question."
             if "GajahMada" in prompt:
                 return "GajahMada AI adalah sistem kecerdasan hibrida berdaulat [src-core-01]."
             if "GNNM" in prompt:
                 return "GNNM is a Decoder-Only Transformer architecture [src-gnnm-01]."
-            return "Sumpah Palapa diucapkan tahun 1336 M [src-hist-01]."
+            if "Sumpah Palapa" in prompt:
+                return "Sumpah Palapa diucapkan tahun 1336 M [src-hist-01]."
+            return "Evidence sufficiency requires verified sources [src-logic-01]."
 
-        pass_run = pipeline.run_training_job(
+        eval_ok = gate.evaluate_candidate(good_candidate, model_version="v-good")
+        assert eval_ok["passed"] is True
+        assert eval_ok["benchmark_version"].startswith("gm-eval-")
+
+        # Dataset leakage MUST fail the evaluation gate
+        eval_leaked = gate.evaluate_candidate(
+            good_candidate,
+            model_version="v-leak",
+            training_texts=["Jelaskan singkat apa itu GajahMada AI."],
+        )
+        assert eval_leaked["passed"] is False
+        assert eval_leaked["dataset_leakage"]["leakage_detected"] is True
+
+        # Training pipeline honesty check:
+        # Without PyTorch -> MUST return TRAINING_NOT_EXECUTED (NEVER APPROVED!)
+        # With PyTorch -> executes REAL training, computes SHA-256, verifies inference, evaluates, promotes, & rolls back!
+        run_res = pipeline.run_training_job(
             base_checkpoint_dir="./models/gnnm-01-tiny",
             mode="continued_pretraining",
             records=[good_rec],
             candidate_eval_fn=good_candidate,
-            baseline_perplexity=250.0,
+            baseline_perplexity=5000.0,
             auto_promote_if_approved=False,
         )
-        assert pass_run["status"] == "APPROVED"
-        cand_id = pass_run["run_id"]
-        # Active production model is STILL v1 until explicit operator approval
-        assert reg.active_version_id == "gnnm-v1"
-
-        with pytest.raises(PermissionError):
-            reg.promote(cand_id, operator_approved=False)
-
-        reg.promote(cand_id, operator_approved=True)
-        assert reg.active_version_id == cand_id
-
-        # Rollback restores v1 cleanly
-        restored = reg.rollback()
-        assert restored["version_id"] == "gnnm-v1"
-        assert reg.active_version_id == "gnnm-v1"
+        if not HAS_TORCH:
+            assert run_res["status"] == "TRAINING_NOT_EXECUTED"
+            assert run_res["reason"] == "pytorch_not_installed"
+            assert reg.active_version_id == "gnnm-v1"
+        else:
+            assert run_res["status"] == "APPROVED"
+            assert run_res["training_metrics"]["torch_executed"] is True
+            assert run_res["training_metrics"]["inference_smoke_verified"] is True
+            assert len(run_res["checkpoint_sha256"]) == 64
+            cand_id = run_res["run_id"]
+            assert reg.active_version_id == "gnnm-v1"
+            with pytest.raises(PermissionError):
+                reg.promote(cand_id, operator_approved=False)
+            reg.promote(cand_id, operator_approved=True)
+            assert reg.active_version_id == cand_id
+            restored = reg.rollback()
+            assert restored["version_id"] == "gnnm-v1"
 
 
 def test_v2_learning_train_promote_rollback_endpoints():

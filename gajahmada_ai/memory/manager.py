@@ -2,6 +2,7 @@ import time
 from typing import Any, Callable, Dict, List, Optional
 
 from gajahmada_ai.cognition.perception import PerceptionModule
+from gajahmada_ai.memory.authorization import MemoryAuthorizationService
 from gajahmada_ai.memory.collective import CollectiveMemory
 from gajahmada_ai.memory.consolidation import MemoryConsolidator
 from gajahmada_ai.memory.episodic import EpisodicMemory
@@ -60,6 +61,7 @@ class MemoryManager:
         self.contradiction_detector = ContradictionDetector()
         self.perception = PerceptionModule()
         self.object_store = ContentAddressedObjectStore(base_dir=backup_dir)
+        self.authorization = MemoryAuthorizationService()
 
     def store(
         self,
@@ -73,6 +75,10 @@ class MemoryManager:
         verification_status: VerificationStatus = VerificationStatus.UNVERIFIED,
         visibility_policy: VisibilityPolicy = VisibilityPolicy.LOCAL,
         record_id: Optional[str] = None,
+        owner_actor_id: Optional[str] = None,
+        organization_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         clean_content = content.strip()
         if not clean_content:
@@ -95,9 +101,18 @@ class MemoryManager:
         prov = SourceProvenance(
             origin_node_id=origin_node_id,
             source_type=source_type,
-            author=author,
+            author=owner_actor_id or author,
             signature=signature,
         )
+        scope_meta: Dict[str, Any] = {}
+        if owner_actor_id:
+            scope_meta["owner_actor_id"] = owner_actor_id
+        if organization_id:
+            scope_meta["organization_id"] = organization_id
+        if agent_id:
+            scope_meta["agent_id"] = agent_id
+        if session_id:
+            scope_meta["session_id"] = session_id
         rec_kwargs: Dict[str, Any] = {
             "content": clean_content,
             "memory_type": memory_type,
@@ -147,6 +162,8 @@ class MemoryManager:
                 detected_contradictions.append(c_dict)
 
         rec_dict = record.to_storage_dict()
+        if scope_meta:
+            rec_dict["source_provenance"] = {**(rec_dict.get("source_provenance") or {}), **scope_meta}
         self.storage.save_record(rec_dict)
         self.versioning.record_version_snapshot(rec_dict, modified_by=author, reason="initial_store")
         self.knowledge_graph.extract_and_store_relations(
@@ -211,13 +228,37 @@ class MemoryManager:
         memory_type: Optional[str] = None,
         top_k: int = 5,
         only_verified: bool = False,
+        access_context: Optional[Any] = None,
     ) -> List[Dict[str, Any]]:
-        return self.retriever.retrieve(
+        """
+        Retrieve memory records with direct memory-boundary authorization (Phase 1 P0).
+        - When `access_context` is provided, strictly enforces `PRIVATE`, `SESSION`, `AGENT`,
+          `ORGANIZATION`, `LOCAL`, `SHARED`, `COLLECTIVE`, `PUBLIC`, and `DISTRIBUTED_SHARED`.
+        - When `access_context` is None (legacy internal callers), NEVER returns strictly scoped
+          records (`PRIVATE`, `SESSION`, `AGENT`, `ORGANIZATION`) — fail-closed by default.
+        """
+        fetch_k = max(top_k * 3, 15)
+        raw = self.retriever.retrieve(
             query=query,
             memory_type=memory_type,
-            top_k=top_k,
+            top_k=fetch_k,
             only_verified=only_verified,
         )
+        if access_context is not None:
+            authorized = self.authorization.filter_records_with_context(raw, access_context)
+            return authorized[:top_k]
+
+        restricted_without_ctx = {
+            VisibilityPolicy.PRIVATE.value,
+            VisibilityPolicy.SESSION.value,
+            VisibilityPolicy.AGENT.value,
+            VisibilityPolicy.ORGANIZATION.value,
+        }
+        safe = [
+            r for r in raw
+            if str(r.get("visibility_policy", "LOCAL")).upper() not in restricted_without_ctx
+        ]
+        return safe[:top_k]
 
     def get_shareable_records(self, limit: int = 100) -> List[Dict[str, Any]]:
         """Rule 6: Only export records whose visibility policy permits sharing."""

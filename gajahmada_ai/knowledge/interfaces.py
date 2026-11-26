@@ -63,19 +63,25 @@ class HybridKnowledgeConfig:
 
 @dataclass
 class KnowledgeAccessContext:
-    """Actor, visibility, agent, and node authorization context enforced at retrieval boundaries."""
+    """Actor, visibility, agent, session, organization, and node authorization context enforced at retrieval boundaries."""
 
     actor_id: str = "anonymous"
     actor_role: str = "anonymous"
     agent_id: Optional[str] = None
     node_id: Optional[str] = None
     org_id: Optional[str] = None
+    session_id: Optional[str] = None
+    request_id: str = field(default_factory=lambda: f"req-{uuid.uuid4().hex[:12]}")
     allowed_source_types: Optional[List[str]] = None
     allowed_visibilities: Optional[List[str]] = None
     include_external: bool = True
     include_memory: bool = True
     include_distributed: bool = False
     max_results: int = 5
+
+    @property
+    def organization_id(self) -> Optional[str]:
+        return self.org_id
 
 
 @dataclass

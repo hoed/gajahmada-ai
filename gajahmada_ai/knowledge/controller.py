@@ -187,19 +187,26 @@ class GNNMKnowledgeAdapter:
         )
         hits: List[RetrievalResult] = retrieval_pkg["results"]
 
-        # Respect active GNNM checkpoint max_seq_len if available
+        # Per-request IMMUTABLE TokenBudgetContextBuilder (Concurrency-safe: NEVER mutates shared builder!)
         active_backend = self.model_router.get_active_neural_backend() if self.model_router else None
         max_ctx_tokens = opts.get("max_context_tokens", self.knowledge_controller.config.max_context_tokens)
+        req_max_seq = self.knowledge_controller.context_builder.max_seq_len
+        req_tokenizer = self.knowledge_controller.context_builder.tokenizer
         if active_backend is not None:
             backend_ctx = getattr(getattr(active_backend, "metadata", None), "context_window", None)
             if isinstance(backend_ctx, int) and backend_ctx > 64:
-                self.knowledge_controller.context_builder.max_seq_len = backend_ctx
-                # Attach GNNM tokenizer if loaded for exact token budgeting
-                gnnm_eng = getattr(active_backend, "_gnnm_engine", None)
-                if gnnm_eng is not None and hasattr(gnnm_eng, "tokenizer"):
-                    self.knowledge_controller.context_builder.tokenizer = gnnm_eng.tokenizer
+                req_max_seq = backend_ctx
+            gnnm_eng = getattr(active_backend, "_gnnm_engine", None)
+            if gnnm_eng is not None and hasattr(gnnm_eng, "tokenizer"):
+                req_tokenizer = gnnm_eng.tokenizer
 
-        built = self.knowledge_controller.build_context(
+        per_request_builder = TokenBudgetContextBuilder(
+            max_seq_len=req_max_seq,
+            reserved_output_tokens=min(max_tokens, self.knowledge_controller.context_builder.reserved_output_tokens),
+            tokenizer=req_tokenizer,
+            system_instructions=self.knowledge_controller.context_builder.system_instructions,
+        )
+        built = per_request_builder.build(
             question=question,
             results=hits,
             max_context_tokens=max_ctx_tokens,

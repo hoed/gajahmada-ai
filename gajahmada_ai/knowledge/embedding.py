@@ -49,6 +49,23 @@ class HashEmbeddingProvider(EmbeddingProvider):
     def dimension(self) -> int:
         return self._dim
 
+    def identity_metadata(self) -> Dict[str, Any]:
+        fp = hashlib.sha256(f"{self.encoder_id}|{self.encoder_version}|{self.dimension}|l2".encode("utf-8")).hexdigest()[:16]
+        return {
+            "provider_id": self.encoder_id,
+            "model_id": self.encoder_id,
+            "model_version": self.encoder_version,
+            "encoder_id": self.encoder_id,
+            "encoder_version": self.encoder_version,
+            "vector_dimension": self.dimension,
+            "dimension": self.dimension,
+            "normalization_method": "l2",
+            "is_learned_model": False,
+            "encoder_kind": "heuristic_semantic_projection",
+            "embedding_fingerprint": fp,
+            "offline_capable": True,
+        }
+
     def embed(self, text: str) -> List[float]:
         return deterministic_hash_embed(text, dim=self._dim)
 
@@ -91,6 +108,23 @@ class NativeSemanticEmbeddingProvider(EmbeddingProvider):
     def dimension(self) -> int:
         return self._dim
 
+    def identity_metadata(self) -> Dict[str, Any]:
+        fp = hashlib.sha256(f"{self.encoder_id}|{self.encoder_version}|{self.dimension}|l2".encode("utf-8")).hexdigest()[:16]
+        return {
+            "provider_id": self.encoder_id,
+            "model_id": self.encoder_id,
+            "model_version": self.encoder_version,
+            "encoder_id": self.encoder_id,
+            "encoder_version": self.encoder_version,
+            "vector_dimension": self.dimension,
+            "dimension": self.dimension,
+            "normalization_method": "l2",
+            "is_learned_model": False,
+            "encoder_kind": "heuristic_semantic_projection",
+            "embedding_fingerprint": fp,
+            "offline_capable": True,
+        }
+
     def _project_feature(self, vec: List[float], feature: str, weight: float):
         digest = hashlib.sha256(feature.encode("utf-8")).digest()
         for k in range(4):
@@ -129,31 +163,94 @@ class NativeSemanticEmbeddingProvider(EmbeddingProvider):
         return [round(x / norm, 6) for x in vec]
 
 
+class LocalLearnedEmbeddingProvider(EmbeddingProvider):
+    """
+    Interface for a locally trained contrastive semantic embedding model (Phase 5 P2).
+    Never pretends to be a trained neural encoder unless actual trained weights exist on disk.
+    """
+
+    def __init__(self, weights_path: Optional[str] = None, dim: int = 384):
+        import os
+
+        self.weights_path = weights_path
+        self._dim = dim
+        self._loaded = bool(weights_path and os.path.isfile(weights_path))
+
+    @property
+    def is_trained_and_loaded(self) -> bool:
+        return self._loaded
+
+    @property
+    def encoder_id(self) -> str:
+        return "gajahmada-local-learned-embed-384d"
+
+    @property
+    def encoder_version(self) -> str:
+        return "1.0.0"
+
+    @property
+    def dimension(self) -> int:
+        return self._dim
+
+    def identity_metadata(self) -> Dict[str, Any]:
+        return {
+            "provider_id": self.encoder_id,
+            "model_id": self.encoder_id,
+            "model_version": self.encoder_version,
+            "encoder_id": self.encoder_id,
+            "encoder_version": self.encoder_version,
+            "vector_dimension": self.dimension,
+            "dimension": self.dimension,
+            "normalization_method": "l2",
+            "is_learned_model": self._loaded,
+            "status": "AVAILABLE" if self._loaded else "NOT_CONFIGURED",
+            "offline_capable": True,
+        }
+
+    def embed(self, text: str) -> List[float]:
+        if not self._loaded:
+            raise RuntimeError(
+                "LocalLearnedEmbeddingProvider has no trained weights loaded. "
+                "Use HashEmbeddingProvider or NativeSemanticEmbeddingProvider (heuristic) until trained weights exist."
+            )
+        return NativeSemanticEmbeddingProvider(dim=self._dim).embed(text)
+
+
 class FutureGNNMEmbeddingProvider(EmbeddingProvider):
     """
     Placeholder adapter for a future dedicated contrastive-trained GNNM embedding model.
-    Explicitly refuses silent fallback to raw LM token embeddings unless a trained
-    embedding head checkpoint is provided.
+    Explicitly refuses to pretend it is a trained encoder when no checkpoint is loaded.
     """
 
     def __init__(self, checkpoint_path: Optional[str] = None, fallback: Optional[EmbeddingProvider] = None):
+        import os
+
         self.checkpoint_path = checkpoint_path
+        self._weights_available = bool(checkpoint_path and os.path.exists(checkpoint_path))
         self._fallback = fallback or NativeSemanticEmbeddingProvider()
 
     @property
     def encoder_id(self) -> str:
-        return "gnnm-contrastive-embed-v1" if self.checkpoint_path else self._fallback.encoder_id
+        return "gnnm-contrastive-embed-v1" if self._weights_available else self._fallback.encoder_id
 
     @property
     def encoder_version(self) -> str:
-        return "0.1.0-preview" if self.checkpoint_path else self._fallback.encoder_version
+        return "0.1.0-preview" if self._weights_available else self._fallback.encoder_version
 
     @property
     def dimension(self) -> int:
         return self._fallback.dimension
 
+    def identity_metadata(self) -> Dict[str, Any]:
+        return {
+            **self._fallback.identity_metadata(),
+            "encoder_id": self.encoder_id,
+            "encoder_version": self.encoder_version,
+            "is_learned_model": self._weights_available,
+            "gnnm_embedding_weights_loaded": self._weights_available,
+        }
+
     def embed(self, text: str) -> List[float]:
-        # Delegates cleanly until a dedicated contrastive GNNM embedding checkpoint is loaded
         return self._fallback.embed(text)
 
 

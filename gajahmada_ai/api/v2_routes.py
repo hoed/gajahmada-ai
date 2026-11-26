@@ -5,6 +5,8 @@ from pydantic import BaseModel, Field
 from gajahmada_ai.blockchain.chain import LedgerEventType
 from gajahmada_ai.knowledge.interfaces import KnowledgeAccessContext
 from gajahmada_ai.memory.authorization import MemoryAuthorizationService
+from gajahmada_ai.security.context import AccessContext
+from gajahmada_ai.security.observability import build_subsystem_health_report
 from gajahmada_ai.memory.models import MemoryType, VerificationStatus, VisibilityPolicy
 from gajahmada_ai.network.consensus import QuorumConsensusManager
 from gajahmada_ai.network.discovery import PeerTrustState
@@ -156,15 +158,23 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
 
         actor = auth.resolve_optional_actor(request)
         can_write_state = actor["role"] in ("admin", "operator")
+        access_ctx = AccessContext.from_actor_dict(
+            actor,
+            node_id=identity.node_id,
+            organization_id=request.headers.get("x-organization-id") or None,
+            session_id=request.headers.get("x-session-id") or None,
+            agent_id=request.headers.get("x-agent-id") or None,
+        )
 
-        raw_retrieved = memory.retrieve(query=req.objective, top_k=4)
-        retrieved = mem_auth.filter_records(raw_retrieved, actor["role"])
+        raw_retrieved = memory.retrieve(query=req.objective, top_k=4, access_context=access_ctx)
+        retrieved = mem_auth.filter_records_with_context(raw_retrieved, access_ctx)
         result = cognition.execute(
             objective=req.objective,
             memory_records=retrieved,
             symbolic_facts=req.symbolic_facts,
             max_tokens=req.max_tokens,
             temperature=req.temperature,
+            actor_context=access_ctx.to_knowledge_access_context(),
         )
 
         # P0 + P2: Public unauthenticated /ask is read-only (cannot mutate memory or ledger).
@@ -1088,6 +1098,11 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
                 "experiments_count": len(learning.experiments),
             },
         }
+
+    @router.get("/system/health/subsystems")
+    def system_subsystem_health():
+        rt = get_runtime()
+        return build_subsystem_health_report(rt)
 
     @router.post("/system/rotate-key")
     def rotate_node_key(request: Request):
