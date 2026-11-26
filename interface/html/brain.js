@@ -48,6 +48,11 @@ document.addEventListener('DOMContentLoaded', () => {
       activeTab = btn.dataset.tab;
       document.querySelectorAll('.obs-tab').forEach((b) => b.classList.toggle('active', b === btn));
       document.querySelectorAll('.obs-view').forEach((v) => v.classList.toggle('active', v.id === `view-${activeTab}`));
+      requestAnimationFrame(() => {
+        if (activeTab === 'brain-overview') brainGraph.resize();
+        else if (activeTab === 'knowledge-universe') kgGraph.resize();
+        else if (activeTab === 'distributed-nodes') nodesGraph.resize();
+      });
       refreshAllActive();
     });
   });
@@ -92,18 +97,30 @@ document.addEventListener('DOMContentLoaded', () => {
       if (this.canvas) this._bindEvents();
     }
 
-    _bindEvents() {
-      const resize = () => {
-        const rect = this.canvas.parentElement.getBoundingClientRect();
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        this.canvas.width = Math.max(300, rect.width * dpr);
-        this.canvas.height = Math.max(240, rect.height * dpr);
+    resize() {
+      if (!this.canvas || !this.ctx || !this.canvas.parentElement) return false;
+      const rect = this.canvas.parentElement.getBoundingClientRect();
+      if (rect.width < 10 || rect.height < 10) return false;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const targetW = Math.round(rect.width * dpr);
+      const targetH = Math.round(rect.height * dpr);
+      if (this.canvas.width !== targetW || this.canvas.height !== targetH || this.width !== rect.width || this.height !== rect.height) {
+        this.canvas.width = targetW;
+        this.canvas.height = targetH;
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         this.width = rect.width;
         this.height = rect.height;
-      };
-      resize();
-      window.addEventListener('resize', resize);
+      }
+      return true;
+    }
+
+    _bindEvents() {
+      this.resize();
+      window.addEventListener('resize', () => this.resize());
+      if (typeof ResizeObserver !== 'undefined' && this.canvas.parentElement) {
+        const ro = new ResizeObserver(() => this.resize());
+        ro.observe(this.canvas.parentElement);
+      }
 
       this.canvas.addEventListener('mousedown', (e) => {
         this.dragging = true; this.lastX = e.clientX; this.lastY = e.clientY;
@@ -213,20 +230,60 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       }
 
+      const hadNodes = this.nodes.length > 0;
       this.nodes = positioned;
       this.nodeMap = Object.fromEntries(positioned.map((n) => [n.id, n]));
       this.edges = edges;
+      if (!hadNodes && positioned.length > 0 && this.resize()) {
+        this.fitView();
+      }
     }
 
     resetView() { this.zoom = 1.0; this.panX = 0; this.panY = 0; }
-    fitView() { this.zoom = 0.92; this.panX = 0; this.panY = 0; }
+    fitView() {
+      if (!this.nodes.length || !this.width || !this.height) {
+        this.zoom = 0.92; this.panX = 0; this.panY = 0;
+        return;
+      }
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const n of this.nodes) {
+        if (!this._isVisible(n)) continue;
+        if (n.x < minX) minX = n.x;
+        if (n.x > maxX) maxX = n.x;
+        if (n.y < minY) minY = n.y;
+        if (n.y > maxY) maxY = n.y;
+      }
+      if (!isFinite(minX)) { this.resetView(); return; }
+      const spanX = Math.max(120, maxX - minX + 120);
+      const spanY = Math.max(120, maxY - minY + 120);
+      const usableW = Math.max(200, this.width - 80);
+      const usableH = Math.max(160, this.height - 140);
+      this.zoom = Math.max(0.45, Math.min(1.35, Math.min(usableW / spanX, usableH / spanY)));
+      this.panX = -((minX + maxX) / 2) * this.zoom;
+      this.panY = -((minY + maxY) / 2) * this.zoom;
+    }
 
     draw() {
-      if (!this.ctx || !this.width) return;
+      if (!this.ctx) return;
+      if (!this.resize()) return;
       const ctx = this.ctx;
       ctx.clearRect(0, 0, this.width, this.height);
+
+      // Subtle futuristic neural radar rings
       ctx.save();
-      ctx.translate(this.width / 2 + this.panX, this.height / 2 + this.panY);
+      const cx = this.width / 2 + this.panX;
+      const cy = this.height / 2 + this.panY;
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.06)';
+      ctx.lineWidth = 1;
+      for (const rad of [95, 185, 280]) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, rad * this.zoom, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(cx, cy);
       ctx.scale(this.zoom, this.zoom);
 
       this.pulsePhase = (this.pulsePhase + 0.014) % 1;
@@ -285,7 +342,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.font = '600 10px "JetBrains Mono", monospace';
         ctx.fillStyle = dim ? '#64748b' : '#e2e8f0';
         ctx.textAlign = 'center';
-        ctx.fillText(n.label.slice(0, 26), n.x, n.y + n.r + 13);
+        ctx.fillText(String(n.label || n.id || '').slice(0, 26), n.x, n.y + n.r + 13);
       }
 
       ctx.restore();
