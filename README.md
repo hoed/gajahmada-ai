@@ -77,7 +77,7 @@ flowchart TD
 
     HKC -->|"1. External Knowledge"| EXT["HybridKnowledgeRetriever (Semantic + BM25 + KG)<br/>SQLite WAL external_knowledge.db + SourceRegistry"]
     HKC -->|"2. Persistent Memory"| MEM["5-Tier MemoryManager (SQLite / Optional Supabase pgvector)<br/>MemoryAuthorizationService & Epistemic Quarantine"]
-    HKC -->|"3. Internal Knowledge"| INT["ModelRouter -> PyTorchNativeBackend (GNNM)<br/>TokenBudgetContextBuilder (<untrusted_retrieved_data>)"]
+    HKC -->|"3. Internal Knowledge"| INT["ModelRouter -> PyTorchNativeBackend (GNNM)<br/>TokenBudgetContextBuilder (Untrusted Data Boundary)"]
 
     EXT & MEM & INT --> COG["14-Stage CognitiveReasoningPipeline<br/>SymbolicReasoner · EvidenceReasoner · ContradictionDetector · MetacognitiveCritic"]
 
@@ -88,6 +88,37 @@ flowchart TD
     end
 
     COG --> SEC["Sovereign Foundation<br/>Ed25519 NodeIdentity · GIP/2.0 (SQLite WAL Replay) · Tamper-Evident Local Signed Event Ledger"]
+```
+
+### Meta-Cognitive vs. Factual Query Orchestration
+
+```mermaid
+flowchart LR
+    UQ["User Query + AccessContext"] --> IC["IntentClassifier"]
+    IC --> CHK{"Meta-Cognitive Query?"}
+
+    CHK -->|"YES (8 Meta Intents)"| TR["LearningEventTracker<br/>Temporal Query (SQLite WAL)"]
+    TR --> KS["4-State Knowledge Inspection<br/>RETRIEVED · STORED · VERIFIED · INTERNALIZED"]
+    KS --> MS["MetaCognitiveOrchestrator<br/>Honest Synthesis (No RAG Override)"]
+
+    CHK -->|"NO (Factual / Math / Logic)"| HK["HybridKnowledgeController<br/>Semantic + BM25 + KG + Memory"]
+    HK --> TB["Immutable TokenBudgetContextBuilder"]
+    TB --> MR["ModelRouter + 14-Stage Cognitive Pipeline"]
+```
+
+### Model Governance & Runtime Promotion Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> DEVELOPMENT
+    DEVELOPMENT --> TRAINING : Approved Filtered Dataset + Base SHA-256 Verified
+    TRAINING --> REJECTED : Training Failed / PyTorch Unavailable / Invalid Checkpoint
+    TRAINING --> EVALUATING : Real PyTorch Training + SHA-256 + Smoke Inference OK
+    EVALUATING --> REJECTED : Failed 6-Dim EvaluationGate or Dataset Leakage
+    EVALUATING --> APPROVED : Passed All Gates (No Baseline Regression)
+    APPROVED --> ACTIVE : Operator Approved + Staged Load + Atomic Runtime Switch
+    ACTIVE --> ARCHIVED : Superseded by Newer Active Version
+    ARCHIVED --> ACTIVE : Controlled Rollback (rollback_reference)
 ```
 
 ### Repository Structure
@@ -370,6 +401,27 @@ python3 scripts/run_ecosystem_benchmarks.py
 | **API Compatibility, SDK & Benchmarks (3)** | Full v1/v2 compatibility, official Python SDK lifecycle, live cognitive benchmarks. | `tests/integration/`, `tests/benchmarks/` | ✅ **PASSED** |
 
 **Total:** **64 passed, 0 failed** on Python 3.14 (`python3 -m pytest -q`) + live PyTorch E2E training, SHA-256 verification, evaluation gate, and atomic `ModelRouter` promotion/rollback verified on `.venv312` (`docs/BENCHMARK_REPORT.json`).
+
+### Verified GNNM Training Loss Progression (From-Scratch CPU Runs)
+
+```mermaid
+xychart-beta
+    title "GNNM Pretrain & SFT Loss Progression (docs/BENCHMARK_REPORT.json)"
+    x-axis ["Pretrain Start", "Pretrain End", "SFT End"]
+    y-axis "Cross-Entropy Loss" 3.0 --> 8.0
+    line "GNNM-01-Tiny (918K)" [6.27, 5.21, 3.92]
+    line "GNNM-01-12M (11.24M)" [7.44, 7.12, 6.84]
+```
+
+### Verified Ecosystem Benchmark Latency (`docs/BENCHMARK_REPORT.json`)
+
+```mermaid
+xychart-beta
+    title "Measured Subsystem & Multi-Node GIP Latency (ms)"
+    x-axis ["Neural-Off S2", "3-Node GIP", "10-Node GIP", "100-Node Quorum", "SDK Round-Trip"]
+    y-axis "Elapsed Time (ms)" 0 --> 350
+    bar [111.2, 122.9, 298.8, 41.0, 299.7]
+```
 
 ---
 
