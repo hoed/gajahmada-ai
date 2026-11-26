@@ -1,15 +1,17 @@
 <div align="center">
 
-# 🏛️ GajahMada AI 2.0
+<img src="interface/html/logo.png" alt="GajahMada AI Logo" width="128" />
+
+# GajahMada AI 2.0
 
 ### Sovereign Hybrid Knowledge & Distributed Intelligence Platform
 
-*GNNM Native Neural Model (Decoder-Only Transformer) · Hybrid External Knowledge Retrieval (Semantic + BM25 + Knowledge Graph) · 5-Tier Persistent Memory (`SQLite WAL` + Optional `Supabase pgvector`) · 14-Stage Hybrid Cognitive Engine · Isolated Knowledge-to-Model Learning Pipeline · GIP/2.0 Cryptographic Mesh · Tamper-Evident Local Signed Event Ledger*
+*GNNM Native Neural Model (Decoder-Only Transformer) · Hybrid External Knowledge Retrieval (Semantic + BM25 + Knowledge Graph) · 5-Tier Persistent Memory (`SQLite WAL` + Optional `Supabase pgvector`) · 14-Stage Hybrid Cognitive & Meta-Cognitive Engine · Isolated Knowledge-to-Model Learning Pipeline · GIP/2.0 Cryptographic Mesh · Tamper-Evident Local Signed Event Ledger*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-blue.svg)](https://www.python.org/)
-[![Tests: 61 Passed](https://img.shields.io/badge/Tests-61%20Passed-brightgreen.svg)](#automated-verification--benchmarks)
-[![Offline First](https://img.shields.io/badge/Mode-Offline--First%20Sovereign-orange.svg)](#quick-start)
+[![Tests: 64 Passed](https://img.shields.io/badge/Tests-64%20Passed-brightgreen.svg)](#automated-verification--benchmarks)
+[![Offline First](https://img.shields.io/badge/Mode-Offline--First%20Sovereign-orange.svg)](#installation--quick-start)
 [![Live Demo](https://img.shields.io/badge/Live-gajahmada.vercel.app-teal.svg)](https://gajahmada.vercel.app/)
 
 [Live Node](https://gajahmada.vercel.app/) · [Architecture](ARCHITECTURE.md) · [Hybrid Knowledge](docs/HYBRID_KNOWLEDGE_ARCHITECTURE.md) · [Learning Pipeline](docs/GNNM_LEARNING_PIPELINE.md) · [Memory Security](docs/MEMORY_SECURITY_MODEL.md) · [Embeddings](docs/EMBEDDING_ARCHITECTURE.md) · [Evaluation](docs/EVALUATION_FRAMEWORK.md) · [Model Registry](docs/MODEL_REGISTRY_AND_PROMOTION.md) · [Distributed Trust](docs/DISTRIBUTED_KNOWLEDGE_TRUST.md) · [GIP/2.0 RFC](docs/GIP_2_0_RFC.md)
@@ -146,45 +148,131 @@ gajahmada/
 │   ├── api/                             # FastAPI server.py (v1, UI, SEO/sitemap.xml) & v2_routes.py (/api/v2/*)
 │   └── cli/                             # Sovereign Node CLI v1 & v2
 ├── interface/html/                      # Dual-Mode Web UI (/, /dashboard, /ui), Hybrid Knowledge & GNNM Lab Modals, SEO JSON-LD, & sitemap.xml
-└── tests/                               # 61 Automated Tests across unit, knowledge, learning, cognition, memory, network, security, integration
+└── tests/                               # 64 Automated Tests across unit, knowledge, learning, cognition, memory, network, security, integration
 ```
 
 ---
 
-## Quick Start
+## Installation & Quick Start
 
-### 1. Local Offline Mode (Zero External APIs)
+### Prerequisites
+
+| Requirement | Minimum | Recommended |
+| :--- | :--- | :--- |
+| **OS** | Linux, macOS, or Windows 10/11 | Ubuntu 22.04+ / Debian / macOS |
+| **Python** | Python `3.10+` | Python `3.12` (for prebuilt PyTorch CPU/CUDA wheels) |
+| **Git** | Git `2.30+` | Latest |
+| **RAM / Disk** | 2 GB RAM · 500 MB free disk | 8 GB+ RAM · 2 GB+ disk (for local GNNM checkpoints) |
+| **Package Manager** | `pip` | [`uv`](https://docs.astral.sh/uv/) (for fast `.venv312` PyTorch setup) |
+
+---
+
+### Step 1 — Clone the Repository
 
 ```bash
-pip install -r requirements.txt
-./run.sh        # Linux / macOS (Windows: run.bat)
+git clone https://github.com/hoed/gajahmada-ai.git
+cd gajahmada-ai
 ```
 
-- **Homepage:** `http://localhost:8000/`
-- **8-Panel Cyberdeck Dashboard:** `http://localhost:8000/dashboard` (or `/ui`)
-- **OpenAPI Docs:** `http://localhost:8000/docs`
+---
 
-> **Operator Authentication:** On first boot, a random 256-bit admin key is saved to `knowledge_store/admin_api.key` (`0600`) or read from `GAJAHMADA_ADMIN_KEY`. In the Dashboard, click **`🔑 AUTH`** to store your key in browser `sessionStorage` for protected administrative actions.
+### Step 2 — Standard Local Offline Installation (Zero External APIs)
 
-### 2. Local Native `GNNM` Neural Runtime (`.venv312` + PyTorch CPU/CUDA)
+Runs the full FastAPI node, 14-Stage Hybrid Cognitive & Meta-Cognitive Engine, Hybrid External Knowledge Retrieval (`SQLite WAL`), 5-Tier Persistent Memory, GIP/2.0 Mesh, Tamper-Evident Local Signed Event Ledger, and Cyberdeck Web UI **without requiring PyTorch or any cloud API**:
 
+#### Linux / macOS
 ```bash
-uv venv --python 3.12 .venv312
-uv pip install --python .venv312/bin/python -r requirements.txt
-uv pip install --python .venv312/bin/python torch --index-url https://download.pytorch.org/whl/cpu
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
 
-# Train a from-scratch GNNM checkpoint (GNNM-01-Tiny or GNNM-01-12M)
-.venv312/bin/python scripts/train_gnnm.py --preset GNNM-01-12M --vocab-size 2048 --steps 12 --sft-steps 6
-
-# ./run.sh automatically selects .venv312/bin/python and loads local GNNM checkpoints
+# Start the sovereign node (default port 8000)
 ./run.sh
 ```
 
-### 3. Configuration & Feature Flags (`.env`)
+#### Windows (PowerShell / CMD)
+```powershell
+python -m venv .venv
+.venv\Scripts\activate
+pip install --upgrade pip
+pip install -r requirements.txt
 
-All Hybrid Knowledge capabilities are backward-compatible and controlled via environment flags (see [.env.example](.env.example)):
+# Start the sovereign node
+run.bat
+```
+
+Once running, open:
+- **Homepage (Focus Command Center + 3D Network):** `http://localhost:8000/`
+- **Full 8-Panel Cyberdeck Dashboard (Hybrid Knowledge & GNNM Lab):** `http://localhost:8000/dashboard` (or `/ui`)
+- **Interactive OpenAPI / Swagger Docs:** `http://localhost:8000/docs`
+- **Subsystem Health Matrix:** `http://localhost:8000/api/v2/system/health/subsystems`
+
+---
+
+### Step 3 — Native `GNNM` PyTorch Runtime & From-Scratch Training (Optional)
+
+To enable live local **GNNM** neural inference and isolated Knowledge-to-Model training, install PyTorch inside `.venv312` (Python 3.12). `./run.sh` automatically detects `.venv312/bin/python` when present.
+
+#### Option A: CPU-Only (Works on any laptop/server)
+```bash
+# Install uv if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Create Python 3.12 environment and install dependencies + PyTorch CPU
+uv venv --python 3.12 .venv312
+uv pip install --python .venv312/bin/python -r requirements.txt
+uv pip install --python .venv312/bin/python torch --index-url https://download.pytorch.org/whl/cpu
+```
+
+#### Option B: NVIDIA CUDA GPU (Faster training & scaling to `GNNM-01-25M`..`GNNM-04-1B`)
+```bash
+uv venv --python 3.12 .venv312
+uv pip install --python .venv312/bin/python -r requirements.txt
+uv pip install --python .venv312/bin/python torch --index-url https://download.pytorch.org/whl/cu124
+```
+
+#### Train Your First Native `GNNM` Checkpoint From Scratch
+```bash
+# Fast smoke checkpoint (~918K params -> ./models/gnnm-01-tiny/)
+.venv312/bin/python scripts/train_gnnm.py --preset GNNM-01-Tiny --steps 80 --sft-steps 40
+
+# Stage 1 10M-50M tier checkpoint (~11.24M params -> ./models/gnnm-01-12m/)
+.venv312/bin/python scripts/train_gnnm.py --preset GNNM-01-12M --vocab-size 2048 --steps 12 --sft-steps 6
+
+# Launch node with native GNNM checkpoint active
+./run.sh
+```
+
+---
+
+### Step 4 — Operator Authentication (`🔑 AUTH`)
+
+On first boot, GajahMada generates a cryptographically random 256-bit admin key and persists it with strict `0600` permissions:
 
 ```bash
+# View your generated local admin key
+cat knowledge_store/admin_api.key
+```
+
+- **Via Web Dashboard:** Click **`🔑 AUTH`** in the top header and paste your key (stored only in browser `sessionStorage`) to unlock protected operations (`🧠 HYBRID KNOWLEDGE` ingestion, `🎓 GNNM LAB` training/promotion/rollback, peer management, and block mining).
+- **Via REST API / CLI:** Pass `-H "X-API-Key: <your-key>"` or `Authorization: Bearer <your-key>`.
+- **Custom Key:** Set `GAJAHMADA_ADMIN_KEY` in `.env` before starting the server.
+
+---
+
+### Step 5 — Configuration, Feature Flags & Optional Supabase Cloud Store
+
+Copy the environment template and customize as needed:
+
+```bash
+cp .env.example .env
+```
+
+Key environment variables:
+
+```bash
+# Hybrid Knowledge Architecture feature flags (all backward-compatible)
 GM_HYBRID_KNOWLEDGE=true
 GM_EXTERNAL_RETRIEVAL=true
 GM_SEMANTIC_EMBEDDING=false            # true enables NativeSemanticEmbeddingProvider; false keeps 384-d hash fallback
@@ -197,7 +285,41 @@ GM_KNOWLEDGE_ENABLE_BM25=true
 GM_KNOWLEDGE_ENABLE_VECTOR_SEARCH=true
 GM_KNOWLEDGE_ENABLE_GRAPH_SEARCH=true
 GM_KNOWLEDGE_ENABLE_DISTRIBUTED_SOURCES=false
+
+# Optional Supabase Cloud Persistence (PostgreSQL + pgvector 384-d + RLS)
+# Run supabase/schema.sql in your Supabase SQL Editor first
+SUPABASE_URL=https://<your-project>.supabase.co
+SUPABASE_PUBLISHABLE_KEY=<your-publishable-key>
+SUPABASE_SECRET_KEY=<your-service-role-key>
 ```
+
+For multi-organization federation deployments (universities, research labs, communities), copy [config.federation.example.yaml](config.federation.example.yaml) to `config.yaml` and update your organization identity and bootstrap peers.
+
+---
+
+### Step 6 — Verify Installation & Run Tests
+
+```bash
+# Run the full automated test suite (64 tests)
+python3 -m pytest -q
+
+# Run the reproducible Stages 1-5 ecosystem benchmark suite
+python3 scripts/run_ecosystem_benchmarks.py
+
+# Check live node capability diagnostics
+curl -s http://localhost:8000/api/v2/intelligence/diagnose | python3 -m json.tool
+```
+
+---
+
+### Step 7 — Optional Serverless Deployment (Vercel)
+
+```bash
+npm i -g vercel
+vercel --prod
+```
+
+Configure `GAJAHMADA_ADMIN_KEY`, `GAJAHMADA_ALLOWED_ORIGINS`, and optional `SUPABASE_*` variables in the Vercel Project Settings dashboard. The ASGI entrypoint (`main.py`) and routing (`vercel.json`) automatically serve `/`, `/dashboard`, `/ui`, `/api/v2/*`, `/sitemap.xml`, and `/robots.txt`.
 
 ---
 
@@ -242,12 +364,12 @@ python3 scripts/run_ecosystem_benchmarks.py
 | **GNNM Native Model (4)** | Analytical param count, lossless byte-level BPE, `.jsonl` dedup, SFT `-100` masking, Transformer forward pass. | `tests/unit/test_gnnm_foundation.py` | ✅ **PASSED** |
 | **Hybrid Knowledge Architecture (8)** | Structure/token chunker, offline semantic/hash embeddings + reversible migration, token-budget context & prompt-injection defense, fail-closed access policy, SQLite WAL external chunk restart persistence, `GNNMKnowledgeAdapter`, v2 APIs, & GSC SEO/sitemap validation. | `tests/knowledge/test_hybrid_knowledge_architecture.py` | ✅ **PASSED** |
 | **Knowledge-to-Model Learning (4)** | `TrainingKnowledgeFilter` (unverified/disputed/injection/license/OCR), Pretraining vs. SFT datasets, `ModelEvaluationGate`, `GNNMModelRegistry` promotion & rollback, & `/api/v2/learning/*` RBAC. | `tests/learning/test_knowledge_learning_pipeline.py` | ✅ **PASSED** |
-| **Cognitive & Memory (6)** | 14-stage pipeline, Stage 2 neural-off 100% accuracy, restart survival, versioning, contradiction preservation. | `tests/cognition/`, `tests/memory/` | ✅ **PASSED** |
+| **Cognitive, Meta-Cognitive & Memory (9)** | 14-stage pipeline, Stage 2 neural-off 100% accuracy, 8 meta-cognitive intents + temporal `LearningEventTracker` (10 cases + `/ai/chat` regression), restart survival, versioning, contradiction preservation. | `tests/cognition/`, `tests/memory/` | ✅ **PASSED** |
 | **GIP, Federation & Scale (7)** | 2/3/10/100-node GIP stress/Sybil/revocation tests, 4-org sovereign federation + Ed25519 `node_attestations`. | `tests/network/` | ✅ **PASSED** |
 | **Security, Audit Rounds 1–3 & Master Hardening (23)** | Signing oracle removal, fail-closed RBAC, direct `MemoryManager` 9-scope cross-user/session/agent/org isolation, canonical `AccessContext`, concurrent immutable context budgets, `SignedKnowledgeEnvelope` org independence, privacy-safe observability, persistent SQLite replay guard, fail-closed key persistence, & non-genesis ledger validation. | `tests/security/` | ✅ **PASSED** |
 | **API Compatibility, SDK & Benchmarks (3)** | Full v1/v2 compatibility, official Python SDK lifecycle, live cognitive benchmarks. | `tests/integration/`, `tests/benchmarks/` | ✅ **PASSED** |
 
-**Total:** **61 passed, 0 failed** on Python 3.14 (`python3 -m pytest -q`) + live PyTorch E2E training, SHA-256 verification, evaluation gate, and atomic `ModelRouter` promotion/rollback verified on `.venv312` (`docs/BENCHMARK_REPORT.json`).
+**Total:** **64 passed, 0 failed** on Python 3.14 (`python3 -m pytest -q`) + live PyTorch E2E training, SHA-256 verification, evaluation gate, and atomic `ModelRouter` promotion/rollback verified on `.venv312` (`docs/BENCHMARK_REPORT.json`).
 
 ---
 
