@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from gajahmada_ai.blockchain.chain import LedgerEventType
+from gajahmada_ai.knowledge.interfaces import KnowledgeAccessContext
 from gajahmada_ai.memory.authorization import MemoryAuthorizationService
 from gajahmada_ai.memory.models import MemoryType, VerificationStatus, VisibilityPolicy
 from gajahmada_ai.network.consensus import QuorumConsensusManager
@@ -82,6 +83,41 @@ class V2PromoteKnowledgeRequest(BaseModel):
 
 class V2PeerTrustRequest(BaseModel):
     trust_state: str = Field(..., description="PENDING | AUTHENTICATED | TRUSTED | REVOKED")
+
+
+class V2HybridIngestRequest(BaseModel):
+    content: str = Field(..., min_length=4, max_length=200000)
+    source_type: str = Field(default="txt", max_length=32)
+    title: str = Field(default="", max_length=256)
+    location: str = Field(default="api_upload", max_length=512)
+    author: str = Field(default="operator", max_length=128)
+    organization: str = Field(default="", max_length=128)
+    license: str = Field(default="unspecified", max_length=64)
+    visibility_policy: str = Field(default="LOCAL", max_length=32)
+    verification_status: str = Field(default="UNVERIFIED", max_length=32)
+    training_approved: bool = False
+
+
+class V2HybridSearchRequest(BaseModel):
+    query: str = Field(..., min_length=1, max_length=4096)
+    top_k: int = Field(default=5, ge=1, le=20)
+    include_external: bool = True
+    include_memory: bool = True
+    metadata_filters: Optional[Dict[str, Any]] = None
+
+
+class V2KnowledgeTrainRequest(BaseModel):
+    mode: str = Field(default="continued_pretraining", description="continued_pretraining | sft")
+    base_checkpoint_dir: str = Field(default="./models/gnnm-01-tiny", max_length=256)
+    seed: int = Field(default=42, ge=0, le=999999)
+    steps: int = Field(default=4, ge=1, le=500)
+    lr: float = Field(default=1e-4, gt=0.0, le=0.1)
+    sft_examples: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class V2PromoteModelRequest(BaseModel):
+    operator_approved: bool = Field(default=False)
+    notes: str = Field(default="", max_length=512)
 
 
 def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
@@ -300,6 +336,204 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
             "contradictions": contras,
             "search_results": results,
         }
+
+    @router.post("/knowledge/ingest")
+    def ingest_external_knowledge(req: V2HybridIngestRequest, request: Request):
+        """GNNM Hybrid Knowledge: Authenticated external document ingestion with provenance & chunking."""
+        rt = get_runtime()
+        auth = rt["auth"]
+        ingestion = rt["knowledge_ingestion"]
+        identity = rt["identity"]
+        blockchain = rt["blockchain"]
+
+        actor_info = auth.authenticate_request(request, required_capability="memory:write")
+        res = ingestion.ingest_text(
+            content=req.content,
+            source_type=req.source_type,
+            title=req.title,
+            location=req.location,
+            author=req.author or actor_info["actor"],
+            organization=req.organization,
+            license_name=req.license,
+            visibility_policy=req.visibility_policy.upper(),
+            verification_status=req.verification_status.upper(),
+            owner_node_id=identity.node_id,
+            training_approved=req.training_approved,
+        )
+        if res.get("status") == "INGESTED":
+            blockchain.record_event(
+                LedgerEventType.KNOWLEDGE_PROPOSED,
+                f"ext:{res['source_id']}|chunks={res['chunks_indexed']}",
+                identity,
+                metadata={"source_id": res["source_id"], "chunks": res["chunks_indexed"]},
+            )
+        return res
+
+    @router.post("/knowledge/hybrid-search")
+    def hybrid_knowledge_search(req: V2HybridSearchRequest, request: Request):
+        """GNNM Hybrid Knowledge: Authorization-enforced hybrid retrieval across external & memory layers."""
+        rt = get_runtime()
+        auth = rt["auth"]
+        controller = rt["hybrid_knowledge"]
+        identity = rt["identity"]
+
+        actor = auth.resolve_optional_actor(request)
+        ctx = KnowledgeAccessContext(
+            actor_id=actor["actor"],
+            actor_role=actor["role"],
+            node_id=identity.node_id,
+            include_external=req.include_external,
+            include_memory=req.include_memory,
+            max_results=req.top_k,
+        )
+        pkg = controller.query(
+            query=req.query,
+            access_context=ctx,
+            top_k=req.top_k,
+            metadata_filters=req.metadata_filters,
+        )
+        return {
+            "retrieval_executed": pkg["retrieval_executed"],
+            "reason": pkg["reason"],
+            "knowledge_layers_used": pkg["knowledge_layers_used"],
+            "conflicts": pkg["conflicts"],
+            "results": [r.to_dict() for r in pkg["results"]],
+        }
+
+    @router.get("/knowledge/sources")
+    def list_knowledge_sources(request: Request):
+        rt = get_runtime()
+        auth = rt["auth"]
+        source_reg = rt["source_registry"]
+        auth.authenticate_request(request, required_capability="memory:read")
+        sources = source_reg.list_sources()
+        return {"count": len(sources), "sources": sources}
+
+    @router.get("/learning/registry")
+    def list_gnnm_model_registry(request: Request):
+        rt = get_runtime()
+        auth = rt["auth"]
+        reg = rt["gnnm_registry"]
+        auth.authenticate_request(request, required_capability="memory:read")
+        return {
+            "active_version_id": reg.active_version_id,
+            "versions": reg.list_versions(),
+        }
+
+    @router.post("/learning/train")
+    def trigger_controlled_gnnm_training(req: V2KnowledgeTrainRequest, request: Request):
+        """Isolated Knowledge-to-Model training job (NEVER overwrites active production weights)."""
+        rt = get_runtime()
+        auth = rt["auth"]
+        pipeline = rt["training_pipeline"]
+        retriever = rt["hybrid_retriever"]
+        source_reg = rt["source_registry"]
+        audit_logger = rt["audit_logger"]
+        blockchain = rt["blockchain"]
+        identity = rt["identity"]
+
+        actor_info = auth.authenticate_request(request, required_capability="learning:approve")
+        sources_map = {s["source_id"]: source_reg.get(s["source_id"]) for s in source_reg.list_sources()}
+        sources_map = {k: v for k, v in sources_map.items() if v is not None}
+
+        try:
+            res = pipeline.run_training_job(
+                base_checkpoint_dir=req.base_checkpoint_dir,
+                mode=req.mode,
+                records=retriever.list_external_records(),
+                sft_examples=req.sft_examples,
+                sources_by_id=sources_map,
+                seed=req.seed,
+                steps=req.steps,
+                lr=req.lr,
+                auto_promote_if_approved=False,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+        audit_logger.record(
+            event_type="GNNM_TRAINING_JOB",
+            severity="INFO",
+            actor=actor_info["actor"],
+            action="POST /api/v2/learning/train",
+            outcome=res.get("status", "UNKNOWN"),
+            details={"run_id": res.get("run_id"), "mode": req.mode},
+        )
+        blockchain.record_event(
+            LedgerEventType.MODEL_VERSION_CHANGED,
+            f"train:{res.get('run_id')}|status={res.get('status')}",
+            identity,
+            metadata={"run_id": res.get("run_id"), "status": res.get("status"), "mode": req.mode},
+        )
+        return res
+
+    @router.post("/learning/promote/{version_id}")
+    def promote_gnnm_model_version(version_id: str, req: V2PromoteModelRequest, request: Request):
+        """Controlled operator-approved promotion of an APPROVED GNNM checkpoint."""
+        rt = get_runtime()
+        auth = rt["auth"]
+        reg = rt["gnnm_registry"]
+        audit_logger = rt["audit_logger"]
+        blockchain = rt["blockchain"]
+        identity = rt["identity"]
+
+        actor_info = auth.authenticate_request(request, required_capability="learning:approve")
+        try:
+            promoted = reg.promote(version_id, operator_approved=req.operator_approved)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+        audit_logger.record(
+            event_type="GNNM_MODEL_PROMOTED",
+            severity="INFO",
+            actor=actor_info["actor"],
+            action=f"POST /api/v2/learning/promote/{version_id}",
+            outcome="ACTIVE",
+            details={"version_id": version_id, "notes": req.notes},
+        )
+        blockchain.record_event(
+            LedgerEventType.MODEL_VERSION_CHANGED,
+            f"promote:{version_id}|by={actor_info['actor']}",
+            identity,
+            metadata={"version_id": version_id, "rollback_reference": promoted.get("rollback_reference")},
+        )
+        return {"status": "promoted", "active_version": promoted}
+
+    @router.post("/learning/rollback")
+    def rollback_gnnm_model_version(request: Request):
+        """Reversibly restore the previous ACTIVE GNNM checkpoint."""
+        rt = get_runtime()
+        auth = rt["auth"]
+        reg = rt["gnnm_registry"]
+        audit_logger = rt["audit_logger"]
+        blockchain = rt["blockchain"]
+        identity = rt["identity"]
+
+        actor_info = auth.authenticate_request(request, required_capability="learning:approve")
+        try:
+            restored = reg.rollback()
+        except RuntimeError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+        audit_logger.record(
+            event_type="GNNM_MODEL_ROLLBACK",
+            severity="WARN",
+            actor=actor_info["actor"],
+            action="POST /api/v2/learning/rollback",
+            outcome="RESTORED",
+            details={"restored_version_id": restored["version_id"]},
+        )
+        blockchain.record_event(
+            LedgerEventType.MODEL_VERSION_CHANGED,
+            f"rollback:{restored['version_id']}|by={actor_info['actor']}",
+            identity,
+            metadata={"restored_version_id": restored["version_id"]},
+        )
+        return {"status": "rolled_back", "active_version": restored}
 
     @router.post("/knowledge/promote/{record_id}")
     def promote_quarantined_knowledge(record_id: str, req: V2PromoteKnowledgeRequest, request: Request):

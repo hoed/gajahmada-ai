@@ -25,12 +25,19 @@
 - `tokenizer.py`: `GNNMBPETokenizer` — pure-Python byte-level BPE trained from scratch (supports Indonesian, English, Arabic, math, & code losslessly).
 - `dataset.py`: `GNNMCorpusBuilder` — text cleaning, SHA-256 deduplication, multilingual seeding, and causal LM sequence packing.
 - `model.py`: `GNNMTransformer` — custom PyTorch Decoder-Only Transformer (`RMSNorm`, `RoPE`, `CausalSelfAttention`, `SwiGLUFeedForward`, autoregressive `generate()`).
-- `trainer.py`: `GNNMTrainer` — AdamW + cosine LR schedule + gradient clipping + checkpoint saver (`config.json`, `tokenizer.json`, `model.pt`).
-- `inference.py`: `GNNMInferenceEngine` — native checkpoint loader & generator for CPU/CUDA.
+- `trainer.py`: `GNNMTrainer` — AdamW + cosine LR schedule + gradient clipping + validation perplexity + SFT (`-100` prompt masking) + checkpoint saver (`config.json`, `tokenizer.json`, `model.pt`, `metrics.json`).
+- `inference.py`: `GNNMInferenceEngine` — native checkpoint loader & generator for CPU/CUDA, integrated with token-budgeted context allocation in `PyTorchNativeBackend` and `GNNMKnowledgeAdapter`.
 
 ---
 
-## 4. Quick Start (Training `GNNM-01-Tiny` Proof of Concept)
+## 4. Hybrid Knowledge & Controlled Internalization
+GNNM operates as the **Internal Knowledge** pillar inside GajahMada's **Hybrid Knowledge Architecture**:
+- **Inference Time:** `GNNMKnowledgeAdapter` retrieves authorized External Knowledge (`external_knowledge.db`) and Persistent Memory (`MemoryManager`), builds a prompt-injection-hardened, token-budgeted `<untrusted_retrieved_data>` context respecting `cfg.max_seq_len`, and routes through `ModelRouter` without altering the checkpoint format.
+- **Training Time (Isolated):** Verified, licensed knowledge is filtered by `TrainingKnowledgeFilter`, packaged into separate `continued_pretraining` or `sft` datasets by `KnowledgeDatasetBuilder`, trained on an isolated checkpoint copy by `KnowledgeToModelPipeline`, gated by `ModelEvaluationGate`, and promoted/rolled back via `GNNMModelRegistry` (`/api/v2/learning/{train,promote,rollback}`).
+
+---
+
+## 5. Quick Start (CLI Training)
 ```python
 from gajahmada_ai.gnnm import GNNM_PRESETS, GNNMBPETokenizer, GNNMCorpusBuilder
 from gajahmada_ai.gnnm.trainer import GNNMTrainer

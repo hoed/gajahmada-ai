@@ -36,6 +36,7 @@ class CognitiveReasoningPipeline:
         symbolic_reasoner: Optional[SymbolicReasoner] = None,
         evidence_reasoner: Optional[EvidenceReasoner] = None,
         fallback_synthesizer: Optional[Callable[[str, str], str]] = None,
+        knowledge_controller: Optional[Any] = None,
     ):
         self.perception = PerceptionModule()
         self.intent_classifier = IntentClassifier()
@@ -48,6 +49,7 @@ class CognitiveReasoningPipeline:
         self.critic = MetacognitiveCritic()
         self.decision_engine = DecisionEngine()
         self.fallback_synthesizer = fallback_synthesizer
+        self.knowledge_controller = knowledge_controller
         self.history: Dict[str, ReasoningResult] = {}
 
     def execute(
@@ -58,6 +60,7 @@ class CognitiveReasoningPipeline:
         max_tokens: int = 256,
         temperature: float = 0.7,
         use_neural: bool = True,
+        actor_context: Optional[Any] = None,
     ) -> ReasoningResult:
         t0 = time.time()
         reasoning_id = f"rsn-{uuid.uuid4().hex[:12]}"
@@ -85,13 +88,33 @@ class CognitiveReasoningPipeline:
             )
         )
 
-        # 3. MEMORY RETRIEVAL
-        raw_evidence = memory_records or []
+        # 3. MEMORY & HYBRID KNOWLEDGE RETRIEVAL (Additive — preserves existing memory_records path)
+        raw_evidence = list(memory_records or [])
+        hybrid_context_block = ""
+        if self.knowledge_controller is not None and actor_context is not None:
+            try:
+                hk_res = self.knowledge_controller.query(
+                    query=perceived.normalized_text,
+                    access_context=actor_context,
+                )
+                if hk_res.get("retrieval_executed") and hk_res.get("memory_compatible_records"):
+                    existing_ids = {r.get("record_id") for r in raw_evidence if isinstance(r, dict)}
+                    for rec in hk_res["memory_compatible_records"]:
+                        if rec.get("record_id") not in existing_ids:
+                            raw_evidence.append(rec)
+                            existing_ids.add(rec.get("record_id"))
+                    built = self.knowledge_controller.build_context(
+                        question=perceived.normalized_text,
+                        results=hk_res["results"],
+                    )
+                    hybrid_context_block = built.context_block
+            except Exception:
+                pass
         steps.append(
             ReasoningStepSummary(
                 step_index=3,
                 stage="MEMORY_RETRIEVAL",
-                summary=f"Retrieved {len(raw_evidence)} memory record(s) for evidence evaluation",
+                summary=f"Retrieved {len(raw_evidence)} memory/knowledge record(s) for evidence evaluation",
                 outcome="COMPLETED",
             )
         )
@@ -158,7 +181,7 @@ class CognitiveReasoningPipeline:
         )
         run_neural = use_neural and not is_exact_math and not is_realtime_or_scripture
 
-        context_str = "\n".join(e.content for e in evidence_res.evidence_items[:3])
+        context_str = hybrid_context_block or "\n".join(e.content for e in evidence_res.evidence_items[:3])
         neural_res = self.model_router.route_generation(
             prompt=perceived.normalized_text,
             context=context_str,

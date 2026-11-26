@@ -1,7 +1,7 @@
 {
   "benchmark_suite": "GajahMada 2.0 Open Ecosystem Benchmark (Stages 1-5)",
-  "generated_at_epoch": 1795514416.225,
-  "total_elapsed_ms": 1002.81,
+  "generated_at_epoch": 1795682224.787,
+  "total_elapsed_ms": 920.29,
   "stage_1_gnnm_checkpoints": {
     "gnnm-01-12m": {
       "estimated_parameters": 11243520,
@@ -70,7 +70,7 @@
     "passed": 3,
     "total": 3,
     "accuracy": 1.0,
-    "elapsed_ms": 126.45
+    "elapsed_ms": 111.21
   },
   "stage_3_gip_distributed_intelligence": {
     "3_nodes": {
@@ -79,7 +79,7 @@
       "participating_nodes": 2,
       "quorum_reached": true,
       "restart_recovery": true,
-      "elapsed_ms": 105.57
+      "elapsed_ms": 122.93
     },
     "10_nodes": {
       "tier": "10_nodes",
@@ -89,7 +89,7 @@
       "replays_blocked": 9,
       "revoked_peer_blocked": true,
       "quorum_participating": 8,
-      "elapsed_ms": 308.1
+      "elapsed_ms": 298.75
     },
     "100_nodes": {
       "tier": "100_nodes",
@@ -100,13 +100,13 @@
       "rejected_forged_revoked_sybil": 20,
       "independent_evidence_sources": 30,
       "unverified_majority_rejected": true,
-      "elapsed_ms": 53.1
+      "elapsed_ms": 40.96
     }
   },
   "stage_5_sdk_interoperability": {
     "health_status": "healthy",
     "ledger_type": "tamper_evident_local_signed_event_ledger",
     "ask_verified": true,
-    "elapsed_ms": 388.32
+    "elapsed_ms": 299.71
   }
 }

@@ -2498,6 +2498,247 @@ document.addEventListener('DOMContentLoaded', () => {
     showHudToast(`🕒 [SYSTEM CLOCK] ${formatSystemDateTime(getSystemNow())}`);
   });
 
+  // J. Hybrid Knowledge Studio & GNNM Learning Lab + Federation Integration (Phases 1-7)
+  const elModalHybrid = document.getElementById('modal-hybrid-knowledge');
+  const elModalLearning = document.getElementById('modal-gnnm-learning');
+  const elHkLog = document.getElementById('hk-status-log');
+  const elHkSearchResults = document.getElementById('hk-search-results');
+  const elHkSourcesList = document.getElementById('hk-sources-list');
+  const elGlLog = document.getElementById('gl-status-log');
+  const elGlRegistryList = document.getElementById('gl-registry-list');
+  const elFedOrgsList = document.getElementById('fed-orgs-list');
+
+  async function refreshHybridSources() {
+    if (!elHkSourcesList) return;
+    try {
+      const res = await fetch(`${API_URL}/api/v2/knowledge/sources`, { headers: getAuthHeaders() });
+      if (res.status === 401) {
+        elHkSourcesList.innerHTML = '<div class="t-line"><span class="t-dim">Klik 🔑 AUTH untuk melihat Source Registry (membutuhkan autentikasi operator).</span></div>';
+        return;
+      }
+      const data = await res.json();
+      const sources = data.sources || [];
+      if (!sources.length) {
+        elHkSourcesList.innerHTML = '<div class="t-line"><span class="t-dim">Belum ada sumber eksternal terdaftar di SourceRegistry.</span></div>';
+        return;
+      }
+      elHkSourcesList.innerHTML = sources.map((s) => `
+        <div style="border:1px solid rgba(56,189,248,0.25);padding:6px 8px;border-radius:4px;font-size:10.5px;background:rgba(8,15,24,0.8)">
+          <b style="color:#7dd3fc">${escapeHTML(s.title || s.source_id)}</b>
+          <span style="color:#94a3b8"> · ${escapeHTML(s.source_type)} · ${escapeHTML(s.visibility_policy)} · ${escapeHTML(s.verification_status)} · license=${escapeHTML(s.license)}</span>
+        </div>
+      `).join('');
+    } catch (err) {
+      if (elHkLog) elHkLog.textContent = `Gagal memuat SourceRegistry: ${err.message}`;
+    }
+  }
+
+  document.getElementById('btn-open-hybrid')?.addEventListener('click', () => {
+    openModal(elModalHybrid);
+    refreshHybridSources();
+  });
+  document.getElementById('btn-hk-refresh-sources')?.addEventListener('click', refreshHybridSources);
+
+  document.getElementById('btn-hk-search')?.addEventListener('click', async () => {
+    const q = (document.getElementById('hk-search-query')?.value || '').trim();
+    if (!q) return;
+    const incExt = Boolean(document.getElementById('hk-inc-ext')?.checked);
+    const incMem = Boolean(document.getElementById('hk-inc-mem')?.checked);
+    if (elHkLog) elHkLog.textContent = `Menjalankan Hybrid Search untuk "${q}"...`;
+    try {
+      const res = await fetch(`${API_URL}/api/v2/knowledge/hybrid-search`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ query: q, top_k: 5, include_external: incExt, include_memory: incMem }),
+      });
+      const data = await res.json();
+      const hits = data.results || [];
+      const layers = data.knowledge_layers_used || {};
+      if (elHkLog) {
+        elHkLog.textContent = `Hybrid Search selesai: ${hits.length} hasil (external=${layers.external || 0}, memory=${layers.memory || 0}, conflicts=${(data.conflicts || []).length}).`;
+      }
+      if (!hits.length) {
+        elHkSearchResults.innerHTML = '<div class="t-line"><span class="t-dim">Tidak ada hasil yang cocok / diizinkan oleh KnowledgeAccessPolicy.</span></div>';
+        return;
+      }
+      elHkSearchResults.innerHTML = hits.map((h) => `
+        <div style="border:1px solid rgba(45,212,191,0.3);padding:6px 8px;border-radius:4px;font-size:10.5px;background:rgba(4,16,18,0.85)">
+          <div style="color:#5eead4;font-weight:700">[${escapeHTML(h.knowledge_layer.toUpperCase())}] ${escapeHTML(h.source_id)} · score=${h.score} (sem=${h.semantic_score}, bm25=${h.lexical_score}) · ${escapeHTML(h.verification_status)}</div>
+          <div style="color:#e2e8f0;margin-top:3px">${escapeHTML(h.content.slice(0, 260))}</div>
+        </div>
+      `).join('');
+      logWatch('ok', `Hybrid Search "${q.slice(0, 32)}": ${hits.length} hits (ext=${layers.external || 0}, mem=${layers.memory || 0})`);
+    } catch (err) {
+      if (elHkLog) elHkLog.textContent = `Hybrid Search error: ${err.message}`;
+    }
+  });
+
+  document.getElementById('btn-hk-ingest')?.addEventListener('click', async () => {
+    const content = (document.getElementById('hk-ingest-content')?.value || '').trim();
+    if (!content) {
+      if (elHkLog) elHkLog.textContent = 'Isi teks dokumen terlebih dahulu.';
+      return;
+    }
+    const payload = {
+      content,
+      title: (document.getElementById('hk-ingest-title')?.value || 'Dashboard Document').trim(),
+      source_type: document.getElementById('hk-ingest-type')?.value || 'txt',
+      visibility_policy: document.getElementById('hk-ingest-vis')?.value || 'COLLECTIVE',
+      verification_status: document.getElementById('hk-ingest-ver')?.value || 'VERIFIED',
+      license: (document.getElementById('hk-ingest-license')?.value || 'CC-BY-4.0').trim(),
+    };
+    if (elHkLog) elHkLog.textContent = 'Meng-ingest dokumen ke SQLite WAL External Knowledge...';
+    try {
+      const res = await fetch(`${API_URL}/api/v2/knowledge/ingest`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (elHkLog) elHkLog.textContent = `HTTP ${res.status}: ${data.detail || 'Gunakan 🔑 AUTH terlebih dahulu.'}`;
+        return;
+      }
+      if (elHkLog) elHkLog.textContent = `✓ Status=${data.status} · source_id=${data.source_id} · chunks=${data.chunks_indexed}`;
+      document.getElementById('hk-ingest-content').value = '';
+      refreshHybridSources();
+      logWatch('ok', `External Knowledge Ingested: ${data.source_id} (${data.chunks_indexed} chunks)`);
+    } catch (err) {
+      if (elHkLog) elHkLog.textContent = `Ingest error: ${err.message}`;
+    }
+  });
+
+  async function refreshLearningAndFederation() {
+    // 1. Model Registry
+    if (elGlRegistryList) {
+      try {
+        const res = await fetch(`${API_URL}/api/v2/learning/registry`, { headers: getAuthHeaders() });
+        if (res.status === 401) {
+          elGlRegistryList.innerHTML = '<div class="t-line"><span class="t-dim">Klik 🔑 AUTH untuk mengelola GNNM Model Registry &amp; Training Jobs.</span></div>';
+        } else {
+          const data = await res.json();
+          const versions = data.versions || [];
+          if (!versions.length) {
+            elGlRegistryList.innerHTML = '<div class="t-line"><span class="t-dim">Belum ada kandidat versi model di GNNMModelRegistry. Jalankan Isolated Training di atas.</span></div>';
+          } else {
+            elGlRegistryList.innerHTML = versions.map((v) => `
+              <div style="display:flex;justify-content:space-between;align-items:center;border:1px solid rgba(192,132,252,0.3);padding:6px 8px;border-radius:4px;font-size:10.5px;background:rgba(16,8,24,0.85)">
+                <div>
+                  <b style="color:#e9d5ff">${escapeHTML(v.version_id)}</b>
+                  <span style="color:#94a3b8"> · ${escapeHTML(v.model_name)} · status=<b style="color:${v.promotion_status === 'ACTIVE' ? '#4ade80' : v.promotion_status === 'APPROVED' ? '#38bdf8' : '#f87171'}">${escapeHTML(v.promotion_status)}</b></span>
+                </div>
+                ${v.promotion_status === 'APPROVED' ? `<button type="button" class="tiny-btn btn-gl-promote" data-ver="${escapeHTML(v.version_id)}" style="border-color:#4ade80;color:#bbf7d0">✓ PROMOTE</button>` : ''}
+              </div>
+            `).join('');
+            elGlRegistryList.querySelectorAll('.btn-gl-promote').forEach((btn) => {
+              btn.addEventListener('click', async () => {
+                const vid = btn.dataset.ver;
+                const pr = await fetch(`${API_URL}/api/v2/learning/promote/${encodeURIComponent(vid)}`, {
+                  method: 'POST',
+                  headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+                  body: JSON.stringify({ operator_approved: true, notes: 'Promoted via Cyberdeck Dashboard' }),
+                });
+                const pd = await pr.json();
+                if (elGlLog) elGlLog.textContent = pr.ok ? `✓ Model ${vid} dipromosikan menjadi ACTIVE.` : `Promote gagal (${pr.status}): ${pd.detail}`;
+                refreshLearningAndFederation();
+              });
+            });
+          }
+        }
+      } catch (err) {
+        if (elGlLog) elGlLog.textContent = `Registry error: ${err.message}`;
+      }
+    }
+
+    // 2. Sovereign Federation Organizations
+    if (elFedOrgsList) {
+      try {
+        const res = await fetch(`${API_URL}/api/v2/federation`);
+        const data = await res.json();
+        const orgs = data.organizations || [];
+        if (!orgs.length) {
+          elFedOrgsList.innerHTML = '<div class="t-line"><span class="t-dim">Belum ada organisasi federasi terdaftar.</span></div>';
+        } else {
+          elFedOrgsList.innerHTML = orgs.map((o) => `
+            <div style="border:1px solid rgba(56,189,248,0.25);padding:5px 8px;border-radius:4px;font-size:10.5px;background:rgba(4,12,22,0.8)">
+              <b style="color:#7dd3fc">${escapeHTML(o.org_name)}</b>
+              <span style="color:#94a3b8"> (${escapeHTML(o.org_type)}) · ${escapeHTML(o.endpoint)} · ${escapeHTML(o.data_sovereignty_policy)}</span>
+            </div>
+          `).join('');
+        }
+      } catch { /* ignore */ }
+    }
+  }
+
+  document.getElementById('btn-open-learning')?.addEventListener('click', () => {
+    openModal(elModalLearning);
+    refreshLearningAndFederation();
+  });
+  document.getElementById('btn-gl-refresh')?.addEventListener('click', refreshLearningAndFederation);
+
+  document.getElementById('btn-gl-train')?.addEventListener('click', async () => {
+    const mode = document.getElementById('gl-train-mode')?.value || 'continued_pretraining';
+    const base_checkpoint_dir = document.getElementById('gl-train-base')?.value || './models/gnnm-01-tiny';
+    const steps = parseInt(document.getElementById('gl-train-steps')?.value || '4', 10);
+    if (elGlLog) elGlLog.textContent = `Menjalankan Isolated GNNM Training (${mode}, steps=${steps})...`;
+    try {
+      const res = await fetch(`${API_URL}/api/v2/learning/train`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ mode, base_checkpoint_dir, steps }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (elGlLog) elGlLog.textContent = `HTTP ${res.status}: ${data.detail || 'Membutuhkan 🔑 AUTH (admin).'}`;
+        return;
+      }
+      if (elGlLog) elGlLog.textContent = `Training selesai: run_id=${data.run_id} · status=${data.status} · items=${data.dataset_manifest?.item_count ?? 0}`;
+      refreshLearningAndFederation();
+      logWatch('ok', `GNNM Training Job ${data.run_id}: ${data.status}`);
+    } catch (err) {
+      if (elGlLog) elGlLog.textContent = `Training error: ${err.message}`;
+    }
+  });
+
+  document.getElementById('btn-gl-rollback')?.addEventListener('click', async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/v2/learning/rollback`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (elGlLog) elGlLog.textContent = res.ok ? `↩ Rollback sukses ke versi ${data.active_version?.version_id}` : `Rollback gagal (${res.status}): ${data.detail}`;
+      refreshLearningAndFederation();
+    } catch (err) {
+      if (elGlLog) elGlLog.textContent = `Rollback error: ${err.message}`;
+    }
+  });
+
+  document.getElementById('btn-fed-register')?.addEventListener('click', async () => {
+    const org_id = (document.getElementById('fed-org-id')?.value || '').trim();
+    const org_name = (document.getElementById('fed-org-name')?.value || '').trim();
+    const org_type = document.getElementById('fed-org-type')?.value || 'university';
+    const endpoint = (document.getElementById('fed-org-endpoint')?.value || '').trim();
+    if (!org_id || !org_name || !endpoint) {
+      if (elGlLog) elGlLog.textContent = 'Lengkapi org_id, nama organisasi, dan endpoint.';
+      return;
+    }
+    try {
+      const infoRes = await fetch(`${API_URL}/node/info`);
+      const info = await infoRes.json();
+      const res = await fetch(`${API_URL}/api/v2/federation/organizations`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ org_id, org_name, org_type, node_id: info.node_id, endpoint }),
+      });
+      const data = await res.json();
+      if (elGlLog) elGlLog.textContent = res.ok ? `✓ Organisasi '${data.org_name}' terdaftar di FederationRegistry.` : `Gagal (${res.status}): ${data.detail}`;
+      refreshLearningAndFederation();
+    } catch (err) {
+      if (elGlLog) elGlLog.textContent = `Federation error: ${err.message}`;
+    }
+  });
+
   // Initial Boot Sequence
   fetchNodeInfo();
   fetchMetrics();

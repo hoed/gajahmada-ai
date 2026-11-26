@@ -1,100 +1,90 @@
 <div align="center">
 
-<img src="interface/html/logo.png" alt="GajahMada AI Nusantara Logo" width="128" />
+# 🏛️ GajahMada AI 2.0
 
-# GajahMada AI Nusantara (v2.0)
+### Sovereign Hybrid Knowledge & Distributed Intelligence Platform
 
-### **Sovereign, Independent, Hybrid, Distributed Intelligence Architecture**
+*GNNM Native Neural Model (Decoder-Only Transformer) · Hybrid External Knowledge Retrieval (Semantic + BM25 + Knowledge Graph) · 5-Tier Persistent Memory (`SQLite WAL` + Optional `Supabase pgvector`) · 14-Stage Hybrid Cognitive Engine · Isolated Knowledge-to-Model Learning Pipeline · GIP/2.0 Cryptographic Mesh · Tamper-Evident Local Signed Event Ledger*
 
-*14-Stage Hybrid Cognitive Pipeline · Sovereign From-Scratch Neural Model (`GNNM` Decoder-Only Transformer · ONNX) · Deterministic Symbolic & Evidence Reasoning · 5-Tier Persistent Memory (`SQLite` + Optional `Supabase pgvector`) · GIP/2.0 Cryptographic Mesh Protocol · Tamper-Evident Schema v2 Audit Ledger*
+[![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](LICENSE)
+[![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-blue.svg)](https://www.python.org/)
+[![Tests: 57 Passed](https://img.shields.io/badge/Tests-57%20Passed-brightgreen.svg)](#automated-verification--benchmarks)
+[![Offline First](https://img.shields.io/badge/Mode-Offline--First%20Sovereign-orange.svg)](#quick-start)
+[![Live Demo](https://img.shields.io/badge/Live-gajahmada.vercel.app-teal.svg)](https://gajahmada.vercel.app/)
 
-[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-2dd4bf?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-REST_v1_%26_v2-009688?style=for-the-badge&logo=fastapi&logoColor=white)](gajahmada_ai/api/server.py)
-[![GNNM Native](https://img.shields.io/badge/GNNM-PyTorch_From_Scratch-ee4c2c?style=for-the-badge&logo=pytorch&logoColor=white)](docs/GNNM_ARCHITECTURE.md)
-[![Supabase pgvector](https://img.shields.io/badge/Supabase-pgvector_384d_%2B_RLS-3ecf8e?style=for-the-badge&logo=supabase&logoColor=white)](supabase/schema.sql)
-[![Protocol](https://img.shields.io/badge/Protocol-GIP%2F2.0_Ed25519-f59e0b?style=for-the-badge)](gajahmada_ai/network/protocol.py)
-[![Tests](https://img.shields.io/badge/Pytest-33%2F33_Passing-4ade80?style=for-the-badge)](tests/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-38bdf8?style=for-the-badge)](LICENSE)
-
-[Overview](#-overview) · [Live UI](#-live-interface-preview) · [Architecture](#-8-layer-architecture) · [Quick Start](#-quick-start) · [Native Model (GNNM)](#-gajahmada-native-neural-model-gnnm) · [API Reference](#-rest--web3-api-reference) · [Security & Verification](#-verification--automated-test-suite-3333) · [License](#-license)
+[Live Node](https://gajahmada.vercel.app/) · [Architecture Reference](ARCHITECTURE.md) · [GNNM Blueprint](docs/GNNM_ARCHITECTURE.md) · [GIP/2.0 RFC](docs/GIP_2_0_RFC.md) · [Security Audit](docs/SECURITY_AUDIT.md) · [Roadmap](docs/ROADMAP.md)
 
 </div>
 
 ---
 
-## 🌐 Overview
+## Overview
 
-**GajahMada AI Nusantara** is an open-source, sovereign, hybrid distributed intelligence node designed to operate **without mandatory third-party cloud AI APIs**. Each node owns its cryptographic identity (**Ed25519**), private persistent memory (**SQLite ACID** + optional **Supabase `pgvector`**), hybrid **neural-symbolic reasoning engine**, **closed-loop strategy adaptation**, and **tamper-evident audit ledger**.
+**GajahMada AI** is an open-source, offline-first **Sovereign Hybrid Intelligence** node engineered to operate without mandatory third-party cloud AI APIs. Rather than relying solely on static model weights or unstructured RAG scripts, GajahMada unifies **three logically separated knowledge systems** under a single authorization-aware control plane:
 
-### 7 Verified Sovereign Architecture Principles
+| Knowledge System | Storage & Lifecycle | Update Mechanism | Core Modules |
+| :--- | :--- | :--- | :--- |
+| **1. Internal Knowledge** | Embedded in **GNNM** (`GajahMada Native Neural Model`) Transformer weights (`models/gnnm-*`) | Isolated **Knowledge-to-Model Learning Pipeline** (Filter → Dataset → Trainer → Evaluation Gate → Operator-Approved Promotion) | `gajahmada_ai/gnnm/`, `gajahmada_ai/learning/`, `gajahmada_ai/neural/` |
+| **2. External Knowledge** | Dynamically indexed multi-format documents (TXT, Markdown, HTML, JSON, CSV, DOCX, PDF) & Knowledge Graph persisted in `SQLite WAL` (`external_knowledge.db`) + `SourceRegistry` | Instant ingestion & chunking **without retraining** the model | `gajahmada_ai/knowledge/` (`ingestion`, `chunker`, `retriever`, `embedding`, `source_registry`) |
+| **3. Persistent Memory** | Operational experiences, conversation context, verified facts, strategies, & contradictions across 5 tiers (`working`, `semantic`, `episodic`, `procedural`, `collective`) | Authorized memory operations, epistemic quarantine, & cryptographic `node_attestations` promotion | `gajahmada_ai/memory/`, `gajahmada_ai/storage/` |
 
-| # | Principle | Verified Implementation |
-| :-: | :--- | :--- |
-| **1** | **Independent Cognitive Engine per Node** | Every `SovereignPeerNode` executes its own 14-stage `CognitiveReasoningPipeline` completely offline. |
-| **2** | **Private Persistent Memory per Node** | Local ACID SQLite (`gajahmada_v2.db`) with `PRIVATE`/`LOCAL` isolation enforced via `MemoryAuthorizationService`, GIP/2.0, and Supabase RLS. |
-| **3** | **Active Neural-Symbolic Reasoning** | Combines **GajahMada Native Neural Model (`GNNM`)** (from-scratch PyTorch Decoder-Only Transformer), AST `SymbolicReasoner`, and `EvidenceReasoner` with honest capability reporting. |
-| **4** | **Experience-Based Strategy Adaptation** | Closed-loop `record_outcome_and_adapt()` extracts verified `PROCEDURAL` strategies and tunes `retrieval_top_k` with regression verification and instant rollback. |
-| **5** | **Open Protocol Cooperation (`GIP/2.0`)** | 8-namespace canonical JSON protocol signed with Ed25519, `PeerTrustState` lifecycle, nonce replay cache, and SSRF protection. |
-| **6** | **Independent Cross-Node Verification** | `QuorumConsensusManager` verifies per-submission Ed25519 signatures and `provenance_hash`, enforcing policy `quorum_size >= 2` and rejecting unbacked majority claims. |
-| **7** | **No Single Central Authority** | Zero mandatory master node; cryptographic keys, policies, peer revocation lists, and memory remain strictly sovereign per node. |
+Coordinating all three systems is the **Hybrid Knowledge Controller** (`HybridKnowledgeController`) and **`GNNMKnowledgeAdapter`**, which enforce retrieval-boundary access control (`KnowledgeAccessPolicy`), detect conflicting sources, construct prompt-injection-hardened token-budgeted contexts (`TokenBudgetContextBuilder`), and feed evidence into GajahMada's **14-stage Cognitive Reasoning Pipeline** and **ModelRouter**.
 
----
-
-## 🖥️ Live Interface Preview
-
-### 1. Homepage — Focus Command Center & Fullscreen 3D Network (`/`)
-![GajahMada Homepage Command Center & 3D Network](interface/html/screenshot-home.jpg)
-
-### 2. Full 8-Panel Tactical Cyberdeck Dashboard (`/dashboard` & `/ui`)
-![GajahMada Tactical Cyberdeck HUD](interface/html/screenshot-v2.jpg)
-
-> **Dual-Mode Web Console (`/` & `/dashboard`):**
-> - **Homepage (`/`):** A sleek **30%-opacity (no-blur) Command Center** floating over an edge-to-edge **3D Network & Architecture Graph** that smoothly accelerates (~16× angular velocity) while the Brain processes a query or crawl.
-> - **Dashboard (`/dashboard` & `/ui`):** Full 8-panel Tactical Cyberdeck HUD (System Logs & Live Config, 3D Network Graph, Command Interface, Module Dependencies, Web3 Consensus Cycle, Modular Architecture Matrix, P2P Mesh, and System Performance & Ledger) with a session-scoped **`🔑 AUTH`** control for authenticated administrative actions.
+> **Live Web Interface ([gajahmada.vercel.app](https://gajahmada.vercel.app/)):**
+> - **Homepage (`/`):** Focus Command Center floating over an interactive full-viewport 3D Network Graph with real-time neural thinking acceleration.
+> - **Tactical Cyberdeck Dashboard (`/dashboard` & `/ui`):** 8-panel operational HUD (System Logs & Live Config, 3D Network Graph, Command Interface, Module Dependencies, Consensus Cycle, Architecture Matrix, P2P Mesh, and System Performance & Ledger) with a session-scoped **`🔑 AUTH`** control for authenticated operator actions.
 
 ---
 
-## ✨ Core Capabilities
+## Core Architectural Capabilities
 
-1. **14-Stage Hybrid Cognitive Reasoning Pipeline (`gajahmada_ai.cognition`, `reasoning`):**
-   - Orchestrates `PERCEPTION` → `INTENT` → `MEMORY RETRIEVAL` → `DECOMPOSITION` → `HYPOTHESES` → `PARALLEL REASONING (Neural + Symbolic + Evidence)` → `EVIDENCE FUSION` → `METACOGNITIVE CRITIC` → `SUFFICIENCY` → `DECISION`.
-   - Outputs structured `ReasoningResult` objects with `EpistemicBreakdown` separating verified facts, unverified claims, hypotheses, inferences, opinions, and unknown information.
-   - **Concise by Default:** Delivers direct 1–3 sentence answers unless the prompt requests detailed elaboration (`detail`, `lengkap`, `rinci`, `step by step`, `in detail`, etc.).
+1. **GajahMada Native Neural Model (`gajahmada_ai/gnnm/` & `neural/`):**
+   - Custom PyTorch Decoder-Only Transformer (**Pre-Norm RMSNorm + RoPE + Grouped/Multi-Head Causal Self-Attention + SwiGLU**) paired with a pure-Python lossless Byte-Level BPE tokenizer (`GNNMBPETokenizer`).
+   - Verified from-scratch checkpoints trained locally on CPU: `GNNM-01-Tiny` (`918,656` params) and `GNNM-01-12M` (**`11,243,520` params**, 10M–50M tier), with scaling presets up to `GNNM-04-1B` (`~1.1B` params).
+   - `PyTorchNativeBackend` enforces exact token-budget context allocation against each checkpoint's `max_seq_len` (zero arbitrary character truncation). When no neural checkpoint is loaded, `ModelRouter` honestly reports `neural_inference_active: False` while the deterministic Cognitive Engine stays 100% operational.
 
-2. **Sovereign From-Scratch Native Neural Model (`GNNM`) (`gajahmada_ai.gnnm`, `neural`):**
-   - Primary neural execution via **GajahMada Native Neural Model (`GNNM`)** (`PyTorchNativeBackend` auto-discovering `./models/gnnm-*`) and optional **ONNX (`OnnxBackend`)** — zero dependency on third-party model weights.
-   - **Honest Capability Reporting:** Reports `neural_inference_active: True` strictly when real `GNNM` model weights are loaded; never masquerades rule-based synthesis as neural inference.
+2. **Hybrid External Knowledge & Pluggable Offline Embeddings (`gajahmada_ai/knowledge/`):**
+   - **10-Step Ingestion (`KnowledgeIngestionPipeline`):** Parse → Normalize → Validate → SHA-256 Deduplicate → Extract Metadata → Structure/Token-Aware Chunking (`DocumentChunker`) → Embed → Persist in `SQLite WAL` (`external_knowledge.db`) → Track Lineage (`SourceRegistry`) → Log Status.
+   - **Pluggable Embeddings (`embedding.py`):** Preserves `HashEmbeddingProvider` (`deterministic-hash-384d`) as default offline fallback, adds `NativeSemanticEmbeddingProvider` (`gajahmada-native-semantic-384d` bilingual ID/EN offline semantic encoder), enforces strict encoder compatibility checks before vector similarity comparisons, and supports incremental, reversible re-embedding (`EmbeddingMigrationManager`).
+   - **Hybrid Retrieval & Safe Context:** Combines cosine vector similarity, Okapi BM25 lexical ranking, Knowledge Graph entity boosts, and Persistent Memory retrieval under fail-closed `KnowledgeAccessPolicy`. Retrieved chunks are wrapped in `<untrusted_retrieved_data>` delimiters with prompt-injection sanitization inside `TokenBudgetContextBuilder`.
 
-3. **5-Tier Memory, Knowledge Quarantine & Optional Supabase `pgvector` (`gajahmada_ai.memory`, `storage`):**
-   - Five persistent tiers: **Working**, **Semantic**, **Episodic**, **Procedural**, and **Collective**, backed by local SQLite (`gajahmada_v2.db`) with SHA-256 integrity hashes, immutable version history, contradiction preservation, and Knowledge Graph extraction.
-   - **6-State Epistemic Model:** `UNVERIFIED`, `MODEL_ASSESSED`, `SOURCE_CORROBORATED`, `INDEPENDENTLY_VERIFIED`, `DISPUTED`, and `REJECTED`. Unverified model outputs, web crawls, and peer `GIP-KNOWLEDGE` enter **`LOCAL` Quarantine** first and require traceable `independent_sources` + contradiction checks via `POST /api/v2/knowledge/promote/{record_id}` before entering `COLLECTIVE` memory.
-   - **Optional Supabase Cloud Persistence (`supabase/schema.sql`):** Content-addressed `knowledge_records` (`vector(384)` + `match_knowledge` RPC) and `ledger_blocks` protected by **Row Level Security (RLS)** (public keys can only `SELECT` `COLLECTIVE` rows; all public writes are blocked with `401 / 42501`).
+3. **Isolated Knowledge-to-Model Learning Pipeline (`gajahmada_ai/learning/`):**
+   - Completely decoupled from production inference and ingestion.
+   - **`TrainingKnowledgeFilter`** rejects `UNVERIFIED`, `DISPUTED`, `REJECTED`, prompt-injection payloads, missing/restricted licenses, low-quality OCR, duplicates, and untrusted peer/agent inputs.
+   - **`KnowledgeDatasetBuilder`** generates separate versioned JSONL manifests for **Continued Pretraining** vs. **Supervised Fine-Tuning (SFT)**.
+   - **`KnowledgeToModelPipeline`** trains from an isolated copy of the base checkpoint with reproducible seeds, evaluates candidates through **`ModelEvaluationGate`** (ID/EN quality, grounded faithfulness, citation accuracy, hallucination rate, perplexity ratio, prompt-injection resilience), and manages lifecycle states (`DEVELOPMENT` → `TRAINING` → `EVALUATING` → `APPROVED` → `ACTIVE` / `REJECTED` / `ARCHIVED`) in **`GNNMModelRegistry`** with explicit operator-approved promotion and instant rollback.
 
-4. **Security Hardening & Tamper-Evident Local Signed Event Ledger (`gajahmada_ai.security`, `blockchain`):**
-   - **Zero Signing Oracle:** `POST /security/sign-verify` uses an isolated ephemeral self-test keypair + domain-separated server nonce (`oracle_protected: True`), never exposing the node's private key.
-   - **Fail-Closed RBAC, Internal Endpoint Protection & Visibility Matrix:** Cryptographically random 256-bit admin key (`admin_api.key`, `0600`), RBAC (`401`/`403`) across all v1/v2 state-mutating endpoints and internal operational endpoints (`/api/v2/reasoning`, `/api/v2/agents`), active `SlidingWindowRateLimiter` (`429`), configurable CORS, unforgeable approvals, and an explicit fail-closed visibility matrix (`PRIVATE`/`LOCAL` → `admin`/`operator` only; `SHARED` → authenticated roles; `COLLECTIVE`/`PUBLIC` → public read).
-   - **Fail-Closed Key Management:** Atomic `0600` private-key persistence (`KeyPersistenceError` on failure) and restart-persistent dual-signed rotation certificates & revocation lists (`node_key.pem.state.json`), synchronizable via `GIP-IDENTITY`.
-   - **Tamper-Evident Local Signed Event Ledger (Schema v2):** Local hash-chained, Ed25519-signed audit ledger (not a public BFT distributed consensus blockchain) with canonical JSON hashing over every field (`event_type`, `event_ref`, `metadata`, `timestamp`, `node_id`, `previous_hash`), strict full-envelope Ed25519 verification on every non-genesis block (`index > 0`, no unsigned or spoofed-genesis bypass), atomic writes (`tmp + fsync + .bak + os.replace`), and explicit `LEDGER_CORRUPTED` halt + `recover_from_backup()`.
+4. **Security Hardening & Tamper-Evident Local Signed Event Ledger (`gajahmada_ai/security/`, `blockchain/`):**
+   - **Zero Signing Oracle & Fail-Closed Auth:** `/security/sign-verify` uses an isolated ephemeral keypair + domain-separated nonce; 256-bit rotatable admin key (`admin_api.key`, `0600`); fail-closed RBAC (`401`/`403`) on all state-mutating v1/v2 endpoints and internal operational endpoints (`/api/v2/reasoning`, `/api/v2/agents`, `/api/v2/learning/*`); active `SlidingWindowRateLimiter` (`429`) and configurable CORS.
+   - **Explicit Visibility Access Matrix (`MemoryAuthorizationService` & `KnowledgeAccessPolicy`):** `PRIVATE` & `LOCAL` restricted to `admin`/`operator` (with cross-agent and cross-node isolation); `SHARED` requires authentication; only `COLLECTIVE`/`PUBLIC` are publicly readable.
+   - **Fail-Closed Key Management:** Atomic `0600` private-key persistence (`KeyPersistenceError` on failure) and restart-persistent dual-signed rotation certificates & revocation lists (`node_key.pem.state.json`).
+   - **Tamper-Evident Local Signed Event Ledger (Schema v2):** Local hash-chained, Ed25519-signed audit ledger (not a public BFT distributed consensus blockchain) with canonical JSON hashing over every field, strict full-envelope Ed25519 verification on every non-genesis block (`index > 0`), atomic writes (`tmp + fsync + .bak + os.replace`), and explicit `LEDGER_CORRUPTED` halt + `recover_from_backup()`.
 
-5. **Full 8-Namespace `GIP/2.0` Mesh Protocol (`gajahmada_ai.network`):**
-   - Operational handlers for `IDENTITY`, `DISCOVERY`, `CAPABILITY`, `TASK`, `KNOWLEDGE`, `VERIFY`, `CONSENSUS`, and `SYNC` at `POST /api/v2/network/gip`, backed by an atomic, restart-persistent SQLite WAL replay nonce store (`gip_replay.db`).
-   - Enforces explicit **`PeerTrustState`** (`UNKNOWN → PENDING → AUTHENTICATED → TRUSTED → REVOKED`), SSRF validation on discovery endpoints, direct Ed25519 verification + independent evidence checks inside `QuorumConsensusManager`, and cryptographic multi-node `node_attestations` for `INDEPENDENTLY_VERIFIED` knowledge promotion.
+5. **GIP/2.0 Cryptographic Mesh, Collective Federation & Ecosystem SDK (`gajahmada_ai/network/`, `sdk/`):**
+   - Full 8-namespace `GIP/2.0` protocol (`docs/GIP_2_0_RFC.md`) backed by an atomic SQLite WAL replay nonce store (`gip_replay.db`), explicit `PeerTrustState` lifecycle, SSRF validation, direct Ed25519 quorum verification (`QuorumConsensusManager`), and multi-organization sovereign federation (`FederationRegistry`, `config.federation.example.yaml`).
+   - Official Python SDK (`sdk/gajahmada_sdk/`) with `GajahMadaClient`, `NodeKeyPair`, and `build_signed_gip_message`.
 
 ---
 
-## 🏗️ 8-Layer Architecture
+## System Architecture
 
 ```mermaid
 flowchart TD
-    UI["Homepage Command Center (/) + 8-Panel Dashboard (/dashboard, /ui) & CLI"] <--> API["FastAPI Gateway<br/>/api/v2/* & Legacy v1 Routes (Fail-Closed RBAC + Rate Limit)"]
-    API --> L8["LAYER 8 — INTELLIGENCE GOVERNANCE<br/>RBAC Auth · Execution Policies · Trust Policies · Closed-Loop Learning & Rollback"]
-    L8 --> L7["LAYER 7 — COLLECTIVE INTELLIGENCE<br/>Multi-Node Task Delegation · Independent Per-Submission Verification · Policy Quorum"]
-    L7 --> L6["LAYER 6 — AUTONOMOUS AGENT RUNTIME<br/>Planner · Researcher · Analyst · Verifier · Scheduler · Unforgeable Human Approval"]
-    L6 --> L5["LAYER 5 — HYBRID REASONING ENGINE<br/>GNNM Native Transformer + AST Symbolic + Evidence + Critic"]
-    L5 --> L4["LAYER 4 — 5-TIER MEMORY & QUARANTINE ENGINE<br/>SQLite + Optional Supabase pgvector (RLS) · MemoryAuthorizationService · Versioning"]
-    L4 --> L3["LAYER 3 — PERCEPTION & OPEN KNOWLEDGE CRAWLER<br/>Input Normalization · Wikipedia · DuckDuckGo · Open-Meteo · Al-Qur'an · Direct URL"]
-    L3 --> L2["LAYER 2 — DISTRIBUTED INFRASTRUCTURE (GIP/2.0)<br/>8 Namespaces · PeerTrustState · Ed25519 Envelopes · Replay Protection · SSRF Guard"]
-    L2 --> L1["LAYER 1 — SOVEREIGN FOUNDATION<br/>Ed25519 Identity & Key Rotation · Schema v2 Canonical PoW Ledger · Atomic Recovery"]
+    Q["User / Agent / SDK Query + KnowledgeAccessContext"] --> HKC["Hybrid Knowledge Controller & GNNMKnowledgeAdapter"]
+
+    HKC -->|"1. External Knowledge"| EXT["HybridKnowledgeRetriever (Semantic + BM25 + KG)<br/>SQLite WAL external_knowledge.db + SourceRegistry"]
+    HKC -->|"2. Persistent Memory"| MEM["5-Tier MemoryManager (SQLite / Optional Supabase pgvector)<br/>MemoryAuthorizationService & Epistemic Quarantine"]
+    HKC -->|"3. Internal Knowledge"| INT["ModelRouter -> PyTorchNativeBackend (GNNM)<br/>TokenBudgetContextBuilder (<untrusted_retrieved_data>)"]
+
+    EXT & MEM & INT --> COG["14-Stage CognitiveReasoningPipeline<br/>SymbolicReasoner · EvidenceReasoner · ContradictionDetector · MetacognitiveCritic"]
+
+    subgraph ISOLATED["Isolated Knowledge-to-Model Learning Pipeline (Offline / Admin-Gated)"]
+        FILT["TrainingKnowledgeFilter"] --> DSB["KnowledgeDatasetBuilder<br/>(Continued Pretraining / SFT)"]
+        DSB --> TRN["KnowledgeToModelPipeline<br/>(Isolated Checkpoint Copy + GNNMTrainer)"]
+        TRN --> GATE["ModelEvaluationGate"] --> REG["GNNMModelRegistry<br/>(Operator Promotion & Rollback)"]
+    end
+
+    COG --> SEC["Sovereign Foundation<br/>Ed25519 NodeIdentity · GIP/2.0 (SQLite WAL Replay) · Tamper-Evident Local Signed Event Ledger"]
 ```
 
 ### Repository Structure
@@ -103,55 +93,57 @@ flowchart TD
 gajahmada/
 ├── main.py                              # Entry point (Localhost Uvicorn & Vercel ASGI)
 ├── config.yaml                          # Node, bootstrap peer, & native GNNM model configuration
-├── config.federation.example.yaml       # Stage 4 multi-organization sovereign node template
-├── .env.example                         # Environment template for optional Supabase & auth
+├── config.federation.example.yaml       # Multi-organization sovereign federation node template
+├── .env.example                         # Environment template for Supabase, auth, & GM_* feature flags
 ├── vercel.json                          # Vercel Serverless routing configuration
 ├── LICENSE                              # MIT Open-Source License
-├── ARCHITECTURE.md                      # Detailed system & security architecture reference
+├── ARCHITECTURE.md                      # Detailed system, hybrid knowledge, & security architecture
 ├── run.sh / run.bat                     # Cross-platform quick-start scripts
 ├── supabase/
 │   └── schema.sql                       # PostgreSQL + pgvector schema, match_knowledge RPC, & RLS
 ├── docs/
-│   ├── ARCHITECTURE_V2.md               # 8-layer & 14-stage cognitive specification
-│   ├── GNNM_ARCHITECTURE.md             # GajahMada Native Neural Model (GNNM-01..04) blueprint
-│   ├── GIP_2_0_RFC.md                   # Stage 5 formal GIP/2.0 wire & interoperability RFC
-│   ├── BENCHMARK_REPORT.json            # Stage 5 reproducible ecosystem benchmark report
-│   ├── AUDIT_V2.md                      # Source code audit & capability classification
+│   ├── GNNM_ARCHITECTURE.md             # GNNM-01..04 Transformer blueprint & training status
+│   ├── GIP_2_0_RFC.md                   # Formal GIP/2.0 wire protocol & interoperability RFC
+│   ├── BENCHMARK_REPORT.json            # Reproducible ecosystem benchmark report (Stages 1-5)
 │   ├── SECURITY_AUDIT.md                # Security controls & Round 1-3 remediation matrix
+│   ├── ARCHITECTURE_V2.md               # 8-layer & 14-stage cognitive specification
+│   ├── AUDIT_V2.md                      # Source code audit & capability classification
 │   ├── MIGRATION_PLAN.md                # v1 -> v2 compatibility contract
-│   └── ROADMAP.md                       # 5-stage sovereign roadmap & benchmark results
+│   └── ROADMAP.md                       # 5-stage sovereign strategic roadmap & results
 ├── scripts/
 │   ├── train_gnnm.py                    # Scalable CLI Pretraining + Val Perplexity + SFT pipeline
 │   ├── train_gnnm_01_tiny.py            # Quick-start local GNNM-01-Tiny pretraining script
-│   ├── run_gip_network_simulation.py    # Stage 3 3 -> 10 -> 100-node GIP stress & recovery harness
-│   └── run_ecosystem_benchmarks.py      # Stage 5 open reproducible benchmark runner
+│   ├── run_gip_network_simulation.py    # 3 -> 10 -> 100-node GIP distributed stress harness
+│   └── run_ecosystem_benchmarks.py      # Reproducible Stages 1-5 benchmark runner
 ├── sdk/
-│   └── gajahmada_sdk/                   # Stage 5 official Python SDK (GajahMadaClient, NodeKeyPair, GIP helpers)
+│   └── gajahmada_sdk/                   # Official Python SDK (GajahMadaClient, NodeKeyPair, GIP helpers)
 ├── models/
-│   ├── gnnm-01-tiny/                    # From-scratch GNNM-01-Tiny checkpoint metadata (918K params; model.pt gitignored)
-│   └── gnnm-01-12m/                     # Stage 1 GNNM-01-12M checkpoint metadata (11.24M params; model.pt gitignored)
+│   ├── gnnm-01-tiny/                    # GNNM-01-Tiny metadata (918K params; model.pt gitignored)
+│   └── gnnm-01-12m/                     # GNNM-01-12M metadata (11.24M params; model.pt gitignored)
 ├── gajahmada_ai/
-│   ├── api/                             # FastAPI server.py (v1 + UI host) & v2_routes.py (/api/v2/* + /federation)
-│   ├── cognition/                       # 14-stage CognitiveReasoningPipeline & EpistemicBreakdown
-│   ├── gnnm/                            # From-scratch Decoder-Only Transformer (config, tokenizer, dataset, model, trainer, inference)
-│   ├── neural/                          # ModelRouter, PyTorchNativeBackend (GNNM), OnnxBackend, InferenceBackend ABC
-│   ├── reasoning/                       # SymbolicReasoner (AST/Logic), EvidenceReasoner, ContradictionDetector
+│   ├── gnnm/                            # From-scratch Decoder-Only Transformer, BPE tokenizer, trainer, inference
+│   ├── knowledge/                       # HybridKnowledgeController, GNNMKnowledgeAdapter, HybridKnowledgeRetriever (SQLite WAL),
+│   │                                    # KnowledgeIngestionPipeline, DocumentChunker, TokenBudgetContextBuilder,
+│   │                                    # EmbeddingProviders, SourceRegistry, KnowledgeAccessPolicy, LocalKnowledge (legacy RAG)
+│   ├── learning/                        # TrainingKnowledgeFilter, KnowledgeDatasetBuilder, KnowledgeToModelPipeline,
+│   │                                    # ModelEvaluationGate, GNNMModelRegistry, LearningExperimentManager
 │   ├── memory/                          # 5-tier MemoryManager, MemoryAuthorizationService, KnowledgeGraph, Versioning
+│   ├── neural/                          # ModelRouter, PyTorchNativeBackend (token-budgeted GNNM), OnnxBackend, InferenceBackend
+│   ├── cognition/ & reasoning/          # 14-stage CognitiveReasoningPipeline, SymbolicReasoner, EvidenceReasoner, Contradictions
 │   ├── storage/                         # RelationalMemoryStore (SQLite/PG), SupabaseKnowledgeStore, ObjectStore
-│   ├── knowledge/                       # LocalKnowledge (384-d RAG), open_knowledge.py crawler, indonesia_corpus.py
 │   ├── agents/ & execution/             # Planner, Researcher, Analyst, Verifier, Scheduler, SandboxedExecutor
-│   ├── learning/                        # FeedbackCollector, ExperienceExtractor, StrategyAdapter, LearningExperimentManager
-│   ├── network/                         # GIP/2.0 protocol (SQLite WAL replay store), FederationRegistry, PeerDiscoveryRegistry, CollectiveCoordinator, QuorumConsensus
+│   ├── network/                         # GIP/2.0 (SQLite WAL replay), FederationRegistry, PeerDiscovery, QuorumConsensus
 │   ├── blockchain/                      # AIBlockchain Schema v2 tamper-evident local signed event ledger + atomic recovery
-│   ├── security/                        # NodeIdentity (Ed25519, fail-closed key/state persistence), AuthManager (RBAC), SSRF guard, RateLimiter, AuditLogger
-│   └── cli/                             # CLI v1 & v2 (`gajahmada`)
-├── interface/html/                      # Dual-Mode Web UI: Homepage (/) & 8-Panel Dashboard (/dashboard, /ui)
-└── tests/                               # 45 Automated Tests across unit, cognition, memory, network, security, integration, benchmarks
+│   ├── security/                        # NodeIdentity (fail-closed Ed25519), AuthManager (RBAC), SSRF, RateLimiter, AuditLogger
+│   ├── api/                             # FastAPI server.py (v1, UI, SEO/sitemap.xml) & v2_routes.py (/api/v2/*)
+│   └── cli/                             # Sovereign Node CLI v1 & v2
+├── interface/html/                      # Dual-Mode Web UI (/, /dashboard, /ui), SEO JSON-LD, & sitemap.xml
+└── tests/                               # 57 Automated Tests across unit, knowledge, learning, cognition, memory, network, security, integration
 ```
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Local Offline Mode (Zero External APIs)
 
@@ -160,11 +152,11 @@ pip install -r requirements.txt
 ./run.sh        # Linux / macOS (Windows: run.bat)
 ```
 
-Open in your browser:
-- **Homepage (Focus Command Center + 3D Network):** `http://localhost:8000/`
-- **Full 8-Panel Tactical Cyberdeck Dashboard:** `http://localhost:8000/dashboard` (or `/ui`)
+- **Homepage:** `http://localhost:8000/`
+- **8-Panel Cyberdeck Dashboard:** `http://localhost:8000/dashboard` (or `/ui`)
+- **OpenAPI Docs:** `http://localhost:8000/docs`
 
-> **Operator Authentication:** On first boot, a random 256-bit admin key is saved to `knowledge_store/admin_api.key` (permissions `0600`) or read from `GAJAHMADA_ADMIN_KEY`. In the Dashboard, click **`🔑 AUTH`** in the header to store your key in browser `sessionStorage` for protected administrative actions.
+> **Operator Authentication:** On first boot, a random 256-bit admin key is saved to `knowledge_store/admin_api.key` (`0600`) or read from `GAJAHMADA_ADMIN_KEY`. In the Dashboard, click **`🔑 AUTH`** to store your key in browser `sessionStorage` for protected administrative actions.
 
 ### 2. Local Native `GNNM` Neural Runtime (`.venv312` + PyTorch CPU/CUDA)
 
@@ -173,140 +165,98 @@ uv venv --python 3.12 .venv312
 uv pip install --python .venv312/bin/python -r requirements.txt
 uv pip install --python .venv312/bin/python torch --index-url https://download.pytorch.org/whl/cpu
 
-# Train your own GNNM-01-Tiny checkpoint from scratch into ./models/gnnm-01-tiny/
-.venv312/bin/python scripts/train_gnnm.py --preset GNNM-01-Tiny --steps 80 --sft-steps 40
+# Train a from-scratch GNNM checkpoint (GNNM-01-Tiny or GNNM-01-12M)
+.venv312/bin/python scripts/train_gnnm.py --preset GNNM-01-12M --vocab-size 2048 --steps 12 --sft-steps 6
 
-# ./run.sh automatically selects .venv312/bin/python and loads ./models/gnnm-01-tiny
+# ./run.sh automatically selects .venv312/bin/python and loads local GNNM checkpoints
 ./run.sh
 ```
 
-### 3. Optional Supabase Persistence (`PostgreSQL + pgvector` + RLS)
+### 3. Configuration & Feature Flags (`.env`)
 
-1. Execute [supabase/schema.sql](supabase/schema.sql) in your Supabase SQL Editor (enables `pgvector`, creates `knowledge_records`, `ledger_blocks`, `match_knowledge` RPC, and enforces RLS).
-2. Copy `.env.example` to `.env` (or configure Vercel Environment Variables):
-   ```env
-   SUPABASE_URL=https://<project-ref>.supabase.co
-   SUPABASE_PUBLISHABLE_KEY=<your-publishable-key>
-   SUPABASE_SECRET_KEY=<your-secret-key>
-   GAJAHMADA_ADMIN_KEY=<your-random-256bit-admin-key>
-   ```
-   *(If setting `DATABASE_URL` with special characters in the password, URL-encode `@` → `%40` and `#` → `%23`.)*
-3. Without `.env`, every node operates 100% independently in local-first SQLite mode.
-
----
-
-## 🧠 GajahMada Native Neural Model (`GNNM`)
-
-GajahMada includes its own **from-scratch Decoder-Only Transformer** (`gajahmada_ai/gnnm/`) with zero external model weights required ([docs/GNNM_ARCHITECTURE.md](docs/GNNM_ARCHITECTURE.md)):
-
-- **Architecture:** Pre-Norm `RMSNorm` + Rotary Positional Embeddings (`RoPE`) + Grouped/Multi-Head Causal Self-Attention + `SwiGLU` + `std=0.02` initialization + repetition-penalized autoregressive decoding.
-- **Tokenizer:** Pure-Python lossless **Byte-Level BPE (`GNNMBPETokenizer`)** supporting Indonesian, English, regional scripts, Arabic, math, and code with zero `<unk>` loss.
-- **Training Pipeline:** Streaming `.jsonl`/`.txt` corpus deduplication (`SHA-256`), causal pretraining, validation perplexity evaluation, and Supervised Fine-Tuning (SFT) with `-100` prompt loss masking.
-- **Auto-Discovery:** Trained checkpoints in `./models/gnnm-*` are automatically loaded by `PyTorchNativeBackend` and surfaced in `ModelRouter`.
+All Hybrid Knowledge capabilities are backward-compatible and controlled via environment flags (see [.env.example](.env.example)):
 
 ```bash
-uv pip install --python .venv312/bin/python torch --index-url https://download.pytorch.org/whl/cpu
-
-# Fast local CPU proof-of-concept (Pretrain + Val Perplexity + SFT + metrics.json)
-.venv312/bin/python scripts/train_gnnm.py --preset GNNM-01-Tiny --steps 80 --sft-steps 40
-
-# Scale to GNNM-01-25M on CUDA GPU with custom multilingual .jsonl/.txt corpus
-.venv312/bin/python scripts/train_gnnm.py --preset GNNM-01-25M --corpus-dir ./data/corpus --vocab-size 8192 --seq-len 256 --steps 5000 --sft-steps 500
+GM_HYBRID_KNOWLEDGE=true
+GM_EXTERNAL_RETRIEVAL=true
+GM_SEMANTIC_EMBEDDING=false            # true enables NativeSemanticEmbeddingProvider; false keeps 384-d hash fallback
+GM_HASH_EMBEDDING_FALLBACK=true
+GM_KNOWLEDGE_TRAINING=false
+GM_KNOWLEDGE_VERIFICATION_REQUIRED=true
+GM_KNOWLEDGE_MAX_RESULTS=5
+GM_KNOWLEDGE_MAX_CONTEXT_TOKENS=1024
+GM_KNOWLEDGE_ENABLE_BM25=true
+GM_KNOWLEDGE_ENABLE_VECTOR_SEARCH=true
+GM_KNOWLEDGE_ENABLE_GRAPH_SEARCH=true
+GM_KNOWLEDGE_ENABLE_DISTRIBUTED_SOURCES=false
 ```
 
 ---
 
-## 💻 CLI Reference
+## REST API Surface (v2 & Backward-Compatible v1)
 
-```bash
-python -m gajahmada_ai.cli.main init
-python -m gajahmada_ai.cli.main node start --config config.yaml
-python -m gajahmada_ai.cli.main intelligence diagnose
-python -m gajahmada_ai.cli.main intelligence ask "Compute sqrt(144) + 25 * 4"
-python -m gajahmada_ai.cli.main memory inspect
-python -m gajahmada_ai.cli.main agent run "Verify Sumpah Palapa 1336 historical provenance"
-python -m gajahmada_ai.cli.main network status
-python -m gajahmada_ai.cli.main system health
-```
+| Method | Endpoint | Auth | Purpose |
+| :--- | :--- | :---: | :--- |
+| `GET` | `/api/v2/intelligence/diagnose` | Public | Honest capability report (`neural_inference_active`, `symbolic_reasoning_active`, memory stats). |
+| `POST` | `/api/v2/intelligence/ask` | Optional | 14-stage hybrid cognitive reasoning (read-only for public; quarantined persistence for operators). |
+| `GET` | `/api/v2/reasoning`, `/api/v2/reasoning/{id}` | **Required** | Authenticated internal reasoning traces & epistemic breakdowns. |
+| `GET` / `POST` | `/api/v2/memory`, `PUT /api/v2/memory/{id}` | Read: Matrix / Write: **Required** | Visibility-enforced 5-tier persistent memory & immutable version history. |
+| `POST` | `/api/v2/knowledge/ingest` | **Required** | 10-step external document ingestion (TXT/MD/HTML/JSON/CSV/DOCX/PDF) into SQLite WAL + `SourceRegistry`. |
+| `POST` | `/api/v2/knowledge/hybrid-search` | Matrix | Authorization-enforced hybrid retrieval (Semantic + BM25 + KG + Memory) with conflict detection. |
+| `GET` | `/api/v2/knowledge/sources` | **Required** | List registered external knowledge sources, hashes, licenses, and verification status. |
+| `POST` | `/api/v2/knowledge/promote/{record_id}` | **Required** | Promote quarantined knowledge (`SOURCE_CORROBORATED` from sources; `INDEPENDENTLY_VERIFIED` requires `>= 2` Ed25519 `node_attestations`). |
+| `GET` | `/api/v2/learning/registry` | **Required** | Inspect versioned `GNNMModelRegistry` checkpoints, statuses, and rollback references. |
+| `POST` | `/api/v2/learning/train` | **Required** | Run isolated `KnowledgeToModelPipeline` training job (`continued_pretraining` or `sft`) + `ModelEvaluationGate`. |
+| `POST` | `/api/v2/learning/promote/{version_id}` | **Required** | Operator-approved promotion of an `APPROVED` checkpoint to `ACTIVE` (audited & ledger-signed). |
+| `POST` | `/api/v2/learning/rollback` | **Required** | Reversible rollback to the previous `ACTIVE` checkpoint. |
+| `GET` / `POST` | `/api/v2/agents`, `/agents/run`, `/tasks/{id}/approve` | **Required** | Bounded autonomous agents with unforgeable human approval gates. |
+| `POST` | `/api/v2/network/gip` | Ed25519 + Trust | 8-namespace GIP/2.0 receiver (SQLite WAL replay store, `PeerTrustState`, direct Ed25519 consensus). |
+| `GET` / `POST` | `/api/v2/federation`, `/federation/organizations` | Read: Public / Write: **Required** | Multi-organization sovereign federation registry. |
+| `GET` | `/api/v2/system/health` | Public (redacted) | Node health, `tamper_evident_local_signed_event_ledger` status, & audit integrity. |
+| `GET` | `/sitemap.xml`, `/robots.txt`, `/manifest.json` | Public | Google Search Console sitemap, crawler directives, and PWA manifest for `https://gajahmada.vercel.app`. |
 
----
-
-## 📡 REST & Web3 API Reference
-
-### GajahMada 2.0 API (`/api/v2/*`)
-
-| Method | Endpoint | Auth | Description |
-| :---: | :--- | :---: | :--- |
-| `GET` | `/api/v2/intelligence/diagnose` | Public | Honest capability report (`gajahmada-native` GNNM, `onnx`, symbolic, memory, agents). |
-| `POST` | `/api/v2/intelligence/ask` | Optional | 14-stage cognitive reasoning (public requests are read-only; authenticated operators persist to `LOCAL` Quarantine). |
-| `GET` | `/api/v2/reasoning/{id}` | Public | Inspect step-by-step reasoning trace, hypotheses, evidence, and contradictions. |
-| `GET` | `/api/v2/memory` | Filtered | Memory stats, records, & contradictions filtered by `MemoryAuthorizationService` (`PRIVATE` hidden from public). |
-| `POST/PUT` | `/api/v2/memory` / `/{id}` | **Required** | Store or correct versioned memory records with SHA-256 provenance & contradiction checks. |
-| `GET` | `/api/v2/memory/{id}/versions` | Guarded | Immutable version history (`403` for unauthorized access to `PRIVATE` records). |
-| `POST` | `/api/v2/memory/backup` | **Required** | Export content-addressed SHA-256 memory snapshot. |
-| `GET` | `/api/v2/knowledge` | Filtered | Knowledge Graph relations & contradictions filtered by `MemoryAuthorizationService`. |
-| `POST` | `/api/v2/knowledge/promote/{id}` | **Required** | Promote quarantined record to `SOURCE_CORROBORATED` / `INDEPENDENTLY_VERIFIED` (`COLLECTIVE`) after validating `independent_sources` & contradictions. |
-| `POST` | `/api/v2/agents/run` | **Required** | Submit autonomous agent objective (`human_approved` always forced `False` on submission). |
-| `POST` | `/api/v2/agents/tasks/{id}/approve` | **Required** | Authenticated human approval for `WAITING` tasks + signed ledger event. |
-| `POST` | `/api/v2/network/gip` | Ed25519 + Trust | 8-namespace GIP/2.0 receiver with `PeerTrustState`, SSRF guard, replay cache, & per-submission verified consensus. |
-| `POST` | `/api/v2/nodes/register` | **Required** | Register a `TRUSTED` peer with SSRF validation. |
-| `POST` | `/api/v2/nodes/{node_id}/trust` | **Required** | Update peer trust state (`PENDING`, `AUTHENTICATED`, `TRUSTED`, `REVOKED`). |
-| `GET` | `/api/v2/system/health` | Public | Full diagnostics including ledger status (`HEALTHY` / `LEDGER_CORRUPTED`), audit integrity, & strategy version. |
-| `POST` | `/api/v2/system/rotate-key` | **Required** | Rotate node Ed25519 key with dual-signed rotation certificate. |
-| `POST` | `/api/v2/system/learning/experiment` | **Required** | Evaluate learning adaptation against regression suite with automatic rollback on failure. |
-
-### Backward-Compatible v1 API (Fail-Closed Mutations)
-
-| Method | Endpoint | Auth | Description |
-| :---: | :--- | :---: | :--- |
-| `GET` | `/`, `/dashboard`, `/ui`, `/health` | Public | Dual-mode Web UI (`/` & `/dashboard`) and health check. |
-| `POST` | `/ai/chat` | Public | Hybrid 14-stage chat + RAG + Schema v2 `record_event()` ledger + quarantined Q&A persistence. |
-| `POST` | `/ai/ingest`, `/knowledge/crawl` | **Required** | Vector assimilation and internet knowledge crawling into `LOCAL` Quarantine. |
-| `DELETE` | `/knowledge/docs/{idx}`, `/node/logs`, `/node/peers` | **Required** | Protected administrative deletion endpoints. |
-| `POST` | `/node/chain/mine`, `/node/sync`, `/node/broadcast`, `/node/config` | **Required** | Protected ledger mining, SSRF-checked peer sync, GIP broadcast, and runtime config updates. |
-| `POST` | `/security/sign-verify` | Public | **Oracle-protected** Ed25519 self-test using an isolated ephemeral keypair + server nonce. |
-| `GET` | `/node/info`, `/node/metrics`, `/node/chain`, `/knowledge/stats` | Public | Read-only node telemetry, ledger inspection, and knowledge statistics. |
+*All legacy v1 endpoints (`/ai/chat`, `/ai/embedding`, `/ai/ingest`, `/knowledge/search`, `/knowledge/stats`, `/node/info`, `/node/chain`, `/security/sign-verify`, etc.) remain 100% compatible with fail-closed RBAC on state-mutating routes.*
 
 ---
 
-## 🧪 Verification & Automated Test Suite (33/33)
+## Automated Verification & Benchmarks
 
-Run the entire verification suite with:
+Run the full automated test suite and reproducible benchmark runner:
 
 ```bash
-pytest -v
+python3 -m pytest -q
+python3 scripts/run_ecosystem_benchmarks.py
 ```
 
-| Suite | Coverage | File | Status |
+| Test Suite | Coverage | File(s) | Result |
 | :--- | :--- | :--- | :---: |
-| **Core & Neural (Tests 1–3, 14, +2)** | Offline boot without cloud APIs, local native neural loading, honest unavailability reporting, regression-guarded learning, closed-loop strategy adaptation, signed ledger. | `tests/unit/test_core_and_neural.py` | ✅ **PASSED** |
-| **Cognitive Pipeline (Tests 4–6)** | LLM-independent AST math/logic, 14-stage `ReasoningResult` & `EpistemicBreakdown`, evidence provenance references. | `tests/cognition/test_cognitive_pipeline.py` | ✅ **PASSED** |
-| **Memory Persistence (Tests 7–8)** | Restart survival, immutable version history, backup restore, contradiction preservation. | `tests/memory/test_memory_persistence.py` | ✅ **PASSED** |
-| **GIP & Collective (Tests 9–11)** | Offline node operation, 2-node signed GIP/2.0 exchange + replay rejection, 3-node collective quorum. | `tests/network/test_gip_and_collective.py` | ✅ **PASSED** |
-| **Security & Governance (Tests 12–13, +1)** | Unauthenticated admin rejection (`401`), malicious peer command/memory isolation, SSRF & predictable seed prevention. | `tests/security/test_security_and_governance.py` | ✅ **PASSED** |
-| **Audit Remediation P0–P5 + Round 3 (16 Tests)** | Signing oracle elimination, fail-closed v1/v2 & internal endpoint auth, explicit visibility matrix (`PRIVATE`/`LOCAL`/`SHARED`/`COLLECTIVE`/`PUBLIC`), cryptographic `node_attestations` promotion, direct Ed25519 consensus + evidence independence, persistent SQLite GIP replay protection, fail-closed key persistence + persisted rotations/revocations, strict non-genesis ledger verification + `LEDGER_CORRUPTED` recovery, & 3-node restart persistence. | `tests/security/test_audit_remediation.py` | ✅ **PASSED** |
-| **GNNM Native Model (4 Tests)** | Parameter estimator, lossless multilingual byte-level BPE, `.jsonl` deduplication, SFT `-100` prompt masking, & Transformer forward/init-loss check. | `tests/unit/test_gnnm_foundation.py` | ✅ **PASSED** |
-| **Roadmap Stages 2–5 (6 Tests)** | Stage 2 neural-off cognition (`model_router=None`), Stage 3 3/10/100-node GIP stress/Sybil/revocation tests, Stage 4 4-org sovereign federation + Ed25519 `node_attestations`, Stage 5 official Python SDK & GIP/2.0 interoperability. | `tests/cognition/test_stage2_*`, `tests/network/test_stage3_*`, `test_stage4_*`, `tests/integration/test_stage5_*` | ✅ **PASSED** |
-| **API Compatibility & Benchmarks** | Full v1/v2 API compatibility & live ecosystem benchmark suite (`docs/BENCHMARK_REPORT.json`). | `tests/integration/`, `tests/benchmarks/` | ✅ **PASSED** |
+| **Core & Neural (6)** | Offline boot, local backend loading, honest capability reporting, closed-loop adaptation, signed ledger. | `tests/unit/test_core_and_neural.py` | ✅ **PASSED** |
+| **GNNM Native Model (4)** | Analytical param count, lossless byte-level BPE, `.jsonl` dedup, SFT `-100` masking, Transformer forward pass. | `tests/unit/test_gnnm_foundation.py` | ✅ **PASSED** |
+| **Hybrid Knowledge Architecture (8)** | Structure/token chunker, offline semantic/hash embeddings + reversible migration, token-budget context & prompt-injection defense, fail-closed access policy, SQLite WAL external chunk restart persistence, `GNNMKnowledgeAdapter`, v2 APIs, & GSC SEO/sitemap validation. | `tests/knowledge/test_hybrid_knowledge_architecture.py` | ✅ **PASSED** |
+| **Knowledge-to-Model Learning (4)** | `TrainingKnowledgeFilter` (unverified/disputed/injection/license/OCR), Pretraining vs. SFT datasets, `ModelEvaluationGate`, `GNNMModelRegistry` promotion & rollback, & `/api/v2/learning/*` RBAC. | `tests/learning/test_knowledge_learning_pipeline.py` | ✅ **PASSED** |
+| **Cognitive & Memory (6)** | 14-stage pipeline, Stage 2 neural-off 100% accuracy, restart survival, versioning, contradiction preservation. | `tests/cognition/`, `tests/memory/` | ✅ **PASSED** |
+| **GIP, Federation & Scale (7)** | 2/3/10/100-node GIP stress/Sybil/revocation tests, 4-org sovereign federation + Ed25519 `node_attestations`. | `tests/network/` | ✅ **PASSED** |
+| **Security & Audit Rounds 1–3 (19)** | Signing oracle removal, fail-closed RBAC, visibility matrix, persistent SQLite replay guard, fail-closed key persistence, non-genesis ledger validation, `LEDGER_CORRUPTED` recovery. | `tests/security/` | ✅ **PASSED** |
+| **API Compatibility, SDK & Benchmarks (3)** | Full v1/v2 compatibility, official Python SDK lifecycle, live cognitive benchmarks. | `tests/integration/`, `tests/benchmarks/` | ✅ **PASSED** |
+
+**Total:** **57 passed, 0 failed** (`docs/BENCHMARK_REPORT.json` verified).
 
 ---
 
-## 🗺️ 5-Stage Sovereign Strategic Roadmap & Honest Maturity Status
+## 5-Stage Sovereign Strategic Roadmap
 
-GajahMada explicitly separates **verified local pipeline foundations** from **future large-scale milestones** so auditors and partners can inspect exact capabilities directly in code:
-
-| Stage | Milestone | Engineering Scope & Current Verified Status |
+| Stage | Milestone | Verified Current Status |
 | :---: | :--- | :--- |
-| **Stage 1** | **GajahMada Native Model (`GNNM`)** | **11.24M-Param Checkpoint Proven:** Custom Decoder-Only Transformer (`gajahmada_ai/gnnm/`), lossless Byte-Level BPE tokenizer, streaming corpus/SFT trainer (`scripts/train_gnnm.py`), and verified from-scratch checkpoints at `models/gnnm-01-tiny/` (`918K` params) and `models/gnnm-01-12m/` (**`11,243,520` params**, 10M–50M tier). *Scaling to 100M–1B (`GNNM-02-100M`..`GNNM-04-1B`) requires larger GPU compute & corpora.* |
-| **Stage 2** | **Native Cognitive Engine** | **Verified Operational (Neural-Off 100%):** 14-stage hybrid reasoning, deterministic `SymbolicReasoner`, `EvidenceReasoner`, `ContradictionDetector`, and 5-tier persistent memory verified via `tests/cognition/test_stage2_native_cognition.py` with zero neural weights loaded. |
-| **Stage 3** | **GIP Distributed Intelligence** | **3, 10, & 100-Node Verified:** `scripts/run_gip_network_simulation.py` + `tests/network/test_stage3_distributed_scale.py` verify 3-node restart recovery, 10-node mesh handshakes/replay/revocation blocking, and 100-node cryptographic quorum (rejecting forged/revoked/Sybil submissions & unbacked majorities). |
-| **Stage 4** | **Collective Knowledge Network** | **Federation Implemented & Verified:** `gajahmada_ai/network/federation.py`, `/api/v2/federation`, `config.federation.example.yaml`, and `tests/network/test_stage4_collective_federation.py` prove strict local ownership of `PRIVATE`/`LOCAL` data across 4 independent organizations (University, Research Lab, Community, Organization) with Ed25519 `node_attestations` for `COLLECTIVE` promotion. |
-| **Stage 5** | **Independent AI Ecosystem** | **SDK, RFC & Open Benchmarks Shipped:** Official Python SDK (`sdk/gajahmada_sdk/`), formal GIP/2.0 RFC specification (`docs/GIP_2_0_RFC.md`), reproducible benchmark runner (`scripts/run_ecosystem_benchmarks.py` → `docs/BENCHMARK_REPORT.json`), and SDK integration tests (`tests/integration/test_stage5_sdk_and_ecosystem.py`). |
+| **Stage 1** | **GajahMada Native Model (`GNNM`)** | **11.24M-Param Checkpoint Proven:** `GNNM-01-Tiny` (`918K`) and `GNNM-01-12M` (`11,243,520` params) trained & verified locally; token-budgeted `GNNMKnowledgeAdapter` and isolated `KnowledgeToModelPipeline` operational. *Scaling to `100M–1B` (`GNNM-02-100M`..`GNNM-04-1B`) requires larger GPU compute & curated corpora.* |
+| **Stage 2** | **Native Cognitive Engine** | **Operational (100% Neural-Off Verified):** 14-stage reasoning, symbolic math/logic, evidence scoring, contradiction detection, and 5-tier memory run deterministically with zero neural weights loaded. |
+| **Stage 3** | **GIP Distributed Intelligence** | **3, 10, & 100-Node Verified:** 3-node restart recovery, 10-node mesh replay/revocation blocking, and 100-node cryptographic quorum stress-tested in `scripts/run_gip_network_simulation.py`. |
+| **Stage 4** | **Collective Knowledge Network** | **Federation Implemented & Verified:** Multi-organization sovereign node registry (`/api/v2/federation`), strict `PRIVATE`/`LOCAL` ownership isolation, and cross-org Ed25519 `node_attestations`. |
+| **Stage 5** | **Independent AI Ecosystem** | **SDK, RFC & Open Benchmarks Shipped:** Official Python SDK (`sdk/gajahmada_sdk/`), formal `docs/GIP_2_0_RFC.md`, and reproducible benchmark suite (`docs/BENCHMARK_REPORT.json`). |
 
 ---
 
-## 🤝 Contributing & License
+## Contributing & License
 
-Contributions, security audits, multilingual corpus tools, and benchmark PRs are welcome! Please open an issue or pull request at **[github.com/hoed/gajahmada-ai](https://github.com/hoed/gajahmada-ai)**.
+Contributions, security audits, multilingual corpora, and benchmark PRs are welcome at **[github.com/hoed/gajahmada-ai](https://github.com/hoed/gajahmada-ai)**.
 
-This project is open-source software licensed under the **[MIT License](LICENSE)**.
+GajahMada AI is open-source software licensed under the **[MIT License](LICENSE)**.

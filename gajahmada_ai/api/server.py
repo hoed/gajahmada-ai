@@ -20,9 +20,16 @@ from gajahmada_ai.blockchain.chain import AIBlockchain, Block, LedgerEventType
 from gajahmada_ai.cognition.reasoning import CognitiveReasoningPipeline
 from gajahmada_ai.core.engine import AIModelEngine
 from gajahmada_ai.knowledge.indonesia_corpus import get_indonesia_knowledge_corpus
+from gajahmada_ai.knowledge.controller import GNNMKnowledgeAdapter, HybridKnowledgeController
+from gajahmada_ai.knowledge.ingestion import KnowledgeIngestionPipeline
+from gajahmada_ai.knowledge.interfaces import HybridKnowledgeConfig
 from gajahmada_ai.knowledge.open_knowledge import crawl_internet_knowledge, format_references_footer
 from gajahmada_ai.knowledge.rag import LocalKnowledge
+from gajahmada_ai.knowledge.retriever import HybridKnowledgeRetriever
+from gajahmada_ai.knowledge.source_registry import SourceRegistry
 from gajahmada_ai.learning.experiments import LearningExperimentManager
+from gajahmada_ai.learning.model_registry import GNNMModelRegistry
+from gajahmada_ai.learning.training_pipeline import KnowledgeToModelPipeline
 from gajahmada_ai.memory.manager import MemoryManager
 from gajahmada_ai.memory.models import MemoryType, VerificationStatus, VisibilityPolicy
 from gajahmada_ai.network.discovery import PeerDiscoveryRegistry
@@ -114,6 +121,13 @@ federation_registry: Optional[FederationRegistry] = None
 knowledge_sync: Optional[KnowledgeSynchronizer] = None
 learning_manager: Optional[LearningExperimentManager] = None
 supabase_store: Optional[SupabaseKnowledgeStore] = None
+source_registry: Optional[SourceRegistry] = None
+hybrid_retriever: Optional[HybridKnowledgeRetriever] = None
+knowledge_ingestion: Optional[KnowledgeIngestionPipeline] = None
+hybrid_knowledge_controller: Optional[HybridKnowledgeController] = None
+gnnm_knowledge_adapter: Optional[GNNMKnowledgeAdapter] = None
+gnnm_model_registry: Optional[GNNMModelRegistry] = None
+training_pipeline: Optional[KnowledgeToModelPipeline] = None
 
 system_logs: List[Dict[str, Any]] = []
 runtime_config: Dict[str, Any] = {
@@ -150,6 +164,7 @@ def ensure_initialized():
     global memory_manager, cognitive_pipeline, agent_scheduler
     global audit_logger, auth_manager, governance_policy, rate_limiter
     global gip_validator, peer_discovery, federation_registry, knowledge_sync, learning_manager, supabase_store
+    global source_registry, hybrid_retriever, knowledge_ingestion, hybrid_knowledge_controller, gnnm_knowledge_adapter, gnnm_model_registry, training_pipeline
 
     if yaml is not None and os.path.exists(CONFIG_PATH):
         try:
@@ -293,6 +308,49 @@ def ensure_initialized():
     if learning_manager is None:
         learning_manager = LearningExperimentManager()
 
+    if source_registry is None:
+        source_registry = SourceRegistry(storage_path=os.path.join(storage_dir, "source_registry.json"))
+
+    if hybrid_retriever is None:
+        hk_cfg = HybridKnowledgeConfig()
+        hybrid_retriever = HybridKnowledgeRetriever(
+            memory_manager=memory_manager,
+            config=hk_cfg,
+            storage_path=os.path.join(storage_dir, "external_knowledge.db"),
+        )
+
+    if knowledge_ingestion is None:
+        knowledge_ingestion = KnowledgeIngestionPipeline(
+            retriever=hybrid_retriever,
+            source_registry=source_registry,
+        )
+
+    if hybrid_knowledge_controller is None:
+        hybrid_knowledge_controller = HybridKnowledgeController(
+            retriever=hybrid_retriever,
+            source_registry=source_registry,
+            config=hybrid_retriever.config,
+        )
+        if cognitive_pipeline is not None:
+            cognitive_pipeline.knowledge_controller = hybrid_knowledge_controller
+
+    if gnnm_knowledge_adapter is None:
+        gnnm_knowledge_adapter = GNNMKnowledgeAdapter(
+            model_router=engine.router if engine else None,
+            knowledge_controller=hybrid_knowledge_controller,
+        )
+
+    if gnnm_model_registry is None:
+        gnnm_model_registry = GNNMModelRegistry(
+            storage_path=os.path.join(storage_dir, "gnnm_model_registry.json")
+        )
+
+    if training_pipeline is None:
+        training_pipeline = KnowledgeToModelPipeline(
+            model_registry=gnnm_model_registry,
+            workspace_dir=os.path.join(storage_dir, "training_runs"),
+        )
+
     if supabase_store is None:
         supabase_store = SupabaseKnowledgeStore()
         if supabase_store.configured:
@@ -321,6 +379,13 @@ def get_runtime_context() -> Dict[str, Any]:
         "synchronizer": knowledge_sync,
         "learning": learning_manager,
         "supabase": supabase_store,
+        "source_registry": source_registry,
+        "hybrid_retriever": hybrid_retriever,
+        "knowledge_ingestion": knowledge_ingestion,
+        "hybrid_knowledge": hybrid_knowledge_controller,
+        "gnnm_adapter": gnnm_knowledge_adapter,
+        "gnnm_registry": gnnm_model_registry,
+        "training_pipeline": training_pipeline,
     }
 
 
@@ -430,15 +495,23 @@ def robots_txt():
     content = (
         "User-agent: *\n"
         "Allow: /\n"
+        "Allow: /dashboard\n"
         "Allow: /ui\n"
+        "Allow: /docs\n"
+        "Disallow: /api/v2/reasoning\n"
+        "Disallow: /api/v2/agents\n"
+        "Disallow: /api/v2/learning/\n"
+        "Disallow: /node/config\n"
+        "Disallow: /node/logs\n"
+        "\n"
         "Sitemap: https://gajahmada.vercel.app/sitemap.xml\n"
     )
-    return PlainTextResponse(content)
+    return PlainTextResponse(content, headers={"Cache-Control": "public, max-age=3600"})
 
 
 @app.get("/sitemap.xml", include_in_schema=False)
 def sitemap_xml():
-    today = datetime.now().astimezone().strftime("%Y-%m-%d")
+    today = datetime.now(WIB_TZ).strftime("%Y-%m-%d")
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
@@ -448,21 +521,38 @@ def sitemap_xml():
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://gajahmada.vercel.app/ui</loc>
+    <loc>https://gajahmada.vercel.app/dashboard</loc>
     <lastmod>{today}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
-</urlset>"""
-    return Response(content=xml, media_type="application/xml")
+  <url>
+    <loc>https://gajahmada.vercel.app/ui</loc>
+    <lastmod>{today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://gajahmada.vercel.app/docs</loc>
+    <lastmod>{today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+</urlset>
+"""
+    return Response(
+        content=xml,
+        media_type="application/xml; charset=utf-8",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
 
 
 @app.get("/manifest.json", include_in_schema=False)
 def web_manifest():
     return {
-        "name": "GajahMada — Sovereign Decentralized Node",
-        "short_name": "GajahMada",
-        "description": "Sovereign Decentralized AI & Web3 Node with 384-d Vector RAG, SHA-256 PoW Blockchain, Ed25519 Identity, and P2P Mesh.",
+        "name": "GajahMada AI — Sovereign Hybrid Knowledge & GNNM Node",
+        "short_name": "GajahMada AI",
+        "description": "Sovereign Hybrid Distributed Intelligence with GNNM Native Transformer, Hybrid External Knowledge Retrieval, 5-Tier Persistent Memory, GIP/2.0, and Ed25519 Signed Audit Ledger.",
         "start_url": "/",
         "display": "standalone",
         "background_color": "#040706",

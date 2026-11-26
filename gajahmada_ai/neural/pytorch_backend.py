@@ -131,10 +131,25 @@ class PyTorchNativeBackend(InferenceBackend):
             )
 
         if self._gnnm_engine is not None:
-            full_prompt = f"{context[:240]}\n{prompt}" if context else prompt
+            # Token-budget-aware context construction respecting GNNM max_seq_len
+            # (replaces legacy fixed 240-char truncation without altering checkpoint format)
+            max_seq = int(self._gnnm_engine.cfg.max_seq_len)
+            gen_budget = min(max(16, int(max_tokens)), max(16, max_seq // 3), 96)
+            tok = self._gnnm_engine.tokenizer
+            prompt_ids = tok.encode(prompt, add_bos=False, add_eos=False)
+            if context:
+                ctx_budget = max(0, max_seq - gen_budget - len(prompt_ids) - 8)
+                ctx_ids = tok.encode(context, add_bos=False, add_eos=False)
+                if len(ctx_ids) > ctx_budget:
+                    ctx_ids = ctx_ids[:ctx_budget]
+                bounded_ctx = tok.decode(ctx_ids, skip_special_tokens=True).strip() if ctx_ids else ""
+                full_prompt = f"{bounded_ctx}\n{prompt}" if bounded_ctx else prompt
+            else:
+                full_prompt = prompt
+
             text = self._gnnm_engine.generate(
                 full_prompt,
-                max_new_tokens=min(max_tokens, 96),
+                max_new_tokens=gen_budget,
                 temperature=min(max(temperature, 0.2), 1.0),
             )
             elapsed_ms = round((time.perf_counter() - t0) * 1000, 3)
@@ -145,7 +160,12 @@ class PyTorchNativeBackend(InferenceBackend):
                 neural_used=True,
                 tokens_generated=len(text.split()),
                 latency_ms=elapsed_ms,
-                metadata={"architecture": "GNNM-DecoderOnly-Transformer", "version": self.metadata.version},
+                metadata={
+                    "architecture": "GNNM-DecoderOnly-Transformer",
+                    "version": self.metadata.version,
+                    "max_seq_len": max_seq,
+                    "gen_token_budget": gen_budget,
+                },
             )
 
         # Forward pass over 384-d input embedding using loaded projection weights
