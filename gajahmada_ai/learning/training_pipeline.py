@@ -41,11 +41,13 @@ class KnowledgeToModelPipeline:
         dataset_builder: Optional[KnowledgeDatasetBuilder] = None,
         evaluation_gate: Optional[ModelEvaluationGate] = None,
         workspace_dir: str = "./knowledge_store/training_runs",
+        learning_event_tracker: Optional[Any] = None,
     ):
         self.model_registry = model_registry
         self.dataset_builder = dataset_builder or KnowledgeDatasetBuilder()
         self.evaluation_gate = evaluation_gate or ModelEvaluationGate()
         self.workspace_dir = workspace_dir
+        self.learning_event_tracker = learning_event_tracker
 
     def run_training_job(
         self,
@@ -294,6 +296,28 @@ class KnowledgeToModelPipeline:
                 checkpoint_sha256=cand_sha,
             )
             final_status = ModelPromotionStatus.APPROVED.value
+            if self.learning_event_tracker is not None:
+                from gajahmada_ai.learning.learning_events import LearningEvent, LearningEventType
+
+                self.learning_event_tracker.record_event(
+                    LearningEvent(
+                        event_type=LearningEventType.TRAINING_COMPLETED.value,
+                        actor_id="learning_pipeline",
+                        visibility_policy="COLLECTIVE",
+                        source_id=",".join(manifest.get("source_ids", [])) or manifest["dataset_id"],
+                        source_type=mode,
+                        source_title=f"GNNM {mode} ({run_id})",
+                        knowledge_domain="gnnm_internal_weights",
+                        summary=f"Verified GNNM {mode} completed on {manifest['item_count']} approved item(s).",
+                        content_hash=manifest["sha256"],
+                        verification_status="VERIFIED",
+                        model_version_before=self.model_registry.active_version_id,
+                        model_version_after=run_id,
+                        training_checkpoint=candidate_ckpt_dir,
+                        training_status="COMPLETED_AND_APPROVED",
+                        internalization_status="INTERNALIZED_IN_GNNM",
+                    )
+                )
             if auto_promote_if_approved and operator_approved:
                 self.model_registry.promote(run_id, operator_approved=True)
                 final_status = ModelPromotionStatus.ACTIVE.value
@@ -305,6 +329,28 @@ class KnowledgeToModelPipeline:
                 checkpoint_sha256=cand_sha,
             )
             final_status = "EVALUATION_FAILED"
+            if self.learning_event_tracker is not None:
+                from gajahmada_ai.learning.learning_events import LearningEvent, LearningEventType
+
+                self.learning_event_tracker.record_event(
+                    LearningEvent(
+                        event_type=LearningEventType.TRAINING_REJECTED.value,
+                        actor_id="learning_pipeline",
+                        visibility_policy="COLLECTIVE",
+                        source_id=manifest["dataset_id"],
+                        source_type=mode,
+                        source_title=f"GNNM {mode} rejected ({run_id})",
+                        knowledge_domain="gnnm_internal_weights",
+                        summary=f"Candidate {run_id} failed evaluation gate: {eval_report.get('failures')}",
+                        content_hash=manifest["sha256"],
+                        verification_status="REJECTED",
+                        model_version_before=self.model_registry.active_version_id,
+                        model_version_after=None,
+                        training_checkpoint=candidate_ckpt_dir,
+                        training_status="EVALUATION_FAILED",
+                        internalization_status="NOT_DEMONSTRATED",
+                    )
+                )
 
         return {
             "run_id": run_id,

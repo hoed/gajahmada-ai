@@ -28,6 +28,7 @@ from gajahmada_ai.knowledge.rag import LocalKnowledge
 from gajahmada_ai.knowledge.retriever import HybridKnowledgeRetriever
 from gajahmada_ai.knowledge.source_registry import SourceRegistry
 from gajahmada_ai.learning.experiments import LearningExperimentManager
+from gajahmada_ai.learning.learning_events import LearningEventTracker
 from gajahmada_ai.learning.model_registry import GNNMModelRegistry
 from gajahmada_ai.learning.training_pipeline import KnowledgeToModelPipeline
 from gajahmada_ai.memory.manager import MemoryManager
@@ -128,6 +129,7 @@ hybrid_knowledge_controller: Optional[HybridKnowledgeController] = None
 gnnm_knowledge_adapter: Optional[GNNMKnowledgeAdapter] = None
 gnnm_model_registry: Optional[GNNMModelRegistry] = None
 training_pipeline: Optional[KnowledgeToModelPipeline] = None
+learning_event_tracker: Optional[LearningEventTracker] = None
 
 system_logs: List[Dict[str, Any]] = []
 runtime_config: Dict[str, Any] = {
@@ -164,7 +166,7 @@ def ensure_initialized():
     global memory_manager, cognitive_pipeline, agent_scheduler
     global audit_logger, auth_manager, governance_policy, rate_limiter
     global gip_validator, peer_discovery, federation_registry, knowledge_sync, learning_manager, supabase_store
-    global source_registry, hybrid_retriever, knowledge_ingestion, hybrid_knowledge_controller, gnnm_knowledge_adapter, gnnm_model_registry, training_pipeline
+    global source_registry, hybrid_retriever, knowledge_ingestion, hybrid_knowledge_controller, gnnm_knowledge_adapter, gnnm_model_registry, training_pipeline, learning_event_tracker
 
     if yaml is not None and os.path.exists(CONFIG_PATH):
         try:
@@ -319,10 +321,16 @@ def ensure_initialized():
             storage_path=os.path.join(storage_dir, "external_knowledge.db"),
         )
 
+    if learning_event_tracker is None:
+        learning_event_tracker = LearningEventTracker(
+            storage_path=os.path.join(storage_dir, "learning_events.db")
+        )
+
     if knowledge_ingestion is None:
         knowledge_ingestion = KnowledgeIngestionPipeline(
             retriever=hybrid_retriever,
             source_registry=source_registry,
+            learning_event_tracker=learning_event_tracker,
         )
 
     if hybrid_knowledge_controller is None:
@@ -333,6 +341,7 @@ def ensure_initialized():
         )
         if cognitive_pipeline is not None:
             cognitive_pipeline.knowledge_controller = hybrid_knowledge_controller
+            cognitive_pipeline.metacognitive_orchestrator.event_tracker = learning_event_tracker
 
     if gnnm_knowledge_adapter is None:
         gnnm_knowledge_adapter = GNNMKnowledgeAdapter(
@@ -350,6 +359,7 @@ def ensure_initialized():
         training_pipeline = KnowledgeToModelPipeline(
             model_registry=gnnm_model_registry,
             workspace_dir=os.path.join(storage_dir, "training_runs"),
+            learning_event_tracker=learning_event_tracker,
         )
 
     if supabase_store is None:
@@ -387,6 +397,7 @@ def get_runtime_context() -> Dict[str, Any]:
         "gnnm_adapter": gnnm_knowledge_adapter,
         "gnnm_registry": gnnm_model_registry,
         "training_pipeline": training_pipeline,
+        "learning_events": learning_event_tracker,
     }
 
 
@@ -585,8 +596,17 @@ def health():
 
 # ─── AI & Command Interface Endpoints ─────────────────────────────────────
 @app.post("/ai/chat")
-async def ai_chat(req: ChatRequest):
+async def ai_chat(req: ChatRequest, request: Request):
     ensure_initialized()
+    from gajahmada_ai.security.context import AccessContext
+
+    actor_info = auth_manager.resolve_optional_actor(request) if auth_manager else {"actor": "anonymous", "role": "anonymous"}
+    chat_access_ctx = AccessContext.from_actor_dict(
+        actor_info,
+        node_id=identity.node_id if identity else None,
+        organization_id=request.headers.get("x-organization-id") or None,
+        session_id=request.headers.get("x-session-id") or None,
+    )
     start = time.time()
     context = ""
     matched_docs = 0
@@ -631,12 +651,13 @@ async def ai_chat(req: ChatRequest):
     cfg_temp = float(runtime_config.get("ai", {}).get("temperature", 0.7))
     cfg_tokens = int(req.max_tokens or runtime_config.get("ai", {}).get("max_tokens", 256))
 
-    # Execute through the 14-Stage Cognitive Reasoning Pipeline
+    # Execute through the 14-Stage Cognitive Reasoning Pipeline (with canonical AccessContext)
     reasoning_res = cognitive_pipeline.execute(
         objective=req.prompt,
         memory_records=memory_records,
         max_tokens=cfg_tokens,
         temperature=cfg_temp,
+        actor_context=chat_access_ctx,
     )
     response = reasoning_res.conclusion
 

@@ -69,10 +69,12 @@ class KnowledgeIngestionPipeline:
         retriever: HybridKnowledgeRetriever,
         source_registry: SourceRegistry,
         chunker: Optional[DocumentChunker] = None,
+        learning_event_tracker: Optional[Any] = None,
     ):
         self.retriever = retriever
         self.source_registry = source_registry
         self.chunker = chunker or DocumentChunker()
+        self.learning_event_tracker = learning_event_tracker
         self.ingestion_logs: List[Dict[str, Any]] = []
 
     def _normalize_text(self, text: str) -> str:
@@ -225,7 +227,29 @@ class KnowledgeIngestionPipeline:
                 self.retriever.index_record(rec)
                 indexed_ids.append(rec.record_id)
 
-            # 9 & 10. Record status
+            # 9 & 10. Record status + emit unified LearningEvent (STORED_ONLY, NOT internalized!)
+            if self.learning_event_tracker is not None:
+                from gajahmada_ai.learning.learning_events import LearningEvent, LearningEventType
+
+                self.learning_event_tracker.record_event(
+                    LearningEvent(
+                        event_type=LearningEventType.DOCUMENT_INGESTED.value,
+                        actor_id=author,
+                        visibility_policy=visibility_policy,
+                        organization_id=organization or None,
+                        source_id=source.source_id,
+                        source_type=fmt,
+                        source_title=source.title,
+                        knowledge_domain=str((extra_metadata or {}).get("domain", "external_knowledge")),
+                        summary=normalized[:240],
+                        content_hash=doc_hash,
+                        verification_status=verification_status,
+                        embedding_provider=provider.encoder_id,
+                        training_status="NOT_PERFORMED",
+                        internalization_status="STORED_ONLY",
+                    )
+                )
+
             entry = {
                 "status": "INGESTED",
                 "source_id": source.source_id,

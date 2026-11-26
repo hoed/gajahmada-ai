@@ -7,6 +7,7 @@ from gajahmada_ai.cognition.decomposition import ProblemDecomposer
 from gajahmada_ai.cognition.hypotheses import HypothesisGenerator
 from gajahmada_ai.cognition.intent import IntentClassifier
 from gajahmada_ai.cognition.metacognition import MetacognitiveCritic
+from gajahmada_ai.cognition.metacognitive_orchestrator import MetaCognitiveOrchestrator
 from gajahmada_ai.cognition.models import (
     ContradictionItem,
     EvidenceItem,
@@ -37,6 +38,7 @@ class CognitiveReasoningPipeline:
         evidence_reasoner: Optional[EvidenceReasoner] = None,
         fallback_synthesizer: Optional[Callable[[str, str], str]] = None,
         knowledge_controller: Optional[Any] = None,
+        learning_event_tracker: Optional[Any] = None,
     ):
         self.perception = PerceptionModule()
         self.intent_classifier = IntentClassifier()
@@ -50,6 +52,7 @@ class CognitiveReasoningPipeline:
         self.decision_engine = DecisionEngine()
         self.fallback_synthesizer = fallback_synthesizer
         self.knowledge_controller = knowledge_controller
+        self.metacognitive_orchestrator = MetaCognitiveOrchestrator(event_tracker=learning_event_tracker)
         self.history: Dict[str, ReasoningResult] = {}
 
     def execute(
@@ -83,10 +86,77 @@ class CognitiveReasoningPipeline:
             ReasoningStepSummary(
                 step_index=2,
                 stage="INTENT_CLASSIFICATION",
-                summary=f"Classified primary intent='{intent.primary_intent}' across domains={intent.reasoning_domains}",
+                summary=f"Classified primary intent='{intent.primary_intent}' (meta_cognitive={intent.is_meta_cognitive}) across domains={intent.reasoning_domains}",
                 outcome="COMPLETED",
             )
         )
+
+        # 2B. META-COGNITIVE TEMPORAL ORCHESTRATION BRANCH
+        # Prevents semantic RAG from overriding user meta-learning / temporal knowledge-state queries.
+        if intent.is_meta_cognitive and intent.meta_cognitive_intent:
+            mc_out = self.metacognitive_orchestrator.handle(
+                query=perceived.normalized_text,
+                meta_intent=intent.meta_cognitive_intent,
+                temporal_scope=intent.temporal_scope,
+                access_context=actor_context,
+            )
+            steps.append(
+                ReasoningStepSummary(
+                    step_index=3,
+                    stage="META_COGNITIVE_TEMPORAL_RETRIEVAL",
+                    summary=f"Queried temporal learning history ({mc_out['window_label']}): {len(mc_out['events'])} authorized event(s), states={mc_out['knowledge_states']}",
+                    outcome="COMPLETED",
+                )
+            )
+            from gajahmada_ai.cognition.models import EpistemicBreakdown
+
+            ev_items = [
+                EvidenceItem(
+                    evidence_id=ev["event_id"],
+                    source=f"{ev['event_type']}:{ev['source_id'] or 'system'}",
+                    provenance_hash=ev.get("content_hash", "")[:16],
+                    excerpt=f"{ev.get('source_title') or ev.get('summary', '')[:200]} (internalization={ev.get('internalization_status')})",
+                    reliability_score=0.95,
+                    relevance_score=1.0,
+                    verification_status=ev.get("verification_status", "VERIFIED"),
+                )
+                for ev in mc_out["events"]
+            ]
+            cap_report = self.model_router.capability_report()
+            cap_report["neural_used_in_this_call"] = False
+            cap_report["symbolic_used_in_this_call"] = False
+            cap_report["meta_cognitive_used_in_this_call"] = True
+            cap_report["knowledge_states"] = mc_out["knowledge_states"]
+            cap_report["evidence_count_in_this_call"] = len(ev_items)
+
+            result = ReasoningResult(
+                reasoning_id=reasoning_id,
+                objective=perceived.normalized_text,
+                interpretation=f"Meta-Cognitive Intent: {intent.meta_cognitive_intent} | Window: {mc_out['window_label']}",
+                assumptions=["Temporal learning history queried directly instead of semantic document RAG."],
+                hypotheses=[],
+                evidence=ev_items,
+                contradictions=[],
+                reasoning_steps=steps,
+                epistemic_breakdown=EpistemicBreakdown(
+                    verified_facts=[f"Observed {len(ev_items)} authorized learning event(s) in window '{mc_out['window_label']}'."],
+                    unverified_claims=[],
+                    hypotheses=[],
+                    inferences=mc_out["knowledge_states"],
+                    opinions=[],
+                    unknown_information=[] if ev_items else ["No recent authorized learning events recorded."],
+                ),
+                conclusion=mc_out["conclusion"],
+                confidence=mc_out["confidence"],
+                uncertainty=round(1.0 - mc_out["confidence"], 4),
+                verification_status=mc_out["verification_status"],
+                memory_references=[e.evidence_id for e in ev_items],
+                execution_requirements=[],
+                capabilities_used=cap_report,
+                timestamp=round(t0, 4),
+            )
+            self.history[reasoning_id] = result
+            return result
 
         # 3. MEMORY & HYBRID KNOWLEDGE RETRIEVAL (Additive — preserves existing memory_records path)
         raw_evidence = list(memory_records or [])
