@@ -196,9 +196,9 @@ GNNM_PRESETS: Dict[str, GNNMConfig] = {
         lifecycle_status="ARCHITECTURE_DESIGNED",
     ),
     "BUMBLECORE-300M": GNNMConfig(
-        name="BUMBLECORE-300M", family="BUMBLECORE", vocab_size=32000, d_model=1024, n_layers=20,
-        n_heads=16, n_kv_heads=4, d_ff=2816, max_seq_len=4096, precision="bf16",
-        lifecycle_status="ARCHITECTURE_DESIGNED",
+        name="BUMBLECORE-300M", family="BUMBLECORE", vocab_size=32000, d_model=1024, n_layers=24,
+        n_heads=16, n_kv_heads=4, d_ff=2816, max_seq_len=2048, precision="bf16",
+        gradient_checkpointing=True, lifecycle_status="ARCHITECTURE_DESIGNED",
     ),
 
     # ── OPTICORE (General-Purpose Family: 1B, 3B, 7B) ──

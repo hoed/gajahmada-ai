@@ -1,0 +1,56 @@
+# GajahMada GNNM BumbleCore 300M — Canonical Configuration (Release 2.5)
+# Exact trainable parameter count: 303,350,784 (~303.35M dense Transformer)
+
+model:
+  name: GNNM-BumbleCore-300M
+  family: BUMBLECORE
+  architecture_type: dense
+  vocab_size: 32000
+  d_model: 1024
+  n_layers: 24
+  n_heads: 16
+  n_kv_heads: 4
+  d_ff: 2816
+  max_seq_len: 2048
+  rope_theta: 10000.0
+  norm_eps: 1.0e-6
+  tie_embeddings: true
+  precision: bf16
+  gradient_checkpointing: true
+
+dataset:
+  dataset_id: gajahmada-bumblecore-id-en-v1
+  dataset_version: "1.0.0"
+  languages: ["id", "en"]
+  train_ratio: 0.90
+  val_ratio: 0.05
+  test_ratio: 0.05
+  min_chars: 24
+  deduplicate: true
+  redact_pii: true
+
+training:
+  seed: 42
+  optimizer: adamw
+  lr: 3.0e-4
+  min_lr_ratio: 0.1
+  weight_decay: 0.01
+  grad_clip: 1.0
+  warmup_steps: 500
+  micro_batch_size: 2
+  gradient_accumulation_steps: 16
+  max_steps: 50000
+  eval_interval: 500
+  checkpoint_interval: 1000
+  target_tokens: 6000000000
+
+sft:
+  lr: 5.0e-5
+  micro_batch_size: 2
+  gradient_accumulation_steps: 8
+  max_steps: 2000
+
+output:
+  checkpoint_dir: ./models/bumblecore-300m
+  export_dir: ./models/bumblecore-300m-export
+  hf_repo_id: GajahMada/GNNM-BumbleCore-300M
