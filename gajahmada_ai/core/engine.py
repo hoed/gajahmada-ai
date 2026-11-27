@@ -208,6 +208,57 @@ class AIModelEngine:
         if quran_ans:
             return quran_ans
 
+        return self._answer_topic_question(q, ql, detailed, current_year, years_merdeka, context)
+
+    # ── Topic answering with a question-relevance gate ──────────────────────
+    _RELEVANCE_THRESHOLD = 0.6
+
+    def _answer_topic_question(
+        self, q: str, ql: str, detailed: bool, current_year: int, years_merdeka: int, context: str
+    ) -> str:
+        """Keyword topic rules pick a *topic*; this gate verifies the answer addresses the *question*."""
+        from gajahmada_ai.cognition.answer_relevance import relevance_score, select_best_passage
+
+        candidate = self._topic_rule_answer(q, ql, detailed, current_year, years_merdeka, context)
+        crawled_by_rules = self.last_crawled_knowledge
+        if relevance_score(q, candidate) >= self._RELEVANCE_THRESHOLD:
+            return candidate
+
+        # Candidate is on-topic but not responsive. Look for a passage that actually answers.
+        pool = [self._topic_rule_answer(q, ql, True, current_year, years_merdeka, "")]
+        if context:
+            pool.append(context)
+        try:
+            from gajahmada_ai.knowledge.indonesia_corpus import get_indonesia_knowledge_corpus
+
+            pool.extend(get_indonesia_knowledge_corpus())
+        except Exception:
+            pass
+        picked = select_best_passage(q, pool, min_score=self._RELEVANCE_THRESHOLD)
+        self.last_crawled_knowledge = None
+        if picked:
+            return picked[0] + format_references_footer(
+                [{"title": "GajahMada Knowledge Base", "url": "gajahmada_ai/knowledge/indonesia_corpus.py"}],
+                max_refs=1,
+            )
+
+        # Last resort before declining: targeted live lookup for this exact question.
+        if crawled_by_rules is None:
+            crawled = crawl_internet_knowledge(q)
+            if crawled and relevance_score(q, crawled.get("extract", "")) >= self._RELEVANCE_THRESHOLD:
+                self.last_crawled_knowledge = crawled
+                refs = crawled.get("references") or [{"title": crawled["title"], "url": crawled.get("source_url", "")}]
+                return crawled["extract"] + format_references_footer(refs, max_refs=3 if detailed else 1)
+
+        return (
+            f"Saya belum menemukan jawaban yang tepat untuk **\"{q}\"** di basis pengetahuan lokal, "
+            "sehingga saya tidak ingin menjawab dengan informasi yang tidak sesuai. "
+            f"Coba `/crawl {q}` atau `/ingest <informasi>` untuk menambahkan pengetahuannya."
+        )
+
+    def _topic_rule_answer(
+        self, q: str, ql: str, detailed: bool, current_year: int, years_merdeka: int, context: str
+    ) -> str:
         # 7. Specific Nusantara & Indonesia Topics (concise by default, detailed when requested)
         if _has_word(ql, ["gajah mada", "sumpah palapa", "amukti palapa", "majapahit", "hayam wuruk", "raden wijaya", "nagarakretagama", "sutasoma", "bhinneka tunggal ika", "trowulan"]):
             refs = [{"title": "Wikipedia: Gajah Mada & Sumpah Palapa", "url": "https://id.wikipedia.org/wiki/Gajah_Mada"}]
