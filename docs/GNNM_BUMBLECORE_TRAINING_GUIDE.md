@@ -37,17 +37,28 @@ Seed corpus is permitted **only** when `--smoke` is explicitly set:
   --stage sft --smoke --steps 4
 ```
 
-## 4. Full 300M Pretraining & SFT (External GPU Host ≥ 16–24 GB VRAM)
-Requires a validated dataset directory containing `dataset_manifest.json` (`approval_status == "approved"`, approved license, verified `split_hashes`, zero cross-split leakage). Training streams line-by-line via `StreamingPretrainDataset` / `StreamingSFTDataset`, enforces exact zero-overshoot `target_tokens` (`3,276,800,000` in `configs/bumblecore_300m.yaml`), and signs `run_metadata.json` via Ed25519 `NodeIdentity` when `node_key.pem` is present:
-```bash
-.venv312/bin/python -m gajahmada_ai.gnnm.train \
-  --config configs/bumblecore_300m.yaml \
-  --stage pretraining --dataset /path/to/approved_pretrain_dataset_dir --resume auto
+## 4. Full 300M Pretraining & SFT (Cloud GPU: Colab Pro / RunPod / A100 / H100 ≥ 16–24 GB VRAM)
+Requires a validated dataset directory containing `dataset_manifest.json` (`approval_status == "approved"`, approved license, verified `split_hashes`, zero cross-split leakage).
 
-.venv312/bin/python -m gajahmada_ai.gnnm.train \
-  --config configs/bumblecore_300m.yaml \
-  --stage sft --dataset /path/to/approved_sft_dataset_dir --resume ./models/bumblecore-300m/pretraining
+### 4A. Prepare & Verify Dataset Manifest (Bounded-Memory SQLite WAL Streaming)
+```bash
+python3 scripts/prepare_bumblecore_dataset.py \
+  --input /workspace/data/raw_id_en.jsonl \
+  --output-dir /workspace/data/pretrain_v1 \
+  --dataset-id bumblecore-id-en-v1 \
+  --source-name wikimedia-id-en \
+  --license CC-BY-SA-4.0 \
+  --approval-status approved
 ```
+
+### 4B. End-to-End Cloud GPU Runner (Preflight → Pretraining → Optional SFT → HF Dry-Run)
+```bash
+PRETRAIN_DATASET_DIR=/workspace/data/pretrain_v1 \
+SFT_DATASET_DIR=/workspace/data/sft_v1 \
+HF_REPO_ID=GajahMada/GNNM-BumbleCore-300M \
+bash scripts/train_bumblecore_300m_gpu.sh
+```
+*(Training streams line-by-line via `StreamingPretrainDataset` / `StreamingSFTDataset`, enforces exact zero-overshoot `target_tokens` = `3,276,800,000`, signs `run_metadata.json` via Ed25519 when `node_key.pem` is present, and supports `--resume auto`.)*
 
 ## 5. Checkpoint Trust Verification, Export & Hugging Face Release CLI
 Once full 300M pretraining/SFT completes on your GPU host, run the fail-closed 5-step release CLI (`scripts/release_bumblecore_300m_hf.py`):
