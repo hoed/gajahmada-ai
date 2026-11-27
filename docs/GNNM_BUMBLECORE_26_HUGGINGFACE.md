@@ -16,3 +16,4 @@ Implemented in [export.py](file:///home/hoed/gajahmada/gajahmada_ai/gnnm/bumblec
 - `validate_export_bundle()` combines the recursive safety scan, live SHA-256 verification of `artifact_manifest.json`, `config.json ↔ tokenizer.json ↔ generation_config.json` consistency, and `validate_hf_model_card()`.
 - `prepare_hf_upload()` defaults to `private=True`, `dry_run=True`, `confirm_upload=False` — **never** uploads automatically. Live upload (`dry_run=False, confirm_upload=True`) additionally enforces `validate_export_bundle()`, rejects untrained/smoke bundles unless `allow_untrained=True`, and requires `HF_TOKEN`.
 - Exported artifacts remain explicitly marked `format: "custom_gnnm_native"` (`transformers_auto_compatible: false`).
+- End-to-end GPU release CLI: [release_bumblecore_300m_hf.py](file:///home/hoed/gajahmada/scripts/release_bumblecore_300m_hf.py) executes all 5 fail-closed verification steps before dry-run or `--confirm-upload`.

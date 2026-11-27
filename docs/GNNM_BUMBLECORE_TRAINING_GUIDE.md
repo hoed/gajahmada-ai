@@ -49,20 +49,21 @@ Requires a validated dataset directory containing `dataset_manifest.json` (`appr
   --stage sft --dataset /path/to/approved_sft_dataset_dir --resume ./models/bumblecore-300m/pretraining
 ```
 
-## 5. Checkpoint Trust Verification, Export & Parity Check
-```python
-from gajahmada_ai.gnnm.bumblecore.checkpoint_trust import verify_trusted_checkpoint
-from gajahmada_ai.gnnm.bumblecore.export import (
-    export_inference_artifact,
-    validate_export_bundle,
-    verify_export_import_parity,
-)
+## 5. Checkpoint Trust Verification, Export & Hugging Face Release CLI
+Once full 300M pretraining/SFT completes on your GPU host, run the fail-closed 5-step release CLI (`scripts/release_bumblecore_300m_hf.py`):
+```bash
+# 1. Dry-run (verifies Checkpoint Trust, exports inference bundle, checks parity & Model Card — does NOT upload)
+.venv312/bin/python scripts/release_bumblecore_300m_hf.py \
+  --checkpoint-dir ./models/bumblecore-300m/sft \
+  --stage sft \
+  --export-dir ./models/bumblecore-300m-export \
+  --repo-id GajahMada/GNNM-BumbleCore-300M
 
-# Verify real PyTorch tensors, live SHA-256 provenance, and Ed25519 signature
-print(verify_trusted_checkpoint("./models/bumblecore-300m/pretraining", expected_stage="pretraining"))
-
-# Export inference-only artifact (pass require_trained=True for production releases)
-export_inference_artifact("./models/bumblecore-smoke/pretraining", "./models/bumblecore-smoke-export")
-print(verify_export_import_parity("./models/bumblecore-smoke/pretraining", "./models/bumblecore-smoke-export"))
-print(validate_export_bundle("./models/bumblecore-smoke-export"))
+# 2. Live Private Upload (requires HF_TOKEN and explicit --confirm-upload)
+HF_TOKEN=hf_xxx .venv312/bin/python scripts/release_bumblecore_300m_hf.py \
+  --checkpoint-dir ./models/bumblecore-300m/sft \
+  --stage sft \
+  --export-dir ./models/bumblecore-300m-export \
+  --repo-id GajahMada/GNNM-BumbleCore-300M \
+  --confirm-upload
 ```
