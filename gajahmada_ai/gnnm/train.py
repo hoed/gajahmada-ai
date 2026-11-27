@@ -19,6 +19,7 @@ import os
 import platform
 import subprocess
 import sys
+import time
 import uuid
 from typing import Any, Dict, List, Optional
 
@@ -233,11 +234,11 @@ def execute_training_run(
         if train_texts:
             tokenizer.train(train_texts, target_vocab_size=cfg.vocab_size)
         elif tr_file and os.path.isfile(tr_file) and stage == "pretraining":
-            # Bounded sample of up to 500 documents for BPE training without loading full corpus into RAM
+            # Bounded sample of up to 2,000 documents for fast incremental BPE training
             sample_texts: List[str] = []
             with open(tr_file, "r", encoding="utf-8") as tf:
                 for line in tf:
-                    if len(sample_texts) >= 500:
+                    if len(sample_texts) >= 2000:
                         break
                     raw = line.strip()
                     if not raw:
@@ -246,7 +247,10 @@ def execute_training_run(
                     if isinstance(obj, dict) and obj.get("text"):
                         sample_texts.append(str(obj["text"]))
             if sample_texts:
+                print(f"[BumbleCore] Training BPE tokenizer on {len(sample_texts)} docs (target_vocab={cfg.vocab_size})...", flush=True)
+                t0_tok = time.time()
                 tokenizer.train(sample_texts, target_vocab_size=cfg.vocab_size)
+                print(f"[BumbleCore] Tokenizer ready: vocab_size={tokenizer.vocab_size} ({time.time() - t0_tok:.1f}s)", flush=True)
 
     # Rebuild & re-validate config against locked tokenizer vocab_size BEFORE model instantiation
     cfg = build_config_from_yaml(raw_cfg, smoke=smoke, vocab_override=tokenizer.vocab_size)

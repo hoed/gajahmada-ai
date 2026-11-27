@@ -323,6 +323,15 @@ class GNNMTrainer:
                 step_dur = max(1e-6, time.perf_counter() - step_t0)
                 loss_val = round(avg_step_loss, 5)
                 self.loss_history.append(loss_val)
+                if (self.device.startswith("cuda") or steps >= 20) and (
+                    steps_executed == 1 or steps_executed % 10 == 0 or steps_executed == steps
+                ):
+                    print(
+                        f"[step {self.global_step} | {steps_executed}/{steps}] "
+                        f"loss={loss_val:.4f} lr={self.optimizer.param_groups[0]['lr']:.2e} "
+                        f"tokens={self.tokens_consumed:,} ({step_dur:.1f}s/step)",
+                        flush=True,
+                    )
                 step_losses.append(loss_val)
 
                 gpu_mem_mb = 0.0
