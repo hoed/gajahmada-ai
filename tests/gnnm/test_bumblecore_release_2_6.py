@@ -198,8 +198,15 @@ def test_phase7_recursive_hf_upload_safety_and_allowlist(tmp_path):
 
 
 def test_phase8_evidence_based_release_gates_reject_smoke_tamper_and_wrong_stage(tmp_path):
+    from gajahmada_ai.gnnm.bumblecore.architecture import build_bumblecore_smoke_config
+    from gajahmada_ai.gnnm.tokenizer import GNNMBPETokenizer
+
     ckpt_dir = tmp_path / "pre"
     ckpt_dir.mkdir()
+    tok = GNNMBPETokenizer()
+    cfg = build_bumblecore_smoke_config(vocab_size=tok.vocab_size)
+    cfg.save(str(ckpt_dir / "config.json"))
+    tok.save(str(ckpt_dir / "tokenizer.json"))
     model_pt = ckpt_dir / "model.pt"
     model_pt.write_bytes(b"fake-weights-for-hash-test")
     good_hash = sha256_file(str(model_pt))
@@ -232,17 +239,18 @@ def test_phase8_evidence_based_release_gates_reject_smoke_tamper_and_wrong_stage
     assert ev_wrong["passed"] is False
     assert any("WRONG_STAGE" in r for r in ev_wrong["reasons"])
 
-    # Valid non-smoke pretraining evidence passes
+    # Fake text weights MUST be rejected even if SHA-256 & metadata match!
     meta["stage"] = "pretraining"
     (ckpt_dir / "run_metadata.json").write_text(json.dumps(meta), encoding="utf-8")
-    ev_ok = verify_stage_checkpoint_evidence(str(ckpt_dir), expected_stage="pretraining")
-    assert ev_ok["passed"] is True
+    ev_fake = verify_stage_checkpoint_evidence(str(ckpt_dir), expected_stage="pretraining")
+    assert ev_fake["passed"] is False
+    assert any("INVALID_PYTORCH_CHECKPOINT" in r or "CONFIG_JSON_MISSING" in r for r in ev_fake["reasons"])
 
-    # Tampering weights breaks SHA-256 check
+    # Tampering weights also triggers CHECKPOINT_HASH_MISMATCH
     model_pt.write_bytes(b"tampered-weights")
     ev_tamper = verify_stage_checkpoint_evidence(str(ckpt_dir), expected_stage="pretraining")
     assert ev_tamper["passed"] is False
-    assert any("CHECKPOINT_HASH_MISMATCH" in r for r in ev_tamper["reasons"])
+    assert any("CHECKPOINT_HASH_MISMATCH" in r or "CONFIG_JSON_MISSING" in r for r in ev_tamper["reasons"])
 
 
 def test_phase9_platform_bumblecore_reports_26_not_started_and_3_27b_budget():

@@ -102,6 +102,9 @@ class GNNMTrainer:
         self.global_step: int = 0
         self.dataset_cursor: int = 0
         self.scheduler_total_steps: int = 0
+        self.scheduler_warmup_steps: int = 0
+        self.last_lr: float = self.lr
+        self.last_grad_accum_steps: int = 1
         self.raw_input_tokens: int = 0
         self.valid_training_tokens: int = 0
         self.loss_bearing_target_tokens: int = 0
@@ -151,24 +154,26 @@ class GNNMTrainer:
 
     def train_steps(
         self,
-        token_pairs: List[Tuple[List[int], List[int]]],
+        token_pairs: Any,
         steps: int = 100,
         batch_size: int = 8,
         grad_accum_steps: int = 1,
         warmup_steps: int = 0,
         target_tokens: Optional[int] = None,
         total_schedule_steps: Optional[int] = None,
-        val_pairs: Optional[List[Tuple[List[int], List[int]]]] = None,
+        val_pairs: Optional[Any] = None,
         eval_interval: int = 0,
         checkpoint_dir: Optional[str] = None,
         checkpoint_interval: int = 0,
         on_step: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> Dict[str, Any]:
-        if not token_pairs:
+        is_sequence = isinstance(token_pairs, (list, tuple))
+        if is_sequence and not token_pairs:
             raise ValueError("token_pairs is empty; build corpus and pack sequences first.")
+        stream_iter = None if is_sequence else iter(token_pairs)
+        n_pairs = len(token_pairs) if is_sequence else 0
         self.model.train()
         t0 = time.perf_counter()
-        n_pairs = len(token_pairs)
         grad_accum = max(1, int(grad_accum_steps))
         pad_id = self.tokenizer.pad_id
 
@@ -178,6 +183,8 @@ class GNNMTrainer:
             self.scheduler_total_steps = int(total_schedule_steps)
         elif self.scheduler_total_steps < self.global_step + steps:
             self.scheduler_total_steps = self.global_step + steps
+        self.scheduler_warmup_steps = int(warmup_steps)
+        self.last_grad_accum_steps = grad_accum
 
         step_losses: List[float] = []
         steps_executed = 0
@@ -195,6 +202,7 @@ class GNNMTrainer:
                 cur_step = self.global_step
                 lr_now = self._compute_lr(cur_step, self.scheduler_total_steps, warmup_steps=warmup_steps)
                 last_lr_used = lr_now
+                self.last_lr = lr_now
                 for pg in self.optimizer.param_groups:
                     pg["lr"] = lr_now
 
@@ -212,16 +220,50 @@ class GNNMTrainer:
 
                     batch_x, batch_y = [], []
                     for _b in range(batch_size):
-                        if self.target_tokens is not None and (self.tokens_consumed + step_valid) >= self.target_tokens:
+                        remaining = (
+                            self.target_tokens - (self.tokens_consumed + step_valid)
+                            if self.target_tokens is not None
+                            else None
+                        )
+                        if remaining is not None and remaining <= 0:
                             self.token_budget_reached = True
                             break
-                        x, y = token_pairs[self.dataset_cursor % n_pairs]
+
+                        if is_sequence:
+                            x, y = token_pairs[self.dataset_cursor % n_pairs]
+                        else:
+                            try:
+                                x, y = next(stream_iter)
+                            except StopIteration:
+                                break
                         self.dataset_cursor += 1
+                        sample_non_pad = sum(1 for tok in x if tok != pad_id)
+
+                        # Zero-overshoot exact trimming when remaining budget < sample_non_pad
+                        if remaining is not None and sample_non_pad > remaining:
+                            x_trim: List[int] = []
+                            y_trim: List[int] = []
+                            kept = 0
+                            for tx, ty in zip(x, y):
+                                if tx != pad_id and kept < remaining:
+                                    x_trim.append(tx)
+                                    y_trim.append(ty)
+                                    kept += 1
+                                else:
+                                    x_trim.append(pad_id)
+                                    y_trim.append(-100)
+                            x, y = x_trim, y_trim
+                            sample_non_pad = kept
+
+                        sample_loss_bearing = sum(1 for tok in y if tok != -100)
+                        if sample_non_pad == 0 or sample_loss_bearing == 0:
+                            continue
+
                         batch_x.append(x)
                         batch_y.append(y)
                         step_raw += len(x)
-                        step_valid += sum(1 for tok in x if tok != pad_id)
-                        step_loss_bearing += sum(1 for tok in y if tok != -100)
+                        step_valid += sample_non_pad
+                        step_loss_bearing += sample_loss_bearing
 
                     if not batch_x:
                         break
@@ -314,6 +356,7 @@ class GNNMTrainer:
             raise
 
         elapsed = round(time.perf_counter() - t0, 3)
+        data_tel = token_pairs.telemetry() if hasattr(token_pairs, "telemetry") else None
         return {
             "model_name": self.cfg.name,
             "device": self.device,
@@ -325,6 +368,7 @@ class GNNMTrainer:
             "last_optimizer_lr": round(last_lr_used, 10),
             "tokens_processed": self.tokens_consumed,
             "token_accounting": self.token_accounting_snapshot(),
+            "data_telemetry": data_tel,
             "tokens_per_sec": round(self.tokens_consumed / max(1e-6, elapsed), 1),
             "parameters": sum(p.numel() for p in self.model.parameters()),
             "initial_loss": step_losses[0] if step_losses else None,
@@ -357,7 +401,9 @@ class GNNMTrainer:
         val_toks = 0
         pad_id = self.tokenizer.pad_id
         with torch.no_grad():
-            for x, y in val_pairs[:max_batches]:
+            for idx_v, (x, y) in enumerate(val_pairs):
+                if idx_v >= max_batches:
+                    break
                 if all(t == -100 for t in y):
                     continue
                 x_t = torch.tensor([x], dtype=torch.long, device=self.device)
@@ -453,6 +499,19 @@ class GNNMTrainer:
         np_mod = _try_numpy()
         state: Dict[str, Any] = {
             "optimizer_state_dict": self.optimizer.state_dict(),
+            "scheduler_state": {
+                "base_lr": self.lr,
+                "min_lr_ratio": self.min_lr_ratio,
+                "warmup_steps": self.scheduler_warmup_steps,
+                "total_steps": self.scheduler_total_steps,
+                "last_lr": self.last_lr,
+            },
+            "hardware_topology": {
+                "device": self.device,
+                "precision": self.precision,
+                "cuda_device_count": torch.cuda.device_count() if torch.cuda.is_available() else 0,
+                "grad_accum_steps": self.last_grad_accum_steps,
+            },
             "global_step": self.global_step,
             "dataset_cursor": self.dataset_cursor,
             "scheduler_total_steps": self.scheduler_total_steps,
@@ -483,11 +542,14 @@ class GNNMTrainer:
         checkpoint_dir: str,
         expected_dataset_hash: Optional[str] = None,
         expected_tokenizer_hash: Optional[str] = None,
+        expected_config_hash: Optional[str] = None,
+        expected_target_tokens: Optional[int] = None,
         allow_resume_mismatch: bool = False,
     ) -> Dict[str, Any]:
         """
         Restore model, optimizer, scheduler, dataset cursor, token counters, and RNG states.
-        Detects dataset/tokenizer hash mismatches and stops unless `allow_resume_mismatch=True`.
+        Detects dataset/tokenizer/config/target_tokens mismatches and environment/topology drift.
+        Never claims EXACT_STATE_RESTORED when hardware, precision, or software version changed.
         """
         weights_path = os.path.join(checkpoint_dir, "model.pt")
         if not os.path.isfile(weights_path):
@@ -505,11 +567,26 @@ class GNNMTrainer:
             mismatches.append("DATASET_MANIFEST_HASH_MISMATCH")
         if expected_tokenizer_hash and saved_hashes.get("tokenizer_sha256") and expected_tokenizer_hash != saved_hashes["tokenizer_sha256"]:
             mismatches.append("TOKENIZER_HASH_MISMATCH")
+        if expected_config_hash and saved_hashes.get("config_sha256") and expected_config_hash != saved_hashes["config_sha256"]:
+            mismatches.append("CONFIG_HASH_MISMATCH")
+        saved_target = t_state.get("target_tokens")
+        if expected_target_tokens is not None and saved_target is not None and int(expected_target_tokens) != int(saved_target):
+            mismatches.append(f"TARGET_TOKENS_MISMATCH(saved={saved_target},requested={expected_target_tokens})")
         if mismatches and not allow_resume_mismatch:
             raise ValueError(
-                f"Refusing silent resume due to provenance mismatch: {mismatches}. "
+                f"Refusing silent resume due to provenance/budget mismatch: {mismatches}. "
                 "Pass allow_resume_mismatch=True explicitly to override."
             )
+
+        env_warnings: List[str] = []
+        saved_topo = t_state.get("hardware_topology") or {}
+        if saved_topo:
+            if saved_topo.get("device") and saved_topo["device"] != self.device:
+                env_warnings.append(f"DEVICE_CHANGED({saved_topo['device']}->{self.device})")
+            if saved_topo.get("precision") and saved_topo["precision"] != self.precision:
+                env_warnings.append(f"PRECISION_CHANGED({saved_topo['precision']}->{self.precision})")
+        if t_state.get("torch_version") and t_state["torch_version"] != torch.__version__:
+            env_warnings.append(f"TORCH_VERSION_CHANGED({t_state['torch_version']}->{torch.__version__})")
 
         state_dict = torch.load(weights_path, map_location=self.device, weights_only=True)
         self.model.load_state_dict(state_dict)
@@ -522,7 +599,10 @@ class GNNMTrainer:
                 restored_optimizer = True
             self.global_step = int(t_state.get("global_step", 0))
             self.dataset_cursor = int(t_state.get("dataset_cursor", 0))
-            self.scheduler_total_steps = int(t_state.get("scheduler_total_steps", 0))
+            sched_st = t_state.get("scheduler_state") or {}
+            self.scheduler_total_steps = int(sched_st.get("total_steps", t_state.get("scheduler_total_steps", 0)))
+            self.scheduler_warmup_steps = int(sched_st.get("warmup_steps", 0))
+            self.last_lr = float(sched_st.get("last_lr", self.lr))
             self.raw_input_tokens = int(t_state.get("raw_input_tokens", 0))
             self.valid_training_tokens = int(t_state.get("valid_training_tokens", 0))
             self.loss_bearing_target_tokens = int(t_state.get("loss_bearing_target_tokens", 0))
@@ -551,13 +631,26 @@ class GNNMTrainer:
             if t_state.get("scaler_state_dict") is not None and self.scaler is not None and self.scaler.is_enabled():
                 self.scaler.load_state_dict(t_state["scaler_state_dict"])
 
+        if not restored_optimizer or mismatches:
+            resume_mode = "OVERRIDE_OR_WEIGHTS_ONLY"
+        elif env_warnings:
+            resume_mode = "APPROXIMATE_ENVIRONMENT_CHANGED"
+        else:
+            resume_mode = "EXACT_STATE_RESTORED"
+
         return {
             "resumed_from": checkpoint_dir,
-            "resume_mode": "EXACT_STATE_RESTORED" if (restored_optimizer and not mismatches) else "OVERRIDE_OR_WEIGHTS_ONLY",
+            "resume_mode": resume_mode,
             "global_step": self.global_step,
             "dataset_cursor": self.dataset_cursor,
             "tokens_consumed": self.tokens_consumed,
+            "scheduler_state": {
+                "total_steps": self.scheduler_total_steps,
+                "warmup_steps": self.scheduler_warmup_steps,
+                "last_lr": self.last_lr,
+            },
             "optimizer_restored": restored_optimizer,
             "rng_restored": restored_rng,
             "mismatches": mismatches,
+            "environment_warnings": env_warnings,
         }

@@ -10,7 +10,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-blue.svg)](https://www.python.org/)
-[![Tests: 134 Passed](https://img.shields.io/badge/Tests-134%20Passed-brightgreen.svg)](#automated-verification--benchmarks)
+[![Tests: 166 Passed](https://img.shields.io/badge/Tests-166%20Passed-brightgreen.svg)](#automated-verification--benchmarks)
+[![Release: 2.6](https://img.shields.io/badge/GNNM%20BumbleCore-Release%202.6-cyan.svg)](docs/GNNM_BUMBLECORE_26_FINAL_AUDIT.md)
 [![Offline First](https://img.shields.io/badge/Mode-Independent%20%26%20Offline--First-orange.svg)](#installation--quick-start)
 [![Live Demo](https://img.shields.io/badge/Live-gajahmada.vercel.app-teal.svg)](https://gajahmada.vercel.app/)
 
@@ -47,9 +48,10 @@ At its core, GajahMada unifies **three logically separated knowledge systems** u
 
 ## Core Architectural Capabilities
 
-1. **Native `GNNM` Architecture, Model Families & `TITANFORGE 70B` Foundation (`gajahmada_ai/gnnm/` — see [GNNM_ARCHITECTURE.md](docs/GNNM_ARCHITECTURE.md)):**
+1. **Native `GNNM` Architecture, `BumbleCore 300M` (Release 2.6) & `TITANFORGE 70B` Foundation (`gajahmada_ai/gnnm/` — see [GNNM_ARCHITECTURE.md](docs/GNNM_ARCHITECTURE.md) & [GNNM_BUMBLECORE_ARCHITECTURE.md](docs/GNNM_BUMBLECORE_ARCHITECTURE.md)):**
    - Custom PyTorch Decoder-Only Transformer (**Pre-Norm RMSNorm + RoPE + Grouped/Multi-Head Causal Attention + SwiGLU + Gradient Checkpointing + optional weight tying**) paired with lossless Byte-Level BPE (`GNNMBPETokenizer`).
-   - Formalized model families: **BUMBLECORE** (`12M`, `100M`, `300M`), **OPTICORE** (`1B`, `3B`, `7B`), **TITANFORGE** (`30B`, **`70B` = `70,549,512,192` params** Dense + experimental MoE variant, `120B`), and planned specializations (**NEUROX**, **CODESTRIKE**, **KNOWTRON** — never represented as separate trained models without verified artifacts).
+   - Formalized model families: **BUMBLECORE** (`12M`, `100M`, **`300M` = `303,350,784` exact trainable params**), **OPTICORE** (`1B`, `3B`, `7B`), **TITANFORGE** (`30B`, **`70B` = `70,549,512,192` params** Dense + experimental MoE variant, `120B`), and planned specializations (**NEUROX**, **CODESTRIKE**, **KNOWTRON** — never represented as separate trained models without verified artifacts).
+   - **BumbleCore 300M Release 2.6 Training Integrity Hardening (`gajahmada_ai/gnnm/bumblecore/`):** Enforces 6 verifiable engineering pillars — (1) 3-layer **Checkpoint Trust Layer** (`checkpoint_trust.py`: PyTorch tensor/shape/dtype/NaN-Inf inspection + live SHA-256 provenance + Ed25519 signing), (2) **Exact Zero-Overshoot Token Budget** & 7-dimension **Exact Resume** (`trainer.py`), (3) **True Streaming Training Engine** (`streaming_loader.py`), (4) **Dataset Manifest & Split-Leakage Verification** (`dataset_governance.py`), (5) **15-Case Bilingual Independent Benchmark Suite** with training-leakage detection (`evaluation.py`), and (6) **Zero-Hardcoded Evidence-Based Release Gates A–G** (`gate_evidence.py`) + **Hardened HF Export** (`export.py`). Current status is reported honestly as `PRETRAINING_STATUS = NOT_STARTED` (`blocked_at_gate = GATE_C_PRETRAINING_CHECKPOINT_VALIDATED`).
    - Pure-Python **Resource Estimator** (`resource_estimator.py`) computing theoretical FP32/BF16/FP16/INT8/INT4 memory, AdamW sharded VRAM, FLOPs, and GPU cluster sizing with zero GPUs, plus **Distributed Training Preparation** (`distributed_prep.py`) for external DDP/FSDP/TP/PP clusters (strictly blocked from executing inside Vercel Free).
    - Verified local CPU checkpoints: `GNNM-01-Tiny` (`918,656` params) and `GNNM-01-12M` (`11,243,520` params). When no weights are loaded, the platform honestly reports `NATIVE MODEL INFERENCE: UNAVAILABLE IN CURRENT RUNTIME`.
 
@@ -136,13 +138,21 @@ stateDiagram-v2
 gajahmada/
 ├── main.py                              # ASGI entry point (Localhost Uvicorn & Vercel Free)
 ├── config.yaml                          # Node, bootstrap peer, & native GNNM configuration
+├── configs/bumblecore_300m.yaml         # Canonical BumbleCore 300M Release 2.6 config (3.2768B token budget)
 ├── vercel.json                          # Vercel Free routing (@vercel/python + @vercel/static)
-├── requirements.txt                     # Lightweight Vercel-compatible dependencies (<50MB)
+├── requirements.txt                     # Lightweight Vercel-compatible dependencies (<50MB; zero torch/FAISS)
 ├── requirements-local.txt               # Optional local runtime packages (faiss-cpu, torch, etc.)
 ├── ARCHITECTURE.md                      # Cohesive system, hybrid knowledge, & security architecture
 ├── docs/
 │   ├── VERCEL_DEPLOYMENT_GUIDE.md       # Complete Vercel Free deployment & Hobby plan guide
 │   ├── GNNM_ARCHITECTURE.md             # GNNM families (BUMBLECORE/OPTICORE/TITANFORGE 70B)
+│   ├── GNNM_BUMBLECORE_ARCHITECTURE.md  # BumbleCore 300M exact 303.35M spec & Release 2.6 modules
+│   ├── GNNM_BUMBLECORE_DATA_GOVERNANCE.md # Strict dataset separation, SQLite WAL streaming, & manifest verification
+│   ├── GNNM_BUMBLECORE_TRAINING_GUIDE.md  # Preflight, smoke validation, full GPU pretraining/SFT, & export parity
+│   ├── GNNM_BUMBLECORE_26_EVALUATION.md   # 3-level evaluation & 15-case bilingual independent benchmark suite
+│   ├── GNNM_BUMBLECORE_26_HUGGINGFACE.md  # Hardened HF export, Model Card validation, & recursive safety scan
+│   ├── GNNM_BUMBLECORE_26_FINAL_AUDIT.md  # Release 2.6 Training Integrity Hardening audit & test evidence
+│   ├── GNNM_BUMBLECORE_26_RELEASE_CHECKLIST.md # Release 2.6 remediation checklist (Gates A-G)
 │   ├── HYBRID_KNOWLEDGE_ARCHITECTURE.md # Three-system hybrid knowledge, FAISS providers, & relevance gate
 │   ├── MODEL_REGISTRY_AND_PROMOTION.md  # Unified 11-state registry, SHA-256 checks, & atomic rollback
 │   ├── GNNM_LEARNING_PIPELINE.md        # Strict P0 training integrity & checkpoint validation
@@ -154,7 +164,8 @@ gajahmada/
 │   ├── BENCHMARK_REPORT.json            # Reproducible Stages 1-5 benchmark report
 │   └── SECURITY_AUDIT.md                # Security controls & remediation matrix
 ├── gajahmada_ai/
-│   ├── gnnm/                            # Transformer (RMSNorm/RoPE/GQA/SwiGLU/GC), BPE, trainer, resource_estimator, distributed_prep
+│   ├── gnnm/                            # Transformer (RMSNorm/RoPE/GQA/SwiGLU/GC), BPE, exact-budget trainer, resource_estimator, distributed_prep
+│   │   └── bumblecore/                  # Release 2.6: architecture, checkpoint_trust, streaming_loader, dataset_governance, evaluation, export, gate_evidence
 │   ├── platform/                        # Unified Model Registry / Model Factory (model_factory.py) & Nexus Prime (nexus.py)
 │   ├── knowledge/                       # HybridKnowledgeController, providers.py (FAISS CPU + fallback), retriever, ingestion, world_facts
 │   ├── learning/                        # TrainingKnowledgeFilter, DatasetBuilder, TrainingPipeline, EvaluationGate, ModelRegistry, Events
@@ -167,7 +178,7 @@ gajahmada/
 │   └── api/                             # server.py, v2_routes.py, observatory_routes.py, platform_routes.py, http_utils.py
 ├── interface/html/                      # Homepage (/), Cyberdeck (/dashboard), Brain Observatory (/brain*), Platform Pages (platform.html/js)
 ├── scripts/ & sdk/                      # Training scripts, GIP stress harness, benchmark runner, & Official Python SDK
-└── tests/                               # 134 Automated Tests across unit, cognition, knowledge, learning, memory, network, security, platform, integration
+└── tests/                               # 166 Automated Tests (+ 5 PyTorch acceptance suites in .venv312) across gnnm, platform, security, knowledge, cognition, memory, learning, network, integration
 ```
 
 ---
@@ -231,7 +242,7 @@ See **[docs/VERCEL_DEPLOYMENT_GUIDE.md](docs/VERCEL_DEPLOYMENT_GUIDE.md)** for f
 
 | Surface | Key Endpoints | Auth | Purpose |
 | :--- | :--- | :---: | :--- |
-| **Platform Control Plane** | `GET /api/v2/platform/{status,models,models/{family},providers,nexus,benchmarks}`, `GET /api/v2/platform/factory/{estimator,distributed-plan}`, `POST /api/v2/platform/factory/validate` | Public | Vercel runtime status, unified 11-state Model Registry, TITANFORGE 70B estimator, FAISS provider status, & Nexus Prime. |
+| **Platform Control Plane** | `GET /api/v2/platform/{status,models,models/{family},bumblecore,providers,nexus,benchmarks}`, `GET /api/v2/platform/factory/{estimator,distributed-plan}`, `POST /api/v2/platform/factory/validate` | Public | Vercel runtime status, unified 11-state Model Registry, BumbleCore 300M Release 2.6 evidence-based gates & actual telemetry, TITANFORGE 70B estimator, FAISS provider status, & Nexus Prime. |
 | **Brain Observatory** | `GET /api/v2/observatory/{overview,brain,cognition,knowledge/graph,memory,learning,models,agents,nodes,events,stream}` & `GET /api/v2/observatory/requests/{id}/trace` | Scope / RBAC | Real-time subsystem telemetry, paginated KG & 9-scope memory, bounded SSE stream, & RBAC-gated traces. |
 | **Intelligence & Memory** | `GET /api/v2/intelligence/diagnose`, `POST /api/v2/intelligence/ask`, `GET/POST /api/v2/memory`, `GET /api/v2/reasoning` | Matrix / **Required** | 14-stage hybrid cognitive reasoning, 5-tier persistent memory, & epistemic traces. |
 | **Hybrid Knowledge** | `POST /api/v2/knowledge/{ingest,hybrid-search,promote/{id}}`, `GET /api/v2/knowledge/sources` | Matrix / **Required** | 10-step SQLite WAL ingestion, authorized hybrid search, source registry, & attestation promotion. |
@@ -249,6 +260,7 @@ python3 scripts/run_ecosystem_benchmarks.py
 
 | Test Suite | Coverage | Location | Result |
 | :--- | :--- | :--- | :---: |
+| **GNNM BumbleCore 300M Release 2.6 Hardening (32 + 5 PyTorch)** | Checkpoint Trust Layer (PyTorch tensor/NaN/Ed25519), zero-overshoot exact token budget, true streaming engine, dataset manifest/leakage/traversal verification, 7-dim exact resume, 15-case bilingual independent benchmark suite, zero-hardcoded Release Gates A–G, HF export hardening & parity, & Vercel Free compliance. | `tests/gnnm/` | ✅ **PASSED** |
 | **Platform, Model Factory & TITANFORGE 70B (30)** | Dense (`70,549,512,192`) & MoE exact param accounting, 5-precision Resource Estimator, Distributed Prep Vercel guard, FAISS CPU vs. Lightweight fallback, 11-state Registry, Nexus Prime, simulated `VERCEL=1` mode, & all 24 HTML routes. | `tests/platform/` | ✅ **PASSED** |
 | **Security, Edge Hardening & Audit Rounds 1–3 (35)** | Zero anonymous RAG poisoning/leakage, redacted `/node/config` & `/node/logs`, bounded `/ai/embedding`, trusted-proxy IP resolution, rate-limit pruning, SSE caps, 9-scope `AccessContext`, signing oracle removal, persistent replay guard, & ledger recovery. | `tests/security/` | ✅ **PASSED** |
 | **Hybrid Knowledge & World Facts (22)** | Chunker, offline embeddings + migration, token-budget context & injection defense, SQLite WAL persistence, 252 curated world/space facts, & GSC sitemap validation. | `tests/knowledge/` | ✅ **PASSED** |
@@ -256,7 +268,7 @@ python3 scripts/run_ecosystem_benchmarks.py
 | **Core, GNNM Native Model & Learning Pipeline (14)** | Offline boot, analytical param counts, lossless BPE, SFT masking, `TrainingKnowledgeFilter`, `ModelEvaluationGate`, & `GNNMModelRegistry` promotion/rollback. | `tests/unit/`, `tests/learning/` | ✅ **PASSED** |
 | **Brain Observatory, API Compat, SDK, GIP & Benchmarks (16)** | `/brain` UI & `/api/v2/observatory/*` RBAC/pagination, 2/3/10/100-node GIP stress & federation, official Python SDK, & live benchmarks. | `tests/integration/`, `tests/network/`, `tests/benchmarks/` | ✅ **PASSED** |
 
-**Total:** **134 passed, 0 failed** (`python3 -m pytest -q`), plus verified PyTorch exact parameter matching + gradient checkpointing (`actual == est == 106,816`) in `.venv312` and clean `node --check` on `brain.js` and `platform.js`.
+**Total:** **166 passed, 0 failed, 6 skipped** (`python3 -m pytest -q` on Python 3.14 without `torch`), plus **all 5 PyTorch acceptance suites passing in `.venv312`** (`test_checkpoint_trust_layer.py`, `test_exact_token_budget.py`, `test_streaming_training_engine.py`, `test_exact_resume_reproducibility.py`, `test_hf_export_hardening.py`) and clean `node --check` on `brain.js` and `platform.js`.
 
 ### Verified GNNM Training Loss Progression (From-Scratch CPU Runs)
 

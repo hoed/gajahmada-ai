@@ -187,10 +187,34 @@ def create_platform_router(get_runtime: Callable[[], Dict[str, Any]], repo_root:
         preflight = run_bumblecore_preflight(cfg=cfg, target_tokens=3_276_800_000)
         tok_audit = validate_gnnm_tokenizer(GNNMBPETokenizer())
         gate_report = evaluate_evidence_based_gates(models_dir)
+        pre_ev = gate_report["evidence"]["pretraining"]
+        sft_ev = gate_report["evidence"]["sft"]
+        eval_ev = gate_report["evidence"]["evaluation"]
         return {
             "release": "2.6",
             "lifecycle_stage": gate_report["lifecycle_stage"],
             "pretraining_status": gate_report["pretraining_status"],
+            "status_taxonomy": [
+                "CONFIGURED",
+                "READY",
+                "RUNNING",
+                "SMOKE_TESTED",
+                "TRAINED",
+                "EVALUATED",
+                "RELEASE_CANDIDATE",
+                "PUBLISHED",
+            ],
+            "actual_telemetry": {
+                "actual_pretraining_tokens": int(pre_ev.get("actual_tokens") or 0),
+                "actual_pretraining_steps": int(pre_ev.get("actual_steps") or 0),
+                "actual_sft_steps": int(sft_ev.get("actual_steps") or 0),
+                "checkpoint_trust_verified": bool(pre_ev.get("passed", False)),
+                "checkpoint_sha256": sft_ev.get("checkpoint_sha256") or pre_ev.get("checkpoint_sha256"),
+                "evaluation_passed": bool(eval_ev.get("passed", False)),
+                "evaluation_score": eval_ev.get("overall_score"),
+                "evaluation_dataset_sha256": eval_ev.get("benchmark_dataset_sha256"),
+                "blocked_at_gate": gate_report["release_gates"].get("blocked_at_gate"),
+            },
             "theoretical_token_budget": {
                 "micro_batch_size": 2,
                 "gradient_accumulation_steps": 16,

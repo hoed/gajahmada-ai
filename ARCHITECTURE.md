@@ -68,12 +68,17 @@ flowchart TD
 
 ---
 
-## 4. GNNM Model Families, TITANFORGE 70B & Model Factory
+## 4. GNNM Model Families, BumbleCore 300M (Release 2.6), TITANFORGE 70B & Model Factory
 
-- **Modular Config & Exact Accounting (`gajahmada_ai/gnnm/config.py`):** Supports Dense and Experimental MoE architectures with verified exact analytical parameter counts (`BUMBLECORE` 12M/100M/300M, `OPTICORE` 1B/3B/7B, `TITANFORGE` 30B / **`70B` = `70,549,512,192` params** / 120B) and planned specializations (`NEUROX`, `CODESTRIKE`, `KNOWTRON`).
+- **Modular Config & Exact Accounting (`gajahmada_ai/gnnm/config.py`):** Supports Dense and Experimental MoE architectures with verified exact analytical parameter counts (`BUMBLECORE` 12M/100M/**`300M` = `303,350,784` params**, `OPTICORE` 1B/3B/7B, `TITANFORGE` 30B / **`70B` = `70,549,512,192` params** / 120B) and planned specializations (`NEUROX`, `CODESTRIKE`, `KNOWTRON`).
+- **BumbleCore 300M Release 2.6 Training Integrity Hardening (`gajahmada_ai/gnnm/bumblecore/`):**
+  - **Checkpoint Trust Layer (`checkpoint_trust.py`):** Verifies PyTorch tensor keys, shapes, dtypes, exact parameter count, finite values (no NaN/Inf), live SHA-256 provenance hashes (`model.pt`, `config.json`, `tokenizer.json`, `dataset_manifest.json`), and Ed25519 manifest signatures.
+  - **Exact Token Budget & Reproducible Resume (`trainer.py`):** Enforces zero-overshoot `target_tokens` stopping via tail-padding + `-100` target masking and 7-dimension exact resume (weights, optimizer, scheduler state, cursor, token counters, RNGs, hardware topology, and config/dataset/tokenizer/budget hash guards).
+  - **True Streaming Engine & Dataset Governance (`streaming_loader.py`, `dataset_governance.py`):** Line-by-line JSONL streaming with bounded shuffle buffer, SQLite WAL deduplication (`fingerprints.db`), safe path-traversal/symlink guards, mandatory split hashes, and cross-split document/source leakage rejection.
+  - **Independent Benchmark Suite, Evidence-Based Gates & HF Export (`evaluation.py`, `gate_evidence.py`, `export.py`):** 15-case bilingual held-out benchmark with training-leakage detection, zero hardcoded booleans across Release Gates A–G (honestly reporting `PRETRAINING_STATUS = NOT_STARTED` at `GATE_C_PRETRAINING_CHECKPOINT_VALIDATED`), Model Card schema validation, untrained/smoke upload guards, and full tensor/dtype/logit/Safetensors parity.
 - **Analytical Resource Estimator (`gajahmada_ai/gnnm/resource_estimator.py`):** Computes theoretical FP32/BF16/FP16/INT8/INT4 inference VRAM, mixed-precision AdamW sharded training memory, checkpoint storage, FLOPs, and GPU cluster sizing with zero GPUs.
 - **Distributed Training Preparation (`gajahmada_ai/gnnm/distributed_prep.py`):** Modular data pipeline spec and DDP/FSDP/TP/PP readiness validation; explicitly blocks execution inside Vercel Free and never simulates multi-GPU success.
-- **Unified 11-State Model Registry (`gajahmada_ai/platform/model_factory.py` & `learning/model_registry.py`):** Tracks `PLANNED` → `ARCHITECTURE_DESIGNED` → `CONFIGURATION_VALIDATED` → `DATASET_PREPARATION` → `READY_FOR_TRAINING` → `TRAINING` → `TRAINING_COMPLETED` → `EVALUATION` → `APPROVED` → `PRODUCTION` / `DEPRECATED`, reconciling strictly with real on-disk checkpoints and live SHA-256 hashes. See [docs/GNNM_ARCHITECTURE.md](docs/GNNM_ARCHITECTURE.md) and [docs/MODEL_REGISTRY_AND_PROMOTION.md](docs/MODEL_REGISTRY_AND_PROMOTION.md).
+- **Unified 11-State Model Registry (`gajahmada_ai/platform/model_factory.py` & `learning/model_registry.py`):** Tracks `PLANNED` → `ARCHITECTURE_DESIGNED` → `CONFIGURATION_VALIDATED` → `DATASET_PREPARATION` → `READY_FOR_TRAINING` → `TRAINING` → `TRAINING_COMPLETED` → `EVALUATION` → `APPROVED` → `PRODUCTION` / `DEPRECATED`, reconciling strictly with real on-disk checkpoints and live SHA-256 hashes. See [docs/GNNM_ARCHITECTURE.md](docs/GNNM_ARCHITECTURE.md), [docs/GNNM_BUMBLECORE_ARCHITECTURE.md](docs/GNNM_BUMBLECORE_ARCHITECTURE.md), and [docs/MODEL_REGISTRY_AND_PROMOTION.md](docs/MODEL_REGISTRY_AND_PROMOTION.md).
 
 ---
 
@@ -87,6 +92,6 @@ flowchart TD
 
 ## 6. Web Interface, Brain Observatory & Verification
 
-- **Web Surfaces (`interface/html/`):** Homepage (`/`), Cyberdeck Dashboard (`/dashboard`, `/ui`), Brain Observatory (`/brain` and `/brain/{activity,knowledge,memory,reasoning,learning}`), and Platform Control Plane (`/chat`, `/knowledge`, `/memory`, `/models`, `/models/{family}`, `/model-factory`, `/training`, `/benchmarks`, `/infrastructure`, `/nexus`, `/settings`, `/documentation`).
-- **Deployment:** Zero-dependency Vercel Free deployment documented in [docs/VERCEL_DEPLOYMENT_GUIDE.md](docs/VERCEL_DEPLOYMENT_GUIDE.md).
-- **Verification:** **134/134 automated tests passing** (`python3 -m pytest -q`) plus verified PyTorch exact parameter matching + gradient checkpointing in `.venv312` and reproducible benchmarks in [docs/BENCHMARK_REPORT.json](docs/BENCHMARK_REPORT.json).
+- **Web Surfaces (`interface/html/`):** Homepage (`/`), Cyberdeck Dashboard (`/dashboard`, `/ui`), Brain Observatory (`/brain` and `/brain/{activity,knowledge,memory,reasoning,learning}` — displaying live `/api/v2/platform/bumblecore` actual telemetry & Release Gates A–G without fabricated progress), and Platform Control Plane (`/chat`, `/knowledge`, `/memory`, `/models`, `/models/{family}`, `/model-factory`, `/training`, `/benchmarks`, `/infrastructure`, `/nexus`, `/settings`, `/documentation`).
+- **Deployment:** Zero-dependency Vercel Free deployment documented in [docs/VERCEL_DEPLOYMENT_GUIDE.md](docs/VERCEL_DEPLOYMENT_GUIDE.md) (`configs/bumblecore_300m.yaml` bundled for live Gate A & Gate B checks; zero `torch`/CUDA/FAISS in `requirements.txt`).
+- **Verification:** **166/166 automated tests passing** (`python3 -m pytest -q`, 6 PyTorch-only tests skipped on Python 3.14) plus **all 5 PyTorch acceptance suites passing in `.venv312`** (`checkpoint_trust`, `exact_token_budget`, `streaming_training_engine`, `exact_resume_reproducibility`, `hf_export_hardening`), clean `node --check`, and reproducible benchmarks in [docs/BENCHMARK_REPORT.json](docs/BENCHMARK_REPORT.json).

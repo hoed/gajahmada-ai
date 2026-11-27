@@ -88,10 +88,12 @@ class BoundedStreamingPreprocessor:
         output_dir: str,
         dataset_id: str,
         dataset_version: str = "1.0.0",
+        dataset_description: str = "Curated GajahMada BumbleCore training dataset",
         source_name: str = "external_corpus",
         source_url: Optional[str] = None,
         license_name: str = "UNSPECIFIED",
         approval_status: str = "pending_review",
+        approval_evidence: Optional[Dict[str, Any]] = None,
         tokenizer: Optional[GNNMBPETokenizer] = None,
         allowed_languages: Optional[List[str]] = None,
         min_quality_score: float = 0.45,
@@ -106,10 +108,12 @@ class BoundedStreamingPreprocessor:
         os.makedirs(self.output_dir, exist_ok=True)
         self.dataset_id = dataset_id
         self.dataset_version = dataset_version
+        self.dataset_description = dataset_description
         self.source_name = source_name
         self.source_url = source_url
         self.license_name = license_name
         self.approval_status = approval_status
+        self.approval_evidence = approval_evidence
         self.tokenizer = tokenizer or GNNMBPETokenizer()
         self.allowed_languages = set(allowed_languages or ["id", "en", "mixed", "unknown"])
         self.min_quality_score = min_quality_score
@@ -164,7 +168,7 @@ class BoundedStreamingPreprocessor:
             "token_count": 0,
         }
         split_counts = {"train": 0, "validation": 0, "test": 0}
-        lang_set: Set[str] = set()
+        lang_dist: Dict[str, int] = {}
 
         conn = sqlite3.connect(self.db_path)
         files = {sp: open(p, "w", encoding="utf-8") for sp, p in split_paths.items()}
@@ -238,7 +242,7 @@ class BoundedStreamingPreprocessor:
                     stats["token_count"] += tok_count
                     stats["accepted"] += 1
                     split_counts[split] += 1
-                    lang_set.add(lang)
+                    lang_dist[lang] = lang_dist.get(lang, 0) + 1
 
                     out_rec = {
                         "document_hash": doc_hash,
@@ -261,14 +265,17 @@ class BoundedStreamingPreprocessor:
             json.dumps(split_hashes, sort_keys=True).encode("utf-8")
         ).hexdigest()
 
-        manifest = {
+        manifest: Dict[str, Any] = {
             "dataset_id": self.dataset_id,
             "dataset_version": self.dataset_version,
+            "dataset_description": self.dataset_description,
             "source_name": self.source_name,
             "source_url": self.source_url,
             "license": self.license_name,
-            "language": sorted(lang_set),
+            "language": sorted(lang_dist.keys()),
+            "language_distribution": lang_dist,
             "collection_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "preprocessing_version": PREPROCESSING_VERSION,
             "document_count": stats["accepted"],
             "token_count": stats["token_count"],
@@ -279,28 +286,56 @@ class BoundedStreamingPreprocessor:
             "split_hashes": split_hashes,
             "document_hash": combined_hash,
             "approval_status": self.approval_status,
+            "approval_evidence": self.approval_evidence,
             "stats": stats,
         }
+        manifest["manifest_checksum"] = hashlib.sha256(
+            json.dumps({k: v for k, v in manifest.items() if k != "manifest_checksum"}, sort_keys=True, default=str).encode("utf-8")
+        ).hexdigest()
         manifest_path = os.path.join(self.output_dir, "dataset_manifest.json")
         with open(manifest_path, "w", encoding="utf-8") as mf:
             json.dump(manifest, mf, indent=2)
         return manifest
 
 
+def _resolve_safe_split_path(dataset_dir: str, rel_split: str, split_name: str) -> Tuple[Optional[str], Optional[str]]:
+    """Reject absolute paths, `../` traversal, and symlinks escaping `dataset_dir`."""
+    if not isinstance(rel_split, str) or not rel_split.strip():
+        return None, f"MISSING_SPLIT_PATH({split_name})"
+    if os.path.isabs(rel_split):
+        return None, f"ABSOLUTE_PATH_FORBIDDEN({split_name}): {rel_split}"
+    norm = os.path.normpath(rel_split)
+    if norm.startswith("..") or "/../" in rel_split.replace("\\", "/"):
+        return None, f"PATH_TRAVERSAL_FORBIDDEN({split_name}): {rel_split}"
+    root_real = os.path.realpath(dataset_dir)
+    candidate = os.path.join(dataset_dir, rel_split)
+    if os.path.islink(candidate):
+        return None, f"SYMLINK_ESCAPE_FORBIDDEN({split_name}): {rel_split}"
+    cand_real = os.path.realpath(candidate)
+    if not (cand_real == root_real or cand_real.startswith(root_real + os.sep)):
+        return None, f"PATH_TRAVERSAL_FORBIDDEN({split_name}): resolved outside dataset root"
+    return candidate, None
+
+
 def validate_dataset_and_manifest(
     dataset_dir: str,
     require_approved: bool = True,
+    require_approval_evidence: bool = False,
     min_documents: int = 1,
+    require_non_empty_train: bool = False,
 ) -> Dict[str, Any]:
     """
     Strictly validate an external dataset directory & its `dataset_manifest.json`.
-    Checks: existence, readability, non-empty, approved license, approval_status,
-    split file SHA-256 integrity, measured doc count, and zero cross-split leakage.
+    Checks: path traversal, symlink escape, mandatory split hashes, live SHA-256 match,
+    manifest checksum, approved license, approval_evidence, measured doc & token counts,
+    intra-split collisions, and zero cross-split leakage.
     """
     errors: List[str] = []
     manifest_path = os.path.join(dataset_dir, "dataset_manifest.json")
     if not os.path.isdir(dataset_dir):
         return {"valid": False, "errors": [f"Dataset directory not found: {dataset_dir}"], "manifest": None}
+    if os.path.islink(manifest_path):
+        return {"valid": False, "errors": ["SYMLINK_ESCAPE_FORBIDDEN(manifest)"], "manifest": None}
     if not os.path.isfile(manifest_path):
         return {"valid": False, "errors": [f"Dataset manifest missing: {manifest_path}"], "manifest": None}
 
@@ -310,31 +345,57 @@ def validate_dataset_and_manifest(
     except Exception as exc:
         return {"valid": False, "errors": [f"Malformed manifest JSON: {exc}"], "manifest": None}
 
+    if manifest.get("manifest_checksum"):
+        expected_cs = hashlib.sha256(
+            json.dumps({k: v for k, v in manifest.items() if k != "manifest_checksum"}, sort_keys=True, default=str).encode("utf-8")
+        ).hexdigest()
+        if manifest["manifest_checksum"] != expected_cs:
+            errors.append("MANIFEST_CHECKSUM_MISMATCH: manifest was modified after checksum generation.")
+
     lic = str(manifest.get("license") or "").strip()
     if require_approved and lic not in APPROVED_LICENSES:
         errors.append(f"UNAPPROVED_LICENSE: '{lic}' is not in approved license allowlist.")
     if require_approved and str(manifest.get("approval_status", "")).lower() != "approved":
         errors.append(f"UNAPPROVED_DATASET: approval_status is '{manifest.get('approval_status')}' (must be 'approved').")
+    if require_approval_evidence:
+        ev = manifest.get("approval_evidence")
+        if not isinstance(ev, dict) or not ev.get("approved_by") or not ev.get("review_reference"):
+            errors.append("MISSING_APPROVAL_EVIDENCE: approval_evidence requires 'approved_by' and 'review_reference'.")
     if not manifest.get("source_name"):
         errors.append("MISSING_PROVENANCE: source_name is required.")
 
-    split_files = {
-        "train": os.path.join(dataset_dir, str(manifest.get("train_split", "train.jsonl"))),
-        "validation": os.path.join(dataset_dir, str(manifest.get("validation_split", "validation.jsonl"))),
-        "test": os.path.join(dataset_dir, str(manifest.get("test_split", "test.jsonl"))),
+    raw_splits = {
+        "train": str(manifest.get("train_split", "train.jsonl")),
+        "validation": str(manifest.get("validation_split", "validation.jsonl")),
+        "test": str(manifest.get("test_split", "test.jsonl")),
     }
-    expected_hashes = manifest.get("split_hashes") or {}
+    expected_hashes = manifest.get("split_hashes")
+    if not isinstance(expected_hashes, dict):
+        expected_hashes = {}
+        errors.append("MISSING_SPLIT_HASHES: split_hashes object is required.")
+
     seen_hashes_by_split: Dict[str, Set[str]] = {"train": set(), "validation": set(), "test": set()}
     seen_sources_by_split: Dict[str, Set[str]] = {"train": set(), "validation": set(), "test": set()}
     measured_docs = 0
+    measured_tokens = 0
+    has_record_tokens = False
 
-    for sp, fp in split_files.items():
-        if not os.path.isfile(fp):
-            errors.append(f"MISSING_SPLIT_FILE: {fp}")
+    for sp, rel_p in raw_splits.items():
+        fp, path_err = _resolve_safe_split_path(dataset_dir, rel_p, sp)
+        if path_err:
+            errors.append(path_err)
             continue
-        actual_hash = sha256_file(fp)
-        if expected_hashes.get(sp) and actual_hash != expected_hashes[sp]:
-            errors.append(f"HASH_MISMATCH({sp}): expected {expected_hashes[sp][:12]} got {actual_hash[:12]}")
+        assert fp is not None
+        if not os.path.isfile(fp):
+            errors.append(f"MISSING_SPLIT_FILE({sp}): {rel_p}")
+            continue
+        if not expected_hashes.get(sp):
+            errors.append(f"MISSING_SPLIT_HASH({sp}): split_hashes['{sp}'] is required.")
+        else:
+            actual_hash = sha256_file(fp)
+            if actual_hash != expected_hashes[sp]:
+                errors.append(f"HASH_MISMATCH({sp}): expected {expected_hashes[sp][:12]} got {actual_hash[:12]}")
+
         with open(fp, "r", encoding="utf-8") as f:
             for line in f:
                 raw = line.strip()
@@ -342,16 +403,25 @@ def validate_dataset_and_manifest(
                     continue
                 obj = json.loads(raw)
                 measured_docs += 1
+                if isinstance(obj.get("token_count"), int):
+                    has_record_tokens = True
+                    measured_tokens += int(obj["token_count"])
                 dh = obj.get("document_hash") or hashlib.sha256(str(obj.get("text", "")).encode("utf-8")).hexdigest()
-                sd = obj.get("source_doc_id")
+                if dh in seen_hashes_by_split[sp]:
+                    errors.append(f"DOCUMENT_ID_COLLISION({sp}): duplicate document_hash {dh[:12]}")
                 seen_hashes_by_split[sp].add(dh)
+                sd = obj.get("source_doc_id")
                 if sd:
                     seen_sources_by_split[sp].add(str(sd))
 
+    if require_non_empty_train and len(seen_hashes_by_split["train"]) == 0:
+        errors.append("EMPTY_TRAIN_SPLIT: train split has 0 documents.")
     if measured_docs < min_documents:
         errors.append(f"EMPTY_OR_INSUFFICIENT_DATASET: measured {measured_docs} docs < required {min_documents}.")
     if manifest.get("document_count") is not None and int(manifest["document_count"]) != measured_docs:
         errors.append(f"DOCUMENT_COUNT_MISMATCH: manifest={manifest['document_count']} actual={measured_docs}")
+    if has_record_tokens and manifest.get("token_count") is not None and int(manifest["token_count"]) != measured_tokens:
+        errors.append(f"TOKEN_COUNT_MISMATCH: manifest={manifest['token_count']} actual={measured_tokens}")
 
     # Cross-split leakage checks (exact document hash + source_doc_id)
     for a, b in (("train", "validation"), ("train", "test"), ("validation", "test")):
@@ -366,6 +436,7 @@ def validate_dataset_and_manifest(
         "valid": len(errors) == 0,
         "errors": errors,
         "measured_documents": measured_docs,
+        "measured_tokens": measured_tokens,
         "manifest": manifest,
     }
 

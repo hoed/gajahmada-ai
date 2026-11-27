@@ -192,7 +192,9 @@ def execute_training_run(
     run_id = f"bc-{stage}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6]}"
     started_at = datetime.now(timezone.utc).isoformat()
 
-    # ── 2. Load dataset splits (external validated OR smoke seed) ──
+    # ── 2. Load dataset handles (bounded streaming for external datasets; seed ONLY for --smoke) ──
+    tr_file: Optional[str] = None
+    va_file: Optional[str] = None
     if smoke:
         pipe = BumbleCoreDataPipeline(
             dataset_id="smoke-seed-validation",
@@ -217,16 +219,10 @@ def execute_training_run(
         dataset_manifest_sha256 = sha256_file(os.path.join(dataset_path, "dataset_manifest.json"))
         tr_file = os.path.join(dataset_path, manifest.get("train_split", "train.jsonl"))
         va_file = os.path.join(dataset_path, manifest.get("validation_split", "validation.jsonl"))
-        if stage == "sft":
-            sft_convs = _load_sft_conversations(tr_file)
-            sft_val_convs = _load_sft_conversations(va_file) if os.path.isfile(va_file) else sft_convs[-2:]
-            train_texts = []
-            val_texts = []
-        else:
-            train_texts = _load_jsonl_texts(tr_file)
-            val_texts = _load_jsonl_texts(va_file) if os.path.isfile(va_file) else []
-            sft_convs = []
-            sft_val_convs = []
+        train_texts = []
+        val_texts = []
+        sft_convs = []
+        sft_val_convs = []
 
     # ── 3. Tokenizer Lock BEFORE Model Instantiation (Phase 3) ──
     resolved_tok_path = tokenizer_path or (os.path.join(out_dir, "tokenizer.json") if resume != "none" else None)
@@ -236,26 +232,53 @@ def execute_training_run(
         tokenizer = GNNMBPETokenizer()
         if train_texts:
             tokenizer.train(train_texts, target_vocab_size=cfg.vocab_size)
+        elif tr_file and os.path.isfile(tr_file) and stage == "pretraining":
+            # Bounded sample of up to 500 documents for BPE training without loading full corpus into RAM
+            sample_texts: List[str] = []
+            with open(tr_file, "r", encoding="utf-8") as tf:
+                for line in tf:
+                    if len(sample_texts) >= 500:
+                        break
+                    raw = line.strip()
+                    if not raw:
+                        continue
+                    obj = json.loads(raw)
+                    if isinstance(obj, dict) and obj.get("text"):
+                        sample_texts.append(str(obj["text"]))
+            if sample_texts:
+                tokenizer.train(sample_texts, target_vocab_size=cfg.vocab_size)
 
     # Rebuild & re-validate config against locked tokenizer vocab_size BEFORE model instantiation
     cfg = build_config_from_yaml(raw_cfg, smoke=smoke, vocab_override=tokenizer.vocab_size)
     tokenizer_sha256 = _sha256_json({"format": "gnnm-bpe-v1", "vocab_size": tokenizer.vocab_size, "merges": tokenizer.merges})
     config_sha256 = _sha256_json(cfg.to_dict())
 
-    # ── 4. Pack Sequences ──
+    # ── 4. Build Streaming / Packed Data Sources ──
+    from gajahmada_ai.gnnm.bumblecore.streaming_loader import StreamingPretrainDataset, StreamingSFTDataset
+
     seq_len = min(cfg.max_seq_len, 64 if smoke else cfg.max_seq_len)
-    if stage == "sft":
-        train_pairs = pack_multiturn_sft_pairs(tokenizer, sft_convs, seq_len=seq_len)
-        val_pairs = pack_multiturn_sft_pairs(tokenizer, sft_val_convs, seq_len=seq_len)
+    seed_val = int(raw_cfg.get("training", {}).get("seed", 42))
+    if smoke:
+        if stage == "sft":
+            train_pairs: Any = pack_multiturn_sft_pairs(tokenizer, sft_convs, seq_len=seq_len)
+            val_pairs: Any = pack_multiturn_sft_pairs(tokenizer, sft_val_convs, seq_len=seq_len)
+        else:
+            cb_tr = GNNMCorpusBuilder()
+            cb_tr.documents = [{"text": t} for t in train_texts]
+            cb_va = GNNMCorpusBuilder()
+            cb_va.documents = [{"text": t} for t in val_texts]
+            train_pairs = cb_tr.pack_token_blocks(tokenizer, seq_len=seq_len)
+            val_pairs = cb_va.pack_token_blocks(tokenizer, seq_len=seq_len)
+            if not val_pairs and len(train_pairs) >= 2:
+                val_pairs = train_pairs[-2:]
     else:
-        cb_tr = GNNMCorpusBuilder()
-        cb_tr.documents = [{"text": t} for t in train_texts]
-        cb_va = GNNMCorpusBuilder()
-        cb_va.documents = [{"text": t} for t in val_texts]
-        train_pairs = cb_tr.pack_token_blocks(tokenizer, seq_len=seq_len)
-        val_pairs = cb_va.pack_token_blocks(tokenizer, seq_len=seq_len)
-        if smoke and not val_pairs and len(train_pairs) >= 2:
-            val_pairs = train_pairs[-2:]
+        assert tr_file is not None
+        if stage == "sft":
+            train_pairs = StreamingSFTDataset(tr_file, tokenizer, seq_len=seq_len, seed=seed_val, cycle=True)
+            val_pairs = StreamingSFTDataset(va_file, tokenizer, seq_len=seq_len, shuffle_buffer_size=1, seed=seed_val, cycle=False) if (va_file and os.path.isfile(va_file)) else []
+        else:
+            train_pairs = StreamingPretrainDataset(tr_file, tokenizer, seq_len=seq_len, seed=seed_val, cycle=True)
+            val_pairs = StreamingPretrainDataset(va_file, tokenizer, seq_len=seq_len, shuffle_buffer_size=1, seed=seed_val, cycle=False) if (va_file and os.path.isfile(va_file)) else []
 
     # ── 5. Initialize Trainer with Exact Configured LR & Provenance Hashes ──
     configured_lr = float(tr_cfg.get("lr", 5e-5 if stage == "sft" else 3e-4))
@@ -290,6 +313,9 @@ def execute_training_run(
             expected_tokenizer_hash=tokenizer_sha256,
             allow_resume_mismatch=allow_resume_mismatch,
         )
+
+    if resumed_info and hasattr(train_pairs, "skip_sequences"):
+        train_pairs.skip_sequences = trainer.dataset_cursor
 
     steps = steps_override if steps_override is not None else (4 if smoke else int(tr_cfg.get("max_steps", 100)))
     batch_size = 2 if smoke else int(tr_cfg.get("micro_batch_size", 2))
@@ -355,6 +381,16 @@ def execute_training_run(
         "validation_metrics": val_metrics,
         "checkpoint_dir": out_dir,
     }
+    # Sign training manifest with existing Ed25519 NodeIdentity when node_key.pem is available
+    try:
+        from gajahmada_ai.gnnm.bumblecore.checkpoint_trust import sign_training_manifest
+        from gajahmada_ai.security.crypto import NodeIdentity
+
+        if os.path.isfile("node_key.pem"):
+            run_meta = sign_training_manifest(run_meta, NodeIdentity(key_path="node_key.pem"))
+    except Exception:
+        pass
+
     with open(os.path.join(out_dir, "run_metadata.json"), "w", encoding="utf-8") as f:
         json.dump(run_meta, f, indent=2)
     return run_meta

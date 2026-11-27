@@ -9,7 +9,7 @@
 ## 1. Vercel Plan & Limitation Notice
 - **Vercel Hobby (Free)** is intended strictly for **personal and non-commercial use**. If GajahMada AI is operated as a commercial service, upgrade to a compliant Vercel plan or deploy on dedicated infrastructure.
 - **Serverless Constraints Respected:**
-  - Lambda size kept under 50 MB (`requirements.txt` contains only lightweight pure-Python/FastAPI packages — no `torch`, `faiss-cpu`, or `llama-cpp-python`).
+  - Lambda size kept under 50 MB (`requirements.txt` contains only lightweight pure-Python/FastAPI packages — no `torch`, `faiss-cpu`, or `llama-cpp-python`; `vercel.json` bundles `configs/bumblecore_300m.yaml` for live Gate A & Gate B validation).
   - No permanent background workers, no persistent TCP/P2P daemons, no persistent WebSocket servers.
   - Filesystem writes inside `/tmp` are **ephemeral** and do not persist across serverless cold starts.
 
@@ -39,4 +39,4 @@
 ## 4. Runtime Behavior on Vercel Free
 - **Native Model Inference:** Displays `NATIVE MODEL INFERENCE: UNAVAILABLE IN CURRENT RUNTIME` unless a compatible local/external runtime loads verified weights. Symbolic reasoning, Hybrid Knowledge, and curated offline facts remain 100% active.
 - **FAISS CPU:** Gracefully reports `INCOMPATIBLE_RUNTIME` on Vercel Free while remaining preserved (`ACTIVE` / `AVAILABLE_LOCALLY`) for local development and server environments via `requirements-local.txt`.
-- **Model Factory & TITANFORGE 70B:** Architecture editor, analytical parameter calculator, and theoretical GPU/VRAM resource estimator run live on Vercel Free with zero GPUs; training execution remains explicitly `DISABLED_ON_VERCEL_FREE`.
+- **Model Factory, BumbleCore 300M (Release 2.6) & TITANFORGE 70B:** Architecture editor, analytical parameter calculator, theoretical GPU/VRAM resource estimator, and `/api/v2/platform/bumblecore` evidence-based Release Gates A–G + `actual_telemetry` run live on Vercel Free with zero GPUs (honestly reporting `PRETRAINING_STATUS = NOT_STARTED`); training execution remains explicitly `DISABLED_ON_VERCEL_FREE`.

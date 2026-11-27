@@ -597,6 +597,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Append live BumbleCore 300M Release 2.6 Transparency Card (verified evidence only)
       try {
         const bc = await fetchJson('/api/v2/platform/bumblecore');
+        const tel = bc.actual_telemetry || {};
         const gatesHtml = (bc.release_gates?.gates || []).map((g) =>
           `<div class="insp-kv"><span class="insp-k">${esc(g.gate)}</span><span class="insp-v">${badge(g.passed ? 'ACTIVE' : 'NOT_EXECUTED')}</span></div>`
         ).join('');
@@ -609,6 +610,11 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="insp-kv"><span class="insp-k">Pretraining Status</span><span class="insp-v">${esc(bc.pretraining_status)}</span></div>
             <div class="insp-kv"><span class="insp-k">Exact Params</span><span class="insp-v">${Number(bc.model_metadata?.exact_trainable_parameters || 0).toLocaleString()}</span></div>
             <div class="insp-kv"><span class="insp-k">Configured Token Budget</span><span class="insp-v">${Number(bc.theoretical_token_budget?.total_tokens || 0).toLocaleString()}</span></div>
+            <div class="insp-kv"><span class="insp-k">Actual Pretrain Tokens</span><span class="insp-v">${Number(tel.actual_pretraining_tokens || 0).toLocaleString()}</span></div>
+            <div class="insp-kv"><span class="insp-k">Actual Pretrain Steps</span><span class="insp-v">${Number(tel.actual_pretraining_steps || 0).toLocaleString()}</span></div>
+            <div class="insp-kv"><span class="insp-k">Checkpoint Trust</span><span class="insp-v">${badge(tel.checkpoint_trust_verified ? 'VERIFIED' : 'NOT_VERIFIED')}</span></div>
+            <div class="insp-kv"><span class="insp-k">Held-Out Eval Score</span><span class="insp-v">${tel.evaluation_score != null ? esc(String(tel.evaluation_score)) : 'NOT_EXECUTED'}</span></div>
+            <div class="insp-kv"><span class="insp-k">Blocked At Gate</span><span class="insp-v">${esc(tel.blocked_at_gate || 'NONE')}</span></div>
             <div class="insp-kv"><span class="insp-k">Preflight</span><span class="insp-v">${esc(bc.preflight?.status || 'N/A')}</span></div>
             ${gatesHtml}
           </div>`;

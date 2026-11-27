@@ -18,6 +18,7 @@
           "interface/html/**",
           "google911ef45bbcb1db67.html",
           "config.yaml",
+          "configs/bumblecore_300m.yaml",
           "gajahmada_ai/**"
         ]
       }

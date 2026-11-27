@@ -1,15 +1,16 @@
-# GajahMada GNNM BumbleCore 300M — Release 2.6 Remediation Checklist
+# GajahMada GNNM BumbleCore 300M — Release 2.6 Remediation & Hardening Checklist
 
 - [x] **1. Full pretraining rejects seed-only data** (`DATASET_GOVERNANCE_FAILED` when `--dataset` missing/unapproved).
 - [x] **2. Full SFT rejects seed-only data** (`validate_sft_dataset` enforces external dataset, manifest, approved license, & minimum examples).
-- [x] **3. Dataset manifests validated** (existence, readability, non-empty, approved license, SHA-256 split hashes, doc/token counts).
-- [x] **4. Zero split leakage** (document-hash + `source_doc_id` pinning across train/val/test + SQLite WAL bounded streaming).
-- [x] **5. True token accounting** (`raw_input_tokens`, `valid_training_tokens`, `loss_bearing_target_tokens`, `tokens_consumed`, `validation_tokens`, `target_tokens` stopping).
-- [x] **6. Config consistency** (`2 × 16 × 2048 × 50,000 = 3,276,800,000` tokens — corrected from 6B).
+- [x] **3. Hardened dataset manifest verification** (schema fields, `manifest_checksum`, path-traversal & symlink escape protection, mandatory live `split_hashes`, `TOKEN_COUNT_MISMATCH`, `DOCUMENT_ID_COLLISION`).
+- [x] **4. Zero split leakage & true streaming engine** (document-hash + `source_doc_id` pinning, SQLite WAL `BoundedStreamingPreprocessor`, `StreamingPretrainDataset` & `StreamingSFTDataset` with bounded shuffle buffer & cursor resume).
+- [x] **5. Exact zero-overshoot token budget** (tail-padding + `-100` target masking ensures `tokens_consumed == target_tokens`; validation tokens excluded; silent budget mutation rejected on resume).
+- [x] **6. Config consistency** (`2 × 16 × 2048 × 50,000 = 3,276,800,000` tokens in `configs/bumblecore_300m.yaml`, dynamically verified by Gate B).
 - [x] **7. Tokenizer locked before model instantiation** (config rebuilt & validated against locked vocab size + `tokenizer_sha256`).
-- [x] **8. SFT learning rate respects YAML (`5e-5`)** (removed hidden `max(..., 1e-4)` override).
-- [x] **9. Exact training resume** (model, optimizer, scheduler horizon, cursor, token counters, CPU/CUDA/Python/NumPy RNG, GradScaler, & hash-mismatch guard).
-- [x] **10. 3-level evaluation hardening** (`functional`, `capability`, `safety` + EM/F1/numerical/JSON + empty benchmark rejection).
-- [x] **11. Recursive HF upload safety scan** (symlink rejection, explicit allowlist, SHA-256 upload manifest).
-- [x] **12. Evidence-based Release Gates A–G** (smoke checkpoints & mere file existence rejected; `PRETRAINING_STATUS = NOT_STARTED`).
-- [x] **13. Vercel Free compatibility preserved** (zero PyTorch/CUDA/FAISS in `requirements.txt`).
+- [x] **8. SFT learning rate respects YAML (`5e-5`)** (no hidden override).
+- [x] **9. 7-dimension exact training resume** (model, optimizer, scheduler state, cursor, token counters, CPU/CUDA/Python/NumPy RNG, GradScaler, hardware topology, & config/dataset/tokenizer/budget hash guards).
+- [x] **10. Checkpoint Trust Layer** (PyTorch `weights_only=True` tensor/shape/dtype/param-count/NaN-Inf inspection + live source SHA-256 provenance + Ed25519 manifest signing).
+- [x] **11. Independent 15-case bilingual benchmark suite** (`functional`/`capability`/`safety`, strict objective `token_f1 >= 0.45` without keyword fallback, `benchmark_dataset_sha256`, `BENCHMARK_LEAKAGE_DETECTED`, & output stability).
+- [x] **12. Hardened HF export & parity verification** (`classify_training_status`, `validate_hf_model_card`, `validate_export_bundle`, `require_trained` guard, `NaN` weight rejection, recursive safety scan, & tensor/dtype/logit/Safetensors parity).
+- [x] **13. Zero-hardcoded Evidence-Based Release Gates A–G** (all 7 gates computed dynamically; `PRETRAINING_STATUS = NOT_STARTED`, `blocked_at_gate = GATE_C_PRETRAINING_CHECKPOINT_VALIDATED`).
+- [x] **14. Brain Observatory & Vercel Free compliance** (`/api/v2/platform/bumblecore` exposes honest `actual_telemetry`, `brain.js` renders live values with zero fabricated progress, `requirements.txt` free of torch/CUDA/FAISS, `configs/bumblecore_300m.yaml` bundled in `vercel.json`).
