@@ -594,6 +594,26 @@ document.addEventListener('DOMContentLoaded', () => {
           `).join('')
         : '<div class="insp-card">No GNNM candidate versions registered yet (N/A). Run isolated training via GNNM Lab or /api/v2/learning/train.</div>';
 
+      // Append live BumbleCore 300M Release 2.6 Transparency Card (verified evidence only)
+      try {
+        const bc = await fetchJson('/api/v2/platform/bumblecore');
+        const gatesHtml = (bc.release_gates?.gates || []).map((g) =>
+          `<div class="insp-kv"><span class="insp-k">${esc(g.gate)}</span><span class="insp-v">${badge(g.passed ? 'ACTIVE' : 'NOT_EXECUTED')}</span></div>`
+        ).join('');
+        document.getElementById('learn-versions-grid').innerHTML += `
+          <div class="insp-card" style="border-color:rgba(0,229,255,0.35)">
+            <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+              <b style="color:var(--cyan)">BumbleCore 300M (Release ${esc(bc.release)})</b>
+              ${badge(bc.lifecycle_stage)}
+            </div>
+            <div class="insp-kv"><span class="insp-k">Pretraining Status</span><span class="insp-v">${esc(bc.pretraining_status)}</span></div>
+            <div class="insp-kv"><span class="insp-k">Exact Params</span><span class="insp-v">${Number(bc.model_metadata?.exact_trainable_parameters || 0).toLocaleString()}</span></div>
+            <div class="insp-kv"><span class="insp-k">Configured Token Budget</span><span class="insp-v">${Number(bc.theoretical_token_budget?.total_tokens || 0).toLocaleString()}</span></div>
+            <div class="insp-kv"><span class="insp-k">Preflight</span><span class="insp-v">${esc(bc.preflight?.status || 'N/A')}</span></div>
+            ${gatesHtml}
+          </div>`;
+      } catch { /* optional */ }
+
       document.getElementById('learn-events-list').innerHTML = data.recent_learning_events.length
         ? data.recent_learning_events.map((e) => `
             <div class="insp-card">

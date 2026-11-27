@@ -197,12 +197,107 @@ def verify_export_import_parity(source_dir: str, export_dir: str) -> Dict[str, A
         out_b, _ = m_b(x)
     outputs_match = bool(torch.allclose(out_a, out_b, atol=1e-6))
 
+    # Also verify Safetensors reload parity if model.safetensors was exported and library is available
+    safetensors_checked = False
+    safetensors_parity = None
+    st_path = os.path.join(export_dir, "model.safetensors")
+    if os.path.isfile(st_path) and _has_safetensors():
+        safetensors_checked = True
+        st_mod = importlib.import_module("safetensors.torch")
+        sd_st = st_mod.load_file(st_path, device="cpu")
+        st_shapes = set(sd_a.keys()) == set(sd_st.keys()) and all(
+            tuple(sd_a[k].shape) == tuple(sd_st[k].shape) and torch.allclose(sd_a[k], sd_st[k], atol=1e-6)
+            for k in sd_a
+        )
+        m_st = GNNMTransformer(cfg_b)
+        m_st.load_state_dict(sd_st)
+        m_st.eval()
+        with torch.no_grad():
+            out_st, _ = m_st(x)
+        safetensors_parity = st_shapes and bool(torch.allclose(out_a, out_st, atol=1e-6))
+
+    all_ok = shapes_match and tok_match and outputs_match and (cfg_a.to_dict() == cfg_b.to_dict())
+    if safetensors_checked:
+        all_ok = all_ok and bool(safetensors_parity)
+
     return {
-        "parity_verified": shapes_match and tok_match and outputs_match and (cfg_a.to_dict() == cfg_b.to_dict()),
+        "parity_verified": all_ok,
         "shapes_match": shapes_match,
         "tokenizer_match": tok_match,
         "config_match": cfg_a.to_dict() == cfg_b.to_dict(),
         "deterministic_outputs_match": outputs_match,
+        "safetensors_checked": safetensors_checked,
+        "safetensors_parity": safetensors_parity,
+    }
+
+
+RELEASE_ARTIFACT_ALLOWLIST = {
+    "config.json",
+    "tokenizer.json",
+    "generation_config.json",
+    "model.pt",
+    "model.safetensors",
+    "README.md",
+    "artifact_manifest.json",
+    "LICENSE",
+}
+
+FORBIDDEN_UPLOAD_PATTERNS = (
+    "trainer_state.pt",
+    ".env",
+    "node_key.pem",
+    "admin_api.key",
+    ".pem",
+    ".key",
+    ".db",
+    ".sqlite",
+    ".log",
+    "fingerprints.db",
+)
+
+
+def scan_export_directory_recursive(export_dir: str) -> Dict[str, Any]:
+    """
+    Recursively inspect every file and symlink under `export_dir` against an explicit
+    release allowlist and forbidden-file policy. Returns an auditable upload manifest.
+    """
+    if not os.path.isdir(export_dir):
+        return {"safe": False, "violations": [f"Export directory not found: {export_dir}"], "manifest": []}
+
+    violations: List[str] = []
+    manifest: List[Dict[str, Any]] = []
+
+    for root, dirs, files in os.walk(export_dir, followlinks=False):
+        # Reject unexpected symlinks on both directories and files
+        for d in dirs:
+            full_d = os.path.join(root, d)
+            if os.path.islink(full_d):
+                violations.append(f"SYMLINK_FORBIDDEN: {os.path.relpath(full_d, export_dir)}")
+        for fn in sorted(files):
+            full_p = os.path.join(root, fn)
+            rel_p = os.path.relpath(full_p, export_dir).replace("\\", "/")
+            if os.path.islink(full_p):
+                violations.append(f"SYMLINK_FORBIDDEN: {rel_p}")
+                continue
+            lower = rel_p.lower()
+            if any(pat in lower for pat in FORBIDDEN_UPLOAD_PATTERNS):
+                violations.append(f"FORBIDDEN_SENSITIVE_FILE: {rel_p}")
+                continue
+            if rel_p not in RELEASE_ARTIFACT_ALLOWLIST:
+                violations.append(f"UNAPPROVED_ARTIFACT_NOT_IN_ALLOWLIST: {rel_p}")
+                continue
+            manifest.append({
+                "relative_path": rel_p,
+                "size_bytes": os.path.getsize(full_p),
+                "sha256": _sha256_file(full_p),
+                "artifact_type": os.path.splitext(fn)[1].lstrip(".") or "text",
+                "included": True,
+            })
+
+    return {
+        "safe": len(violations) == 0 and len(manifest) > 0,
+        "violations": violations,
+        "manifest": manifest,
     }
 
 
@@ -214,15 +309,14 @@ def prepare_hf_upload(
     confirm_upload: bool = False,
 ) -> Dict[str, Any]:
     """
-    Optional Hugging Face upload preparation.
+    Optional Hugging Face upload preparation with recursive safety scan & allowlist.
     NEVER uploads automatically — requires explicit confirm_upload=True, dry_run=False, and HF_TOKEN.
     """
-    forbidden_patterns = ("trainer_state.pt", ".env", "node_key.pem", "admin_api.key")
-    files = sorted(os.listdir(export_dir)) if os.path.isdir(export_dir) else []
-    blocked = [f for f in files if any(p in f for p in forbidden_patterns)]
-    if blocked:
-        raise ValueError(f"Refusing upload: forbidden private/training files present in export_dir: {blocked}")
+    scan = scan_export_directory_recursive(export_dir)
+    if not scan["safe"]:
+        raise ValueError(f"Refusing upload due to recursive safety / forbidden artifact violations: {scan['violations']}")
 
+    files = [m["relative_path"] for m in scan["manifest"]]
     if dry_run or not confirm_upload:
         return {
             "status": "DRY_RUN_ONLY",
@@ -230,15 +324,16 @@ def prepare_hf_upload(
             "repo_id": repo_id,
             "private": private,
             "files_ready": files,
+            "upload_manifest": scan["manifest"],
             "note": "Explicit user authorization (dry_run=False, confirm_upload=True, HF_TOKEN) required to upload.",
         }
 
     token = os.environ.get("HF_TOKEN", "").strip()
     if not token:
-        return {"status": "MISSING_HF_TOKEN", "uploaded": False, "repo_id": repo_id}
+        return {"status": "MISSING_HF_TOKEN", "uploaded": False, "repo_id": repo_id, "upload_manifest": scan["manifest"]}
 
     hf_hub = importlib.import_module("huggingface_hub")
     api = hf_hub.HfApi(token=token)
     api.create_repo(repo_id=repo_id, private=private, exist_ok=True)
     api.upload_folder(folder_path=export_dir, repo_id=repo_id, repo_type="model")
-    return {"status": "UPLOADED", "uploaded": True, "repo_id": repo_id, "private": private, "files": files}
+    return {"status": "UPLOADED", "uploaded": True, "repo_id": repo_id, "private": private, "files": files, "upload_manifest": scan["manifest"]}

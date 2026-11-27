@@ -22,7 +22,8 @@ from fastapi import APIRouter, HTTPException, Query
 
 from gajahmada_ai.gnnm.bumblecore.architecture import build_bumblecore_300m_config
 from gajahmada_ai.gnnm.bumblecore.data_pipeline import validate_gnnm_tokenizer
-from gajahmada_ai.gnnm.bumblecore.evaluation import RELEASE_GATES, evaluate_release_gates
+from gajahmada_ai.gnnm.bumblecore.evaluation import RELEASE_GATES
+from gajahmada_ai.gnnm.bumblecore.gate_evidence import evaluate_evidence_based_gates
 from gajahmada_ai.gnnm.bumblecore.preflight import run_bumblecore_preflight
 from gajahmada_ai.gnnm.config import GNNM_PRESETS
 from gajahmada_ai.gnnm.tokenizer import GNNMBPETokenizer
@@ -183,26 +184,26 @@ def create_platform_router(get_runtime: Callable[[], Dict[str, Any]], repo_root:
     @router.get("/bumblecore")
     def platform_bumblecore():
         cfg = build_bumblecore_300m_config()
-        preflight = run_bumblecore_preflight(cfg=cfg)
+        preflight = run_bumblecore_preflight(cfg=cfg, target_tokens=3_276_800_000)
         tok_audit = validate_gnnm_tokenizer(GNNMBPETokenizer())
-        ckpt_300m = os.path.join(models_dir, "bumblecore-300m", "pretraining", "model.pt")
-        sft_300m = os.path.join(models_dir, "bumblecore-300m", "sft", "model.pt")
-        export_300m = os.path.join(models_dir, "bumblecore-300m-export", "artifact_manifest.json")
-        gates = evaluate_release_gates({
-            "GATE_A_ARCHITECTURE_VALIDATED": (True, "303,350,784 exact trainable parameters verified."),
-            "GATE_B_TRAINING_PIPELINE_VALIDATED": (True, "GNNMTrainer grad accum, AMP, warmup, resume, & non-empty val verified."),
-            "GATE_C_PRETRAINING_CHECKPOINT_VALIDATED": (os.path.isfile(ckpt_300m), "Full 300M pretraining checkpoint present." if os.path.isfile(ckpt_300m) else "Pending external GPU pretraining run."),
-            "GATE_D_SFT_CHECKPOINT_VALIDATED": (os.path.isfile(sft_300m), "Full 300M SFT checkpoint present." if os.path.isfile(sft_300m) else "Pending SFT stage after Gate C."),
-            "GATE_E_EVALUATION_PASSED": (False, "Pending full 300M checkpoint evaluation."),
-            "GATE_F_DISTRIBUTION_VALIDATED": (os.path.isfile(export_300m), "Export manifest present." if os.path.isfile(export_300m) else "Pending full 300M export."),
-            "GATE_G_GAJAHMADA_INTEGRATION_VALIDATED": (False, "Pending full 300M checkpoint activation in ModelRouter."),
-        })
+        gate_report = evaluate_evidence_based_gates(models_dir)
         return {
-            "release": "2.5",
+            "release": "2.6",
+            "lifecycle_stage": gate_report["lifecycle_stage"],
+            "pretraining_status": gate_report["pretraining_status"],
+            "theoretical_token_budget": {
+                "micro_batch_size": 2,
+                "gradient_accumulation_steps": 16,
+                "sequence_length": 2048,
+                "tokens_per_optimizer_step": 65_536,
+                "max_steps": 50_000,
+                "total_tokens": 3_276_800_000,
+            },
             "model_metadata": cfg.metadata(),
             "tokenizer_audit": tok_audit,
             "preflight": preflight,
-            "release_gates": gates,
+            "release_gates": gate_report["release_gates"],
+            "gate_evidence": gate_report["evidence"],
             "release_gate_names": RELEASE_GATES,
             "epistemic_separation": {
                 "document_retrieval_is_training": False,

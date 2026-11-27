@@ -17,7 +17,8 @@
 | **Recommended Single-GPU Target for Full Pretraining** | **1× 16 GB–24 GB VRAM GPU (e.g., RTX 4090 / L4 / A10G / A100)** |
 | **Inference-Only Weights (BF16 / INT8 / INT4)** | `0.565 GB` / `0.283 GB` / `0.155 GB` |
 | **Full Resumable Checkpoint Size (Weights + Optimizer)** | `~3.955 GB` |
-| **Chinchilla-Optimal Token Horizon (`20 × N`)** | `~6.07 Billion tokens` |
+| **Configured Token Budget (`2 × 16 × 2048 × 50,000`)** | **`3,276,800,000 tokens` (`65,536 tokens/step`)** |
+| **Chinchilla-Optimal Reference (`20 × N`, theoretical)** | `~6.07 Billion tokens (reference only — NOT the configured YAML budget)` |
 
 ---
 
@@ -25,7 +26,7 @@
 - **PyTorch:** `2.15.0+cpu` in `.venv312` (`CUDA: False`, zero GPUs)
 - **System RAM:** `7.63 GB` total (`~4.2 GB` available)
 - **Free Disk:** `79.75 GB`
-- **Preflight Verdict for Full 300M Pretraining on Current Host:** **`BLOCKED_INSUFFICIENT_RESOURCES`** (`GPU_REQUIRED_FOR_FULL_TRAINING` — CPU-only host cannot execute 6B-token 300M pretraining; smoke training & 303M BF16 instantiation/forward pass ARE supported locally).
+- **Preflight Verdict for Full 300M Pretraining on Current Host:** **`BLOCKED_INSUFFICIENT_RESOURCES`** (`GPU_REQUIRED_FOR_FULL_TRAINING` — CPU-only host cannot execute 3.2768B-token 300M pretraining; smoke training & 303M BF16 instantiation/forward pass ARE supported locally).
 - **Preflight Verdict on Vercel Free:** **`VERCEL_FREE_FORBIDDEN`** (strictly disabled on serverless).
 
 ## 3. Running Preflight Yourself
