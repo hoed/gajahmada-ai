@@ -13,10 +13,16 @@ class SlidingWindowRateLimiter:
         self.max_requests = max_requests
         self.window_seconds = window_seconds
         self._buckets: Dict[str, Deque[float]] = defaultdict(deque)
+        self._calls = 0
 
     def check(self, key: str, cost: int = 1) -> Tuple[bool, int]:
         now = time.time()
         cutoff = now - self.window_seconds
+        self._calls += 1
+        if self._calls % 1024 == 0:
+            # Prune idle buckets so per-IP keys cannot grow memory without bound.
+            for k in [k for k, b in self._buckets.items() if not b or b[-1] < cutoff]:
+                del self._buckets[k]
         bucket = self._buckets[key]
         while bucket and bucket[0] < cutoff:
             bucket.popleft()

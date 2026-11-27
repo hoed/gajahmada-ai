@@ -16,10 +16,14 @@ from typing import Any, Callable, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
+from gajahmada_ai.api.http_utils import build_sse_limiter, resolve_client_ip
 from gajahmada_ai.memory.authorization import MemoryAuthorizationService
 from gajahmada_ai.memory.models import VisibilityPolicy
 from gajahmada_ai.security.context import AccessContext
 from gajahmada_ai.security.observability import build_subsystem_health_report
+
+
+SSE_LIMITER = build_sse_limiter()
 
 
 def _iso_ts(ts: Optional[float]) -> Optional[str]:
@@ -748,13 +752,23 @@ def create_observatory_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIR
             "events": filtered[offset : offset + limit],
         }
 
+    sse_limiter = SSE_LIMITER
+
     @router.get("/stream")
     async def observatory_sse_stream(request: Request):
         """Real Server-Sent Events (SSE) stream pushing actual backend telemetry snapshots."""
         rt = get_runtime()
         ctx = _build_access_context(rt, request)
+        client_ip = resolve_client_ip(request)
+        if not sse_limiter.acquire(client_ip):
+            raise HTTPException(
+                status_code=429,
+                detail="Too many concurrent observatory streams. Close an existing stream and retry.",
+                headers={"Retry-After": "10"},
+            )
 
         async def event_gen():
+          try:
             last_sig = ""
             # Send initial real snapshot immediately, then poll internal state cleanly (max 60s per serverless conn)
             for _ in range(15):
@@ -769,6 +783,8 @@ def create_observatory_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIR
                 else:
                     yield f": heartbeat {int(time.time())}\n\n"
                 await asyncio.sleep(4)
+          finally:
+            sse_limiter.release(client_ip)
 
         return StreamingResponse(
             event_gen(),

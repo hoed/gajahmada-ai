@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from gajahmada_ai.agents.scheduler import AutonomousTaskScheduler
+from gajahmada_ai.api.http_utils import resolve_client_ip
 from gajahmada_ai.api.observatory_routes import create_observatory_router
 from gajahmada_ai.api.v2_routes import create_v2_router
 from gajahmada_ai.blockchain.chain import AIBlockchain, Block, LedgerEventType
@@ -83,7 +84,17 @@ DEFAULT_KNOWLEDGE_DOCS = [
     "Module network.p2p (P2PNetwork): Mengelola topologi mesh peer-to-peer asinkron via httpx, sinkronisasi bootstrap peers (/node/sync), dan siaran gossip bertanda tangan (/node/broadcast).",
 ] + get_indonesia_knowledge_corpus()
 
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    ensure_initialized()
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="GajahMada 2.0 — Sovereign Hybrid Distributed Intelligence Node",
     description="Sovereign, Independent, Hybrid, Distributed Intelligence Architecture (Local & Serverless Ready)",
     version="2.0.0",
@@ -443,12 +454,6 @@ class ConfigUpdateRequest(BaseModel):
     pow_difficulty: Optional[int] = None
     max_tokens: Optional[int] = None
     temperature: Optional[float] = None
-
-
-# ─── Startup ──────────────────────────────────────────────────────────────
-@app.on_event("startup")
-async def startup_event():
-    ensure_initialized()
 
 
 # ─── Health, Root & SEO Endpoints ─────────────────────────────────────────
@@ -1295,7 +1300,7 @@ async def enforce_rate_limit(request: Request, call_next):
     if rate_limiter is not None and (
         path.startswith(("/ai/", "/knowledge/", "/node/", "/api/v2/", "/security/"))
     ):
-        client_ip = request.client.host if request.client else "unknown"
+        client_ip = resolve_client_ip(request)
         bucket_key = f"{client_ip}:{path.split('/')[1]}"
         allowed, _remaining = rate_limiter.check(bucket_key)
         if not allowed:
