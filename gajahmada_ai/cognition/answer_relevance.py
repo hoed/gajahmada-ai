@@ -139,9 +139,10 @@ def relevance_score(question: str, answer: str, context_title: str = "") -> floa
 def _split_units(passage: str) -> Tuple[str, List[str]]:
     clean = _strip_markup(passage).strip()
     lines = [ln.strip() for ln in clean.split("\n") if ln.strip()]
-    # Only a short header line of a multi-line passage may lend context to the lines under it;
-    # a single long paragraph must never credit unrelated sentences with its own first sentence.
-    title = lines[0] if len(lines) > 1 and len(lines[0]) <= 120 else ""
+    # Only an explicit header line ending with ':' in a multi-line passage may lend context to
+    # the lines under it; independent sentences joined by newlines (e.g. RAG chunks) must NEVER
+    # credit each other with the first sentence's terms.
+    title = lines[0] if len(lines) > 1 and len(lines[0]) <= 120 and lines[0].rstrip().endswith(":") else ""
     units: List[str] = []
     for ln in lines:
         # "Heading: body" -> score the body only; a heading must not make unrelated body text look relevant.

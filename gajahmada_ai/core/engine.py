@@ -231,6 +231,9 @@ class AIModelEngine:
         try:
             from gajahmada_ai.knowledge.indonesia_corpus import get_indonesia_knowledge_corpus
 
+            from gajahmada_ai.knowledge.world_facts import get_world_knowledge_corpus
+
+            pool.extend(get_world_knowledge_corpus())
             pool.extend(get_indonesia_knowledge_corpus())
         except Exception:
             pass
@@ -450,6 +453,19 @@ class AIModelEngine:
                 f"resp = httpx.post('http://localhost:8000/ai/chat', json={{'prompt': {q!r}}}).json()\n"
                 f"print(resp['response'])\n"
                 f"```"
+            )
+
+        # 7Z. Curated offline fact base (world, science, space): answer from the sentence that actually
+        # responds to the question before spending a network lookup.
+        from gajahmada_ai.cognition.answer_relevance import select_best_passage
+        from gajahmada_ai.knowledge.world_facts import get_world_knowledge_corpus
+
+        fact_pool = get_world_knowledge_corpus() + ([context] if context else [])
+        fact = select_best_passage(q, fact_pool, min_score=self._RELEVANCE_THRESHOLD)
+        if fact:
+            return fact[0] + format_references_footer(
+                [{"title": "GajahMada World & Space Fact Base", "url": "gajahmada_ai/knowledge/world_facts.py"}],
+                max_refs=1,
             )
 
         # 8. Autonomous Multi-Source Internet Knowledge Crawler (Wikipedia ID/EN + DuckDuckGo + Weather + Direct URL)

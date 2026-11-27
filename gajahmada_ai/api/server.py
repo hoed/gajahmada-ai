@@ -22,6 +22,7 @@ from gajahmada_ai.blockchain.chain import AIBlockchain, Block, LedgerEventType
 from gajahmada_ai.cognition.reasoning import CognitiveReasoningPipeline
 from gajahmada_ai.core.engine import AIModelEngine
 from gajahmada_ai.knowledge.indonesia_corpus import get_indonesia_knowledge_corpus
+from gajahmada_ai.knowledge.world_facts import get_world_knowledge_corpus
 from gajahmada_ai.knowledge.controller import GNNMKnowledgeAdapter, HybridKnowledgeController
 from gajahmada_ai.knowledge.ingestion import KnowledgeIngestionPipeline
 from gajahmada_ai.knowledge.interfaces import HybridKnowledgeConfig
@@ -82,7 +83,7 @@ DEFAULT_KNOWLEDGE_DOCS = [
     "Module blockchain.chain (AIBlockchain): Mencatat setiap task_hash SHA-256 (prompt + response) ke dalam rantai blok Proof-of-Work (difficulty=2) yang ditandatangani secara kriptografis.",
     "Module security.crypto (NodeIdentity): Menggunakan pasangan kunci asimetris Ed25519 (RFC 8032) untuk identitas node unik (node_id) dan verifikasi tanda tangan digital setiap blok.",
     "Module network.p2p (P2PNetwork): Mengelola topologi mesh peer-to-peer asinkron via httpx, sinkronisasi bootstrap peers (/node/sync), dan siaran gossip bertanda tangan (/node/broadcast).",
-] + get_indonesia_knowledge_corpus()
+] + get_indonesia_knowledge_corpus() + get_world_knowledge_corpus()
 
 from contextlib import asynccontextmanager
 
