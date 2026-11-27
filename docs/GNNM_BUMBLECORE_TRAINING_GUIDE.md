@@ -60,6 +60,9 @@ bash scripts/train_bumblecore_300m_gpu.sh
 ```
 *(Training streams line-by-line via `StreamingPretrainDataset` / `StreamingSFTDataset`, enforces exact zero-overshoot `target_tokens` = `3,276,800,000`, signs `run_metadata.json` via Ed25519 when `node_key.pem` is present, and supports `--resume auto`.)*
 
+### 4C. Google Colab GPU Notebook (1-Click Setup + Google Drive Persistence)
+Buka [notebooks/train_bumblecore_300m_colab.ipynb](file:///home/hoed/gajahmada/notebooks/train_bumblecore_300m_colab.ipynb) di Google Colab (`Runtime → Change runtime type → GPU`, disarankan L4/A100). Notebook otomatis memasang Google Drive untuk persistensi checkpoint (`--resume auto`), mengkurasi korpus Wikipedia ID+EN (`CC-BY-SA-4.0`), menjalankan pretraining, memverifikasi Checkpoint Trust Layer + Safetensors parity, dan mengunggah ke Hugging Face memakai `HF_TOKEN` secara aman.
+
 ## 5. Checkpoint Trust Verification, Export & Hugging Face Release CLI
 Once full 300M pretraining/SFT completes on your GPU host, run the fail-closed 5-step release CLI (`scripts/release_bumblecore_300m_hf.py`):
 ```bash

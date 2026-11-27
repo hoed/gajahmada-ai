@@ -89,6 +89,13 @@ class GNNMTrainer:
         self.weight_decay = float(weight_decay)
         self.grad_clip = float(grad_clip)
         self.precision = (precision or cfg.precision or "fp32").lower()
+        if (
+            self.device.startswith("cuda")
+            and self.precision == "bf16"
+            and hasattr(torch.cuda, "is_bf16_supported")
+            and not torch.cuda.is_bf16_supported()
+        ):
+            self.precision = "fp16"
         self.optimizer = torch.optim.AdamW(
             self.model.parameters(), lr=self.lr, betas=(0.9, 0.95), weight_decay=self.weight_decay
         )

@@ -21,7 +21,7 @@ CONFIG_PATH="${CONFIG_PATH:-configs/bumblecore_300m.yaml}"
 PRETRAIN_DATASET_DIR="${PRETRAIN_DATASET_DIR:-}"
 SFT_DATASET_DIR="${SFT_DATASET_DIR:-}"
 EXPORT_DIR="${EXPORT_DIR:-./models/bumblecore-300m-export}"
-HF_REPO_ID="${HF_REPO_ID:-GajahMada/GNNM-BumbleCore-300M}"
+HF_REPO_ID="${HF_REPO_ID:-Hoedhud/GNNM_bumblecore_300m}"
 
 echo "=================================================================="
 echo " GajahMada GNNM BumbleCore 300M — Release 2.6 Cloud GPU Runner"

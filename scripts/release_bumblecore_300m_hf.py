@@ -157,7 +157,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
     parser.add_argument(
         "--repo-id",
-        default="GajahMada/GNNM-BumbleCore-300M",
+        default="Hoedhud/GNNM_bumblecore_300m",
         help="Target Hugging Face repository ID (e.g. username/GNNM-BumbleCore-300M).",
     )
     parser.add_argument(
