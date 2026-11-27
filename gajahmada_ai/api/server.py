@@ -604,6 +604,27 @@ def health():
 
 
 # ─── AI & Command Interface Endpoints ─────────────────────────────────────
+_USER_QA_PREFIX = "Pertanyaan:"
+_PRIVILEGED_ROLES = ("admin", "operator")
+_ANON_EMBEDDING_MAX_CHARS = 4096
+
+
+def _is_privileged_actor(actor_info: Optional[Dict[str, str]]) -> bool:
+    return bool(actor_info) and actor_info.get("role") in _PRIVILEGED_ROLES
+
+
+def _is_user_qa_entry(doc: str) -> bool:
+    """Legacy RAG entries written from user conversations (never public corpus knowledge)."""
+    return isinstance(doc, str) and doc.lstrip().startswith(_USER_QA_PREFIX)
+
+
+def _redact_log_message(message: str) -> str:
+    """Hide user-supplied fragments (quoted prompts/queries) from non-privileged log readers."""
+    import re
+
+    return re.sub(r"'[^']*'", "'[redacted]'", str(message))
+
+
 @app.post("/ai/chat")
 async def ai_chat(req: ChatRequest, request: Request):
     ensure_initialized()
@@ -627,7 +648,15 @@ async def ai_chat(req: ChatRequest, request: Request):
         try:
             query_emb = engine.create_embedding(req.prompt)
             if query_emb:
-                results = rag.search(query_emb, k=active_top_k, query_text=req.prompt)
+                if _is_privileged_actor(actor_info):
+                    results = rag.search(query_emb, k=active_top_k, query_text=req.prompt)
+                else:
+                    # Never surface other users' stored Q&A: over-fetch, filter, then trim to top-k.
+                    results = [
+                        r
+                        for r in rag.search(query_emb, k=max(active_top_k * 8, 24), query_text=req.prompt)
+                        if not _is_user_qa_entry(r)
+                    ][:active_top_k]
                 if results:
                     matched_docs = len(results)
                     context = "\n".join(results)
@@ -699,7 +728,10 @@ async def ai_chat(req: ChatRequest, request: Request):
             "Permintaan telah diproses oleh **GajahMada Hybrid Cognitive Engine**" in response
             or "Belum ada data spesifik untuk" in response
         )
-        if rag and engine and not is_generic_fallback and knowledge_entry not in rag.doc_store:
+        # Anonymous/low-privilege conversations must NOT write into the shared legacy RAG store
+        # (prevents knowledge poisoning and cross-user leakage); they stay in scoped MemoryManager.
+        may_write_shared_rag = src_type != "cognitive_brain_qa_update" or _is_privileged_actor(actor_info)
+        if rag and engine and may_write_shared_rag and not is_generic_fallback and knowledge_entry not in rag.doc_store:
             k_emb = engine.create_embedding(knowledge_entry)
             if k_emb:
                 rag.ingest(knowledge_entry, k_emb)
@@ -860,8 +892,14 @@ async def ai_ingest(req: EmbeddingRequest, request: Request):
 
 
 @app.post("/ai/embedding")
-async def ai_embedding(req: EmbeddingRequest):
+async def ai_embedding(req: EmbeddingRequest, request: Request):
     ensure_initialized()
+    actor = auth_manager.resolve_optional_actor(request) if auth_manager else {"role": "anonymous"}
+    if not _is_privileged_actor(actor) and len(req.text) > _ANON_EMBEDDING_MAX_CHARS:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Text too long for unauthenticated embedding (max {_ANON_EMBEDDING_MAX_CHARS} chars).",
+        )
     emb = engine.create_embedding(req.text)
     record_log("core.engine", "INFO", f"Generated {len(emb)}-d embedding vector")
     return {"embedding": emb, "dimension": len(emb)}
@@ -869,8 +907,10 @@ async def ai_embedding(req: EmbeddingRequest):
 
 # ─── Knowledge Expansion Management Endpoints ─────────────────────────────
 @app.get("/knowledge/stats")
-def knowledge_stats():
+def knowledge_stats(request: Request):
     ensure_initialized()
+    actor = auth_manager.resolve_optional_actor(request) if auth_manager else {"role": "anonymous"}
+    privileged = _is_privileged_actor(actor)
     return {
         "total_docs": len(rag.doc_store) if rag else 0,
         "dimension": rag.dimension if rag else 384,
@@ -880,15 +920,29 @@ def knowledge_stats():
         "docs": [
             {"index": idx, "preview": doc[:120], "tokens": len(doc.split())}
             for idx, doc in enumerate(rag.doc_store if rag else [])
+            if privileged or not _is_user_qa_entry(doc)
         ],
+        "user_qa_entries_hidden": (
+            0 if privileged else sum(1 for d in (rag.doc_store if rag else []) if _is_user_qa_entry(d))
+        ),
     }
 
 
 @app.post("/knowledge/search")
-def knowledge_search(req: SearchKnowledgeRequest):
+def knowledge_search(req: SearchKnowledgeRequest, request: Request):
     ensure_initialized()
+    actor = auth_manager.resolve_optional_actor(request) if auth_manager else {"role": "anonymous"}
     emb = engine.create_embedding(req.query)
-    results = rag.search(emb, k=req.k, query_text=req.query) if rag else []
+    if not rag:
+        results = []
+    elif _is_privileged_actor(actor):
+        results = rag.search(emb, k=req.k, query_text=req.query)
+    else:
+        results = [
+            r
+            for r in rag.search(emb, k=max(req.k * 8, 24), query_text=req.query)
+            if not _is_user_qa_entry(r)
+        ][: req.k]
     record_log("knowledge.rag", "INFO", f"Semantic search query='{req.query[:30]}' -> {len(results)} match(es)")
     return {"query": req.query, "results": results, "count": len(results)}
 
@@ -1154,9 +1208,21 @@ def security_sign_verify(req: SignVerifyRequest):
 
 
 @app.get("/node/config")
-def get_node_config():
+def get_node_config(request: Request):
     ensure_initialized()
-    return runtime_config
+    actor = auth_manager.resolve_optional_actor(request) if auth_manager else {"role": "anonymous"}
+    if _is_privileged_actor(actor):
+        return runtime_config
+    # Public view: only non-sensitive tunables (no filesystem paths, hosts, or peer URLs).
+    return {
+        "node": {"name": runtime_config.get("node", {}).get("name")},
+        "ai": {
+            "max_tokens": runtime_config.get("ai", {}).get("max_tokens"),
+            "temperature": runtime_config.get("ai", {}).get("temperature"),
+        },
+        "blockchain": {"difficulty": runtime_config.get("blockchain", {}).get("difficulty")},
+        "redacted": True,
+    }
 
 
 @app.post("/node/config")
@@ -1204,9 +1270,13 @@ def get_dependencies():
 
 
 @app.get("/node/logs")
-def get_system_logs():
+def get_system_logs(request: Request):
     ensure_initialized()
-    return {"logs": system_logs[-50:]}
+    actor = auth_manager.resolve_optional_actor(request) if auth_manager else {"role": "anonymous"}
+    logs = system_logs[-50:]
+    if not _is_privileged_actor(actor):
+        logs = [{**entry, "message": _redact_log_message(entry.get("message", ""))} for entry in logs]
+    return {"logs": logs}
 
 
 @app.delete("/node/logs")
