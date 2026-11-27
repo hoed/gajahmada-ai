@@ -18,6 +18,48 @@ BLOCKED_HOSTNAMES: Set[str] = {
 }
 
 
+def _unwrap_ip(ip_obj: ipaddress._BaseAddress) -> ipaddress._BaseAddress:
+    mapped = getattr(ip_obj, "ipv4_mapped", None)
+    return mapped or ip_obj
+
+
+def _ip_block_reason(ip_obj: ipaddress._BaseAddress, allow_local: bool) -> Optional[str]:
+    """Return a rejection reason, or None if this address may be contacted."""
+    ip_obj = _unwrap_ip(ip_obj)
+    if str(ip_obj) in ("169.254.169.254", "100.100.100.200"):
+        return f"Cloud metadata IP blocked: {ip_obj}"
+    if ip_obj.is_link_local or ip_obj.is_multicast or ip_obj.is_unspecified:
+        return f"Link-local / cloud metadata IP blocked: {ip_obj}"
+    # Reserved ranges (except private/loopback, which follow allow_local) are never peers.
+    if ip_obj.is_reserved and not ip_obj.is_private and not ip_obj.is_loopback:
+        return f"Reserved IP blocked: {ip_obj}"
+    if not allow_local and (ip_obj.is_loopback or ip_obj.is_private or ip_obj.is_reserved):
+        return f"Private/loopback IP {ip_obj} blocked in strict external-only mode"
+    return None
+
+
+def _resolved_ips(hostname: str) -> Tuple[bool, list]:
+    """Resolve a hostname to concrete addresses. Literal IPs are not looked up."""
+    try:
+        return True, [_unwrap_ip(ipaddress.ip_address(hostname))]
+    except ValueError:
+        pass
+    try:
+        infos = socket.getaddrinfo(hostname, None, type=socket.SOCK_STREAM)
+    except socket.gaierror:
+        return False, []
+    found = []
+    for info in infos:
+        sockaddr = info[4] if len(info) > 4 else None
+        if not sockaddr:
+            continue
+        try:
+            found.append(_unwrap_ip(ipaddress.ip_address(sockaddr[0])))
+        except ValueError:
+            continue
+    return True, found
+
+
 def validate_peer_url(
     url: str,
     allow_local: bool = True,
@@ -66,22 +108,18 @@ def validate_peer_url(
         if port in BLOCKED_PORTS:
             return False, f"Port {port} is restricted (internal service port)"
 
-    # Inspect literal IP or resolve hostname if literal
-    ip_obj = None
-    try:
-        ip_obj = ipaddress.ip_address(hostname)
-    except ValueError:
-        ip_obj = None
+    # Inspect every address the name resolves to. A public name that points at
+    # metadata, link-local, or (when disallowed) private space is rejected.
+    # Unresolvable names fail closed so a later lookup cannot slip past.
+    resolved, ips = _resolved_ips(hostname)
+    if not resolved or not ips:
+        return False, f"Hostname did not resolve: {hostname}"
+    for ip_obj in ips:
+        reason = _ip_block_reason(ip_obj, allow_local=allow_local)
+        if reason:
+            return False, reason
 
-    if ip_obj is not None:
-        if ip_obj.is_link_local or str(ip_obj).startswith("169.254."):
-            return False, f"Link-local / cloud metadata IP blocked: {ip_obj}"
-        if ip_obj.is_multicast or ip_obj.is_unspecified:
-            return False, f"Multicast or unspecified IP blocked: {ip_obj}"
-        if not allow_local and (ip_obj.is_loopback or ip_obj.is_private or ip_obj.is_reserved):
-            return False, f"Private/loopback IP {ip_obj} blocked in strict external-only mode"
-    else:
-        if not allow_local and hostname in ("localhost", "localhost.localdomain", "ip6-localhost"):
-            return False, "Localhost blocked in strict external-only mode"
+    if not allow_local and hostname in ("localhost", "localhost.localdomain", "ip6-localhost"):
+        return False, "Localhost blocked in strict external-only mode"
 
     return True, clean

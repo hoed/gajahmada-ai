@@ -85,9 +85,11 @@ def create_observatory_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIR
         recent_events = tracker.query_temporal(access_context=ctx, limit=5) if tracker else []
         cap = rt["engine"].capability_status() if rt.get("engine") else {}
 
+        privileged = ctx.actor_role in ("admin", "operator")
         return {
             "timestamp": _iso_ts(time.time()),
-            "node_id": rt["identity"].node_id,
+            "node_id": rt["identity"].node_id if privileged else None,
+            "identity_redacted": not privileged,
             "actor_role": ctx.actor_role,
             "system_status": "HEALTHY" if subsystems["api"]["status"] == "HEALTHY" else "DEGRADED",
             "active_runtime_model": {
@@ -95,7 +97,7 @@ def create_observatory_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIR
                 "backend": cap.get("active_neural_backend") or "NOT_CONFIGURED",
                 "model_id": cap.get("active_model_id") or "UNAVAILABLE",
                 "registry_active_version": reg.active_version_id if reg else None,
-                "registry_checkpoint_sha256": (reg.get_active() or {}).get("checkpoint_sha256") if reg else None,
+                "registry_checkpoint_sha256": (reg.get_active() or {}).get("checkpoint_sha256") if reg and privileged else None,
             },
             "counts": {
                 "accessible_memory_records": len(accessible_mem),
@@ -103,12 +105,12 @@ def create_observatory_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIR
                 "knowledge_graph_relations": mem.storage.health().get("relations_count", 0),
                 "registered_agents": len(agents_list),
                 "running_tasks": len(running_tasks),
-                "registered_peers": len(active_peers),
-                "trusted_peers": len(trusted_peers),
-                "bootstrap_peer_urls": len(getattr(p2p, "peers", [])),
+                "registered_peers": len(active_peers) if privileged else None,
+                "trusted_peers": len(trusted_peers) if privileged else None,
+                "bootstrap_peer_urls": len(getattr(p2p, "peers", [])) if privileged else None,
                 "reasoning_traces_recorded": len(cognition.history),
                 "recent_learning_events": len(recent_events),
-                "ledger_height": len(rt["blockchain"].chain),
+                "ledger_height": len(rt["blockchain"].chain) if privileged else None,
             },
             "subsystems": subsystems,
         }
@@ -205,8 +207,16 @@ def create_observatory_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIR
 
             # Group F: DISTRIBUTED NETWORK
             {"id": "net-local", "label": "Local Sovereign Node", "group": "DISTRIBUTED_NETWORK", "status": "HEALTHY", "active": True,
-             "description": f"Ed25519 identity {rt['identity'].node_id[:16]}... with fail-closed key persistence.",
-             "metrics": {"node_id": rt["identity"].node_id, "key_version": rt["identity"].key_version}},
+             "description": (
+                 f"Ed25519 identity {rt['identity'].node_id[:16]}... with fail-closed key persistence."
+                 if ctx.actor_role in ("admin", "operator")
+                 else "Ed25519 node identity is hidden from anonymous callers."
+             ),
+             "metrics": (
+                 {"node_id": rt["identity"].node_id, "key_version": rt["identity"].key_version}
+                 if ctx.actor_role in ("admin", "operator")
+                 else {"node_id": None, "redacted": True}
+             )},
             {"id": "net-agents", "label": "Autonomous Agents", "group": "DISTRIBUTED_NETWORK", "status": "HEALTHY", "active": has_active_tasks,
              "description": "Planner, Researcher, Analyst, and Verifier agents with bounded budgets.",
              "metrics": {"registered": len(scheduler.list_agents()), "tasks": len(scheduler.tasks)}},
@@ -634,45 +644,48 @@ def create_observatory_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIR
         p2p = rt["p2p"]
         federation = rt.get("federation")
 
+        privileged = rt["auth"].resolve_optional_actor(request)["role"] in ("admin", "operator")
         local_fp = hashlib.sha256(identity.node_id.encode("utf-8")).hexdigest()[:16]
-        orgs = federation.list_organizations() if federation else []
+        orgs = federation.list_organizations() if federation and privileged else []
         org_by_node = {o["node_id"]: o for o in orgs}
 
         peers = []
-        for p in discovery.list_active_peers():
-            nid = p.get("node_id", "")
-            trust = p.get("trust_state", "PENDING")
-            is_rev = identity.is_revoked(nid)
-            org_info = org_by_node.get(nid)
-            peers.append({
-                "node_id": nid,
-                "fingerprint": hashlib.sha256(nid.encode("utf-8")).hexdigest()[:16] if nid else "N/A",
-                "node_name": p.get("node_name", "peer"),
-                "endpoint": p.get("endpoint", ""),
-                "connection_status": "DISCONNECTED" if is_rev else "CONNECTED",
-                "trust_status": "REVOKED" if is_rev else trust,
-                "organization": org_info["org_name"] if org_info else "UNVERIFIED_OPERATOR",
-                "organization_type": org_info["org_type"] if org_info else None,
-                "last_heartbeat": _iso_ts(p.get("last_seen")),
-                "capabilities": p.get("capabilities", []),
-            })
+        if privileged:
+            for p in discovery.list_active_peers():
+                nid = p.get("node_id", "")
+                trust = p.get("trust_state", "PENDING")
+                is_rev = identity.is_revoked(nid)
+                org_info = org_by_node.get(nid)
+                peers.append({
+                    "node_id": nid,
+                    "fingerprint": hashlib.sha256(nid.encode("utf-8")).hexdigest()[:16] if nid else "N/A",
+                    "node_name": p.get("node_name", "peer"),
+                    "endpoint": p.get("endpoint", ""),
+                    "connection_status": "DISCONNECTED" if is_rev else "CONNECTED",
+                    "trust_status": "REVOKED" if is_rev else trust,
+                    "organization": org_info["org_name"] if org_info else "UNVERIFIED_OPERATOR",
+                    "organization_type": org_info["org_type"] if org_info else None,
+                    "last_heartbeat": _iso_ts(p.get("last_seen")),
+                    "capabilities": p.get("capabilities", []),
+                })
 
         return {
             "timestamp": _iso_ts(time.time()),
             "local_node": {
-                "node_id": identity.node_id,
-                "fingerprint": local_fp,
-                "key_version": identity.key_version,
+                "node_id": identity.node_id if privileged else None,
+                "fingerprint": local_fp if privileged else None,
+                "key_version": identity.key_version if privileged else None,
                 "connection_status": "CONNECTED",
                 "trust_status": "TRUSTED",
-                "ledger_height": len(rt["blockchain"].chain),
-                "revoked_peers_count": len(identity.revoked_node_ids),
+                "ledger_height": len(rt["blockchain"].chain) if privileged else None,
+                "revoked_peers_count": len(identity.revoked_node_ids) if privileged else None,
             },
-            "bootstrap_urls": list(getattr(p2p, "peers", [])),
-            "registered_peers_count": len(peers),
-            "trusted_peers_count": sum(1 for p in peers if p["trust_status"] == "TRUSTED"),
+            "bootstrap_urls": list(getattr(p2p, "peers", [])) if privileged else [],
+            "registered_peers_count": len(peers) if privileged else None,
+            "trusted_peers_count": sum(1 for p in peers if p["trust_status"] == "TRUSTED") if privileged else None,
             "federation_organizations": orgs,
             "peers": peers,
+            "redacted": not privileged,
         }
 
     # ─── 9. /api/v2/observatory/events & SSE /stream ──────────────────────────

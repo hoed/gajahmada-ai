@@ -130,21 +130,23 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
     # ─── 1. /api/v2/intelligence ──────────────────────────────────────────────
     @router.get("/intelligence")
     @router.get("/intelligence/diagnose")
-    def intelligence_diagnose():
+    def intelligence_diagnose(request: Request):
         rt = get_runtime()
         engine = rt["engine"]
         memory = rt["memory"]
         scheduler = rt["scheduler"]
         identity = rt["identity"]
+        privileged = rt["auth"].resolve_optional_actor(request)["role"] in ("admin", "operator")
         return {
             "version": "2.0.0",
-            "node_id": identity.node_id,
-            "key_version": identity.key_version,
+            "node_id": identity.node_id if privileged else None,
+            "key_version": identity.key_version if privileged else None,
             "capabilities": engine.capability_status(),
-            "memory_summary": memory.stats(),
+            "memory_summary": memory.stats() if privileged else None,
             "agents_registered": len(scheduler.list_agents()),
             "offline_capable": True,
             "external_ai_providers_mandatory": False,
+            "redacted": not privileged,
         }
 
     @router.post("/intelligence/ask")
@@ -956,16 +958,24 @@ def create_v2_router(get_runtime: Callable[[], Dict[str, Any]]) -> APIRouter:
         return {"accepted": True, "ack": ack.model_dump()}
 
     @router.get("/nodes")
-    def list_nodes():
+    def list_nodes(request: Request):
         rt = get_runtime()
         discovery = rt["discovery"]
         identity = rt["identity"]
+        privileged = rt["auth"].resolve_optional_actor(request)["role"] in ("admin", "operator")
+        if not privileged:
+            return {
+                "self_node": {"node_id": None, "key_version": None},
+                "peers": [],
+                "redacted": True,
+            }
         return {
             "self_node": {
                 "node_id": identity.node_id,
                 "key_version": identity.key_version,
             },
             "peers": discovery.list_active_peers(),
+            "redacted": False,
         }
 
     @router.post("/nodes/register")

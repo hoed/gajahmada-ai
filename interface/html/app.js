@@ -183,7 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function syncServerLogs() {
     try {
-      const res = await fetch(`${API_URL}/node/logs`);
+      const res = await fetch(`${API_URL}/node/logs`, { headers: getAuthHeaders() });
       if (!res.ok) return;
       const data = await res.json();
       if (Array.isArray(data.logs)) {
@@ -976,7 +976,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = await res.json();
         if (elSdDesc) elSdDesc.textContent = `LIVE OK: ${data.total_docs} dokumen terindeks (${data.dimension}-d ${data.engine})`;
       } else if (skillName === 'AIBlockchain' || skillName === 'SHA256-PoW' || skillName === 'GET /node/chain') {
-        const res = await fetch(`${API_URL}/node/chain`);
+        const res = await fetch(`${API_URL}/node/chain`, { headers: getAuthHeaders() });
         const data = await res.json();
         const latest = data.chain?.[data.chain.length - 1];
         if (elSdDesc) elSdDesc.textContent = `LIVE OK: Height=${data.height} blks · Valid=${data.valid} · Latest=${latest?.hash?.substring(0, 18)}...`;
@@ -989,11 +989,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = await res.json();
         if (elSdDesc) elSdDesc.textContent = `LIVE OK: Ed25519 Verified=${data.verified} · Sig=${data.signature?.substring(0, 22)}...`;
       } else if (skillName === 'P2PNetwork' || skillName === 'POST /node/sync') {
-        const res = await fetch(`${API_URL}/node/peers`);
+        const res = await fetch(`${API_URL}/node/peers`, { headers: getAuthHeaders() });
         const data = await res.json();
         if (elSdDesc) elSdDesc.textContent = `LIVE OK: ${data.peers?.length || 0} active peer(s): ${(data.peers || []).join(', ') || 'local-mesh'}`;
       } else {
-        const res = await fetch(`${API_URL}/node/info`);
+        const res = await fetch(`${API_URL}/node/info`, { headers: getAuthHeaders() });
         const data = await res.json();
         const ms = (performance.now() - t0).toFixed(1);
         if (elSdDesc) elSdDesc.textContent = `LIVE OK (${ms}ms): Node=${data.node_name || 'gajahmada-alpha'} · Mode=${data.mode} · Uptime=${data.uptime_sec || 0}s`;
@@ -1150,7 +1150,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const res = await fetch(`${API_URL}/security/sign-verify`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ message: `gajahmada-auth-${Date.now()}` }),
       });
       if (res.ok) {
@@ -1210,7 +1210,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function verifyBlockchainLedger(quiet = false) {
     try {
-      const res = await fetch(`${API_URL}/node/chain/verify`, { method: 'POST' });
+      const res = await fetch(`${API_URL}/node/chain/verify`, { method: 'POST', headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         const chainLog = document.getElementById('chain-status-log');
@@ -2045,14 +2045,17 @@ document.addEventListener('DOMContentLoaded', () => {
   // Live Backend Telemetry Polling
   async function fetchNodeInfo() {
     try {
-      const res = await fetch(`${API_URL}/node/info`);
+      const res = await fetch(`${API_URL}/node/info`, { headers: getAuthHeaders() });
       if (!res.ok) return;
       const data = await res.json();
       if (data.system_time?.epoch) {
         serverTimeOffsetMs = data.system_time.epoch * 1000 - Date.now();
         updateClock();
       }
-      if (data.node_id) {
+      if (data.redacted || !data.node_id) {
+        if (elHdrNodeId) elHdrNodeId.textContent = 'REDACTED';
+        if (elTxtIdentShort) elTxtIdentShort.textContent = 'AUTH';
+      } else {
         const shortId = data.node_id.substring(0, 10);
         if (elHdrNodeId) elHdrNodeId.textContent = shortId;
         if (elTxtIdentShort) elTxtIdentShort.textContent = shortId;
@@ -2061,11 +2064,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (elHdrNodeState) elHdrNodeState.textContent = '● ONLINE';
       if (data.uptime_sec !== undefined && elHdrUptime) elHdrUptime.textContent = `UP ${Math.round(data.uptime_sec)}s`;
 
-      const height = data.blockchain_height ?? 1;
-      if (elHdrBlocks) elHdrBlocks.textContent = height;
-      if (elTxtChainHeight) elTxtChainHeight.textContent = `${height} blk`;
+      const height = data.blockchain_height;
+      if (elHdrBlocks) elHdrBlocks.textContent = height == null ? '—' : height;
+      if (elTxtChainHeight) elTxtChainHeight.textContent = height == null ? '—' : `${height} blk`;
       const pcTagChain = document.getElementById('pc-tag-chain');
-      if (pcTagChain) pcTagChain.textContent = `${height} blk`;
+      if (pcTagChain) pcTagChain.textContent = height == null ? 'auth' : `${height} blk`;
 
       if (data.pow_difficulty) {
         currentDiff = data.pow_difficulty;
@@ -2105,6 +2108,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.addEventListener('click', async () => {
               await fetch(`${API_URL}/node/peers?peer=${encodeURIComponent(btn.dataset.removePeer)}`, {
                 method: 'DELETE',
+                headers: getAuthHeaders(),
               });
               fetchNodeInfo();
               syncServerLogs();
@@ -2120,7 +2124,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function fetchMetrics() {
     if (document.hidden) return;
     try {
-      const res = await fetch(`${API_URL}/node/metrics`);
+      const res = await fetch(`${API_URL}/node/metrics`, { headers: getAuthHeaders() });
       if (!res.ok) return;
       const data = await res.json();
       const cpu = Math.max(4, Math.min(Math.round(data.cpu_usage || 12), 100));
@@ -2135,7 +2139,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchChain() {
     try {
-      const res = await fetch(`${API_URL}/node/chain`);
+      const res = await fetch(`${API_URL}/node/chain`, { headers: getAuthHeaders() });
       if (!res.ok) return;
       const data = await res.json();
       if (elBadgeValid) elBadgeValid.textContent = data.valid ? '✓ CHAIN VALID' : '✗ INVALID';
@@ -2724,7 +2728,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     try {
-      const infoRes = await fetch(`${API_URL}/node/info`);
+      const infoRes = await fetch(`${API_URL}/node/info`, { headers: getAuthHeaders() });
       const info = await infoRes.json();
       const res = await fetch(`${API_URL}/api/v2/federation/organizations`, {
         method: 'POST',

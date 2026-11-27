@@ -59,6 +59,47 @@ def test_anonymous_cannot_see_legacy_user_qa_but_admin_can(client: TestClient):
     assert admin["user_qa_entries_hidden"] == 0
 
 
+def test_anonymous_chat_does_not_mutate_memory_or_ledger(client: TestClient):
+    secret = f"rahasia-{uuid.uuid4().hex[:10]}"
+    docs_before = len(server.rag.doc_store)
+    mem_before = server.memory_manager.storage.health()["active_records"]
+    height_before = len(server.blockchain.chain)
+
+    r = client.post("/ai/chat", json={"prompt": f"Berapa 17 * 3? {secret}"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["block_index"] == 0
+    assert body["brain_record_id"] is None
+    assert "51" in body["response"]
+
+    assert not any(secret in d for d in server.rag.doc_store)
+    assert len(server.rag.doc_store) == docs_before
+    assert server.memory_manager.storage.health()["active_records"] == mem_before
+    assert len(server.blockchain.chain) == height_before
+
+
+def test_public_node_surfaces_redact_identity(client: TestClient):
+    info = client.get("/node/info").json()
+    assert info["redacted"] is True
+    assert info["node_id"] is None
+    assert info["peers"] == []
+    assert info["blockchain_height"] is None
+
+    peers = client.get("/node/peers").json()
+    assert peers["redacted"] is True
+    assert peers["peers"] == []
+
+    chain = client.get("/node/chain").json()
+    assert chain["redacted"] is True
+    assert chain["chain"] == []
+    assert chain["height"] is None
+
+    full = client.get("/node/info", headers=_admin()).json()
+    assert full["redacted"] is False
+    assert full["node_id"]
+    assert isinstance(full["blockchain_height"], int)
+
+
 def test_public_corpus_remains_available_to_anonymous(client: TestClient):
     stats = client.get("/knowledge/stats").json()
     assert stats["total_docs"] >= 15

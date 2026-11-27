@@ -207,13 +207,17 @@ def ensure_initialized():
 
     if governance_policy is None:
         governance_policy = GovernancePolicy()
+        allow_local_env = os.environ.get("GAJAHMADA_ALLOW_LOCAL_PEERS", "").strip().lower()
+        if IS_VERCEL and allow_local_env not in ("1", "true", "yes"):
+            governance_policy.allow_local_peers = False
 
     if auth_manager is None:
-        admin_key_path = os.path.join(storage_dir, "admin_api.key")
+        admin_key_path = None if IS_VERCEL else os.path.join(storage_dir, "admin_api.key")
         auth_manager = AuthManager(
             identity=identity,
             audit_logger=audit_logger,
             admin_key_file=admin_key_path,
+            allow_generated_key=not IS_VERCEL,
         )
 
     if rate_limiter is None:
@@ -231,7 +235,11 @@ def ensure_initialized():
 
     if p2p is None:
         node_cfg = runtime_config.get("node", {})
-        p2p = P2PNetwork(node_cfg.get("host", "0.0.0.0"), int(node_cfg.get("port", 8000)))
+        p2p = P2PNetwork(
+            node_cfg.get("host", "0.0.0.0"),
+            int(node_cfg.get("port", 8000)),
+            allow_local=bool(governance_policy.allow_local_peers) if governance_policy else not IS_VERCEL,
+        )
         for bp in runtime_config.get("network", {}).get("bootstrap_peers", []):
             p2p.add_peer(bp)
         record_log("network.p2p", "OK", f"P2PNetwork active with {len(p2p.peers)} bootstrap peer(s)")
@@ -621,6 +629,11 @@ def _is_privileged_actor(actor_info: Optional[Dict[str, str]]) -> bool:
     return bool(actor_info) and actor_info.get("role") in _PRIVILEGED_ROLES
 
 
+def _actor_is_privileged(request: Request) -> bool:
+    actor = auth_manager.resolve_optional_actor(request) if auth_manager else {"role": "anonymous"}
+    return _is_privileged_actor(actor)
+
+
 def _is_user_qa_entry(doc: str) -> bool:
     """Legacy RAG entries written from user conversations (never public corpus knowledge)."""
     return isinstance(doc, str) and doc.lstrip().startswith(_USER_QA_PREFIX)
@@ -712,114 +725,88 @@ async def ai_chat(req: ChatRequest, request: Request):
         learning_manager.record_outcome_and_adapt(
             objective=req.prompt,
             reasoning_res=reasoning_res,
-            memory_manager=memory_manager,
+            memory_manager=memory_manager if _is_privileged_actor(actor_info) else None,
             rag_matches=matched_docs,
         )
         if learning_manager
         else {"strategy_version": 1, "retrieval_top_k": active_top_k, "procedural_record_id": None, "adaptation_triggered": False}
     )
 
-    # Persist every question & answer interaction into the GajahMada Brain (RAG Vector Store + 5-Tier Memory)
+    # Anonymous /ai/chat is read-only: no shared RAG, memory, ledger, or Supabase writes.
+    # Privileged chats stay in LOCAL quarantine. Symbolic VERIFIED answers are never
+    # auto-promoted to COLLECTIVE or synced to Supabase.
     brain_record_id = None
-    try:
-        crawled_info = getattr(engine, "last_crawled_knowledge", None) if engine else None
-        if crawled_info and crawled_info.get("extract"):
-            knowledge_entry = f"{crawled_info['title']}: {crawled_info['extract']} (Referensi: {crawled_info.get('source_url', '')})"
-            src_type = "internet_knowledge_crawler"
-        else:
-            clean_resp = response.split("\n\n---\n📚")[0].strip()
-            knowledge_entry = f"Pertanyaan: {req.prompt.strip()} | Jawaban: {clean_resp}"
-            src_type = "cognitive_brain_qa_update"
-
-        # 1. Update 384-d Vector RAG Store (docs.json) if not already present and not a generic fallback
-        is_generic_fallback = (
-            "Permintaan telah diproses oleh **GajahMada Hybrid Cognitive Engine**" in response
-            or "Belum ada data spesifik untuk" in response
-        )
-        # Anonymous/low-privilege conversations must NOT write into the shared legacy RAG store
-        # (prevents knowledge poisoning and cross-user leakage); they stay in scoped MemoryManager.
-        may_write_shared_rag = src_type != "cognitive_brain_qa_update" or _is_privileged_actor(actor_info)
-        if rag and engine and may_write_shared_rag and not is_generic_fallback and knowledge_entry not in rag.doc_store:
-            k_emb = engine.create_embedding(knowledge_entry)
-            if k_emb:
-                rag.ingest(knowledge_entry, k_emb)
-                rag.flush()
-
-        # 2. Persist Q&A with P2 Knowledge Quarantine Policy:
-        #    Unverified LLM/crawler outputs enter LOCAL Quarantine (UNVERIFIED),
-        #    never directly into COLLECTIVE memory until independently verified.
-        can_promote_collective = (
-            not is_generic_fallback
-            and reasoning_res.verification_status == "VERIFIED"
-            and float(reasoning_res.confidence) >= 0.85
-            and not reasoning_res.contradictions
-        )
-        if memory_manager:
-            target_tier = MemoryType.EPISODIC if is_generic_fallback else MemoryType.SEMANTIC
-            rec = memory_manager.store(
-                content=knowledge_entry,
-                memory_type=target_tier,
-                origin_node_id=identity.node_id if identity else "local",
-                source_type=src_type,
-                author="cognitive_brain",
-                confidence=reasoning_res.confidence,
-                verification_status=(
-                    VerificationStatus.VERIFIED if can_promote_collective else VerificationStatus.UNVERIFIED
-                ),
-                visibility_policy=(
-                    VisibilityPolicy.COLLECTIVE if can_promote_collective else VisibilityPolicy.LOCAL
-                ),
-            )
-            brain_record_id = rec["record_id"]
-            memory_manager.working.push({
-                "record_id": brain_record_id,
-                "question": req.prompt.strip(),
-                "answer_preview": response[:240],
-                "confidence": reasoning_res.confidence,
-                "timestamp": start,
-            })
-        # 3. Sync ONLY verified COLLECTIVE knowledge to Supabase pgvector (never quarantined/unverified)
-        if supabase_store and supabase_store.configured and can_promote_collective:
-            k_emb_sb = engine.create_embedding(knowledge_entry) if engine else None
-            sig_sb = identity.sign_message(knowledge_entry.encode("utf-8")) if identity else ""
-            supabase_store.upsert_knowledge(
-                content=knowledge_entry,
-                embedding=k_emb_sb,
-                source_type=src_type,
-                source_url=(crawled_info.get("source_url", "") if crawled_info else ""),
-                origin_node_id=identity.node_id if identity else "local",
-                signature=sig_sb,
-                confidence=reasoning_res.confidence,
-                verification_status="VERIFIED",
-                visibility="COLLECTIVE",
-            )
-        record_log("memory.brain", "OK", f"Brain knowledge updated from question '{req.prompt[:32]}' (id={brain_record_id}, docs={len(rag.doc_store) if rag else 0})")
-    except Exception as e:
-        record_log("memory.brain", "WARN", f"Brain knowledge update warning: {e}")
-
-    task_hash = hashlib.sha256((req.prompt + response).encode()).hexdigest()
-    signature = ""
     block_idx = 0
-
-    if blockchain and identity:
+    signature = ""
+    if _is_privileged_actor(actor_info):
         try:
-            # P0 Strict Schema v2: ALL new blocks go through record_event() with full-envelope Ed25519 signature
-            block = blockchain.record_event(
-                event_type=LedgerEventType.TASK_COMPLETED,
-                content_reference=f"{reasoning_res.reasoning_id}|{task_hash[:16]}",
-                identity=identity,
-                metadata={
-                    "reasoning_id": reasoning_res.reasoning_id,
-                    "task_hash": task_hash,
-                    "verification_status": reasoning_res.verification_status,
-                },
+            crawled_info = getattr(engine, "last_crawled_knowledge", None) if engine else None
+            if crawled_info and crawled_info.get("extract"):
+                knowledge_entry = f"{crawled_info['title']}: {crawled_info['extract']} (Referensi: {crawled_info.get('source_url', '')})"
+                src_type = "internet_knowledge_crawler"
+            else:
+                clean_resp = response.split("\n\n---\n📚")[0].strip()
+                knowledge_entry = f"Pertanyaan: {req.prompt.strip()} | Jawaban: {clean_resp}"
+                src_type = "cognitive_brain_qa_update"
+
+            is_generic_fallback = (
+                "Permintaan telah diproses oleh **GajahMada Hybrid Cognitive Engine**" in response
+                or "Belum ada data spesifik untuk" in response
             )
-            block_idx = block.index
-            signature = block.signature
-            if supabase_store and supabase_store.configured:
-                supabase_store.upsert_block(block.to_dict())
+            if (
+                rag
+                and engine
+                and src_type != "cognitive_brain_qa_update"
+                and not is_generic_fallback
+                and knowledge_entry not in rag.doc_store
+            ):
+                k_emb = engine.create_embedding(knowledge_entry)
+                if k_emb:
+                    rag.ingest(knowledge_entry, k_emb)
+                    rag.flush()
+
+            if memory_manager and not is_generic_fallback:
+                rec = memory_manager.store(
+                    content=knowledge_entry,
+                    memory_type=MemoryType.SEMANTIC,
+                    origin_node_id=identity.node_id if identity else "local",
+                    source_type=src_type,
+                    author=actor_info.get("actor", "operator"),
+                    confidence=reasoning_res.confidence,
+                    verification_status=VerificationStatus.UNVERIFIED,
+                    visibility_policy=VisibilityPolicy.LOCAL,
+                )
+                brain_record_id = rec["record_id"]
+                memory_manager.working.push({
+                    "record_id": brain_record_id,
+                    "question": req.prompt.strip(),
+                    "answer_preview": response[:240],
+                    "confidence": reasoning_res.confidence,
+                    "timestamp": start,
+                })
+            record_log("memory.brain", "OK", f"Brain knowledge quarantined locally (id={brain_record_id})")
         except Exception as e:
-            record_log("blockchain.chain", "WARN", f"Block mining error: {e}")
+            record_log("memory.brain", "WARN", f"Brain knowledge update warning: {e}")
+
+        task_hash = hashlib.sha256((req.prompt + response).encode()).hexdigest()
+        if blockchain and identity:
+            try:
+                block = blockchain.record_event(
+                    event_type=LedgerEventType.TASK_COMPLETED,
+                    content_reference=f"{reasoning_res.reasoning_id}|{task_hash[:16]}",
+                    identity=identity,
+                    metadata={
+                        "reasoning_id": reasoning_res.reasoning_id,
+                        "task_hash": task_hash,
+                        "verification_status": "QUARANTINED",
+                    },
+                )
+                block_idx = block.index
+                signature = block.signature
+            except Exception as e:
+                record_log("blockchain.chain", "WARN", f"Block mining error: {e}")
+    else:
+        task_hash = hashlib.sha256((req.prompt + response).encode()).hexdigest()
 
     elapsed = round(time.time() - start, 3)
     record_log(
@@ -1024,35 +1011,40 @@ def delete_knowledge_doc(doc_idx: int, request: Request):
 
 # ─── Node, Network, Config, Dependencies & Diagnostics Endpoints ──────────
 @app.get("/node/info")
-def node_info():
+def node_info(request: Request):
     ensure_initialized()
     cap = engine.capability_status() if engine else {}
-    return {
-        "node_id": identity.node_id if identity else "uninitialized",
+    privileged = _actor_is_privileged(request)
+    payload = {
+        "node_id": identity.node_id if identity and privileged else None,
         "node_name": runtime_config.get("node", {}).get("name", "gajahmada-alpha"),
-        "peers": list(p2p.peers) if p2p else [],
-        "blockchain_height": len(blockchain.chain) if blockchain else 0,
+        "peers": list(p2p.peers) if p2p and privileged else [],
+        "blockchain_height": len(blockchain.chain) if blockchain and privileged else None,
         "blockchain_valid": blockchain.is_chain_valid() if blockchain else True,
         "ledger_status": blockchain.status if blockchain else "UNKNOWN",
         "pow_difficulty": blockchain.difficulty if blockchain else 2,
         "knowledge_docs": len(rag.doc_store) if rag else 0,
         "mode": "serverless" if IS_VERCEL else "full",
-        "ml_ready": engine is not None,
+        "ml_ready": engine is not None and bool(cap.get("neural_inference_active")),
         "neural_inference_active": cap.get("neural_inference_active", False),
         "symbolic_reasoning_active": True,
         "active_neural_backend": cap.get("active_neural_backend"),
         "active_model_id": cap.get("active_model_id"),
-        "supabase_configured": supabase_store.configured if supabase_store else False,
-        "memory_tiers": memory_manager.stats()["tiers"] if memory_manager else {},
+        "supabase_configured": bool(supabase_store.configured) if supabase_store and privileged else None,
+        "memory_tiers": memory_manager.stats()["tiers"] if memory_manager and privileged else {},
         "uptime_sec": round(time.time() - START_TIME, 1),
         "system_time": get_system_time_info(),
+        "redacted": not privileged,
     }
+    return payload
 
 
 @app.get("/node/peers")
-def get_peers():
+def get_peers(request: Request):
     ensure_initialized()
-    return {"peers": list(p2p.peers) if p2p else []}
+    if not _actor_is_privileged(request):
+        return {"peers": [], "redacted": True}
+    return {"peers": list(p2p.peers) if p2p else [], "redacted": False}
 
 
 @app.post("/node/sync")
@@ -1116,7 +1108,7 @@ async def broadcast_to_peers(req: BroadcastRequest, request: Request):
 
 
 @app.get("/node/metrics")
-def node_metrics():
+def node_metrics(request: Request):
     ensure_initialized()
     try:
         import psutil
@@ -1132,23 +1124,28 @@ def node_metrics():
         "memory_usage": mem,
         "disk_read_mb": disk_read_mb,
         "knowledge_docs": len(rag.doc_store) if rag else 0,
-        "chain_height": len(blockchain.chain) if blockchain else 1,
+        "chain_height": len(blockchain.chain) if blockchain and _actor_is_privileged(request) else None,
         "pow_difficulty": blockchain.difficulty if blockchain else 2,
-        "peers_count": len(p2p.peers) if p2p else 0,
+        "peers_count": len(p2p.peers) if p2p and _actor_is_privileged(request) else None,
         "neural_inference_active": engine.is_neural_active() if engine else False,
         "time": time.time(),
+        "redacted": not _actor_is_privileged(request),
     }
 
 
 @app.get("/node/chain")
-def get_chain():
+def get_chain(request: Request):
     ensure_initialized()
     valid = blockchain.is_chain_valid()
+    privileged = _actor_is_privileged(request)
+    if not privileged:
+        return {"chain": [], "valid": valid, "height": None, "difficulty": None, "redacted": True}
     return {
         "chain": [b.to_dict() for b in blockchain.chain],
         "valid": valid,
         "height": len(blockchain.chain),
         "difficulty": blockchain.difficulty,
+        "redacted": False,
     }
 
 
@@ -1168,28 +1165,31 @@ def mine_manual_block(req: MineBlockRequest, request: Request):
 
 
 @app.post("/node/chain/verify")
-def verify_full_chain():
+def verify_full_chain(request: Request):
     ensure_initialized()
     is_valid = blockchain.is_chain_valid(verify_signatures=True)
+    privileged = _actor_is_privileged(request)
     sig_verified = 0
-    for b in blockchain.chain[1:]:
-        if b.signature and blockchain.verify_block_signature(b):
-            sig_verified += 1
+    if privileged:
+        for b in blockchain.chain[1:]:
+            if b.signature and blockchain.verify_block_signature(b):
+                sig_verified += 1
     record_log(
         "blockchain.chain",
         "OK" if is_valid else "ERR",
-        f"Chain audit complete: valid={is_valid}, height={len(blockchain.chain)}, verified_sigs={sig_verified}",
+        f"Chain audit complete: valid={is_valid}",
     )
     return {
         "valid": is_valid,
-        "height": len(blockchain.chain),
-        "difficulty": blockchain.difficulty,
-        "verified_signatures": sig_verified,
+        "height": len(blockchain.chain) if privileged else None,
+        "difficulty": blockchain.difficulty if privileged else None,
+        "verified_signatures": sig_verified if privileged else None,
+        "redacted": not privileged,
     }
 
 
 @app.post("/security/sign-verify")
-def security_sign_verify(req: SignVerifyRequest):
+def security_sign_verify(req: SignVerifyRequest, request: Request):
     """
     P0 Security Remediation (Signing Oracle Eliminated):
     Verifies Ed25519 (RFC 8032) cryptographic primitives using an isolated ephemeral
@@ -1203,15 +1203,17 @@ def security_sign_verify(req: SignVerifyRequest):
     challenge = f"GAJAHMADA_SELFTEST_V2|{_secrets.token_hex(16)}|{msg_digest}".encode("utf-8")
     signature = ephemeral.sign_message(challenge)
     verified = ephemeral.verify_message(challenge, signature, ephemeral.node_id)
+    privileged = _actor_is_privileged(request)
     record_log("security.crypto", "OK", f"Ed25519 isolated self-test: verified={verified}")
     return {
-        "node_id": identity.node_id,
+        "node_id": identity.node_id if privileged else None,
         "selftest_ephemeral_key_id": ephemeral.node_id,
         "message_sha256": msg_digest,
         "signature": signature,
         "verified": verified,
         "algorithm": "Ed25519 (RFC 8032)",
         "oracle_protected": True,
+        "redacted": not privileged,
     }
 
 

@@ -61,8 +61,17 @@ def test_observatory_overview_and_brain_graph(client: TestClient):
     ov = client.get("/api/v2/observatory/overview")
     assert ov.status_code == 200
     data = ov.json()
-    assert data["node_id"]
+    assert data["identity_redacted"] is True
+    assert data["node_id"] is None
+    assert data["counts"]["ledger_height"] is None
     assert data["system_status"] in ("HEALTHY", "DEGRADED")
+    admin = client.get(
+        "/api/v2/observatory/overview",
+        headers={"X-API-Key": server.auth_manager.admin_api_key},
+    )
+    assert admin.status_code == 200
+    assert admin.json()["node_id"]
+    assert admin.json()["counts"]["ledger_height"] is not None
     assert "counts" in data
     assert "subsystems" in data
     assert "active_runtime_model" in data
@@ -206,8 +215,15 @@ def test_observatory_learning_agents_nodes_events(client: TestClient):
     nd = client.get("/api/v2/observatory/nodes")
     assert nd.status_code == 200
     ndata = nd.json()
-    assert ndata["local_node"]["node_id"]
-    assert "peers" in ndata
+    assert ndata["redacted"] is True
+    assert ndata["local_node"]["node_id"] is None
+    assert ndata["peers"] == []
+    admin_nd = client.get(
+        "/api/v2/observatory/nodes",
+        headers={"X-API-Key": server.auth_manager.admin_api_key},
+    )
+    assert admin_nd.json()["local_node"]["node_id"]
+    assert "peers" in admin_nd.json()
 
     ev = client.get("/api/v2/observatory/events?limit=20")
     assert ev.status_code == 200

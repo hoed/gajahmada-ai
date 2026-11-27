@@ -450,7 +450,8 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchJson('/api/v2/observatory/brain'),
       ]);
       setOnlineState(true);
-      document.getElementById('obs-node-subtitle').textContent = `NODE ${ov.node_id.slice(0, 14)}... · ROLE: ${ov.actor_role.toUpperCase()}`;
+      const nid = ov.node_id || 'REDACTED';
+      document.getElementById('obs-node-subtitle').textContent = `NODE ${String(nid).slice(0, 14)} · ROLE: ${ov.actor_role.toUpperCase()}`;
       const m = ov.active_runtime_model;
       document.getElementById('txt-active-model').textContent = m.neural_inference_active
         ? `${m.model_id} (${m.backend})`
@@ -460,8 +461,10 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('kpi-ext').textContent = ov.counts.accessible_external_chunks;
       document.getElementById('kpi-kg').textContent = ov.counts.knowledge_graph_relations;
       document.getElementById('kpi-agents').textContent = `${ov.counts.running_tasks} / ${ov.counts.registered_agents}`;
-      document.getElementById('kpi-peers').textContent = `${ov.counts.trusted_peers} / ${ov.counts.registered_peers}`;
-      document.getElementById('kpi-ledger').textContent = ov.counts.ledger_height;
+      document.getElementById('kpi-peers').textContent = ov.counts.trusted_peers == null
+        ? '—'
+        : `${ov.counts.trusted_peers} / ${ov.counts.registered_peers}`;
+      document.getElementById('kpi-ledger').textContent = ov.counts.ledger_height ?? '—';
 
       const healthEl = document.getElementById('brain-health-list');
       healthEl.innerHTML = Object.entries(ov.subsystems || {}).map(([k, v]) => `
@@ -646,20 +649,22 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('dist-summary-pill').textContent =
         `LOCAL + ${data.registered_peers_count} PEERS (${data.trusted_peers_count} TRUSTED)`;
 
+      const localId = data.local_node.node_id || data.local_node.fingerprint || 'local';
       const gNodes = [{
-        id: data.local_node.node_id,
+        id: localId,
         label: 'LOCAL NODE',
-        fingerprint: data.local_node.fingerprint,
+        fingerprint: data.local_node.fingerprint || 'REDACTED',
         connection_status: 'CONNECTED',
         trust_status: 'LOCAL',
         organization: 'Sovereign Local Operator',
-        endpoint: window.location.origin,
+        endpoint: data.redacted ? 'hidden' : window.location.origin,
       }];
       const gEdges = [];
-      data.peers.forEach((p) => {
+      (data.peers || []).forEach((p, i) => {
+        const peerId = p.node_id || p.fingerprint || `peer-${i}`;
         gNodes.push({
-          id: p.node_id,
-          label: p.node_name || p.node_id.slice(0, 12),
+          id: peerId,
+          label: p.node_name || (p.node_id ? p.node_id.slice(0, 12) : 'peer'),
           fingerprint: p.fingerprint,
           connection_status: p.connection_status,
           trust_status: p.trust_status,
@@ -668,8 +673,8 @@ document.addEventListener('DOMContentLoaded', () => {
           last_heartbeat: p.last_heartbeat,
         });
         gEdges.push({
-          source: data.local_node.node_id,
-          target: p.node_id,
+          source: localId,
+          target: peerId,
           active: p.trust_status === 'TRUSTED' && p.connection_status === 'CONNECTED',
         });
       });

@@ -57,11 +57,15 @@ class P2PNetwork:
         """Broadcast signed payload to all peers with timeout."""
         if not self.peers:
             return []
-        async with httpx.AsyncClient(timeout=_DEFAULT_TIMEOUT) as client:
-            tasks = [
-                client.post(f"{peer}{endpoint}", json=data)
-                for peer in list(self.peers)
-            ]
+        async with httpx.AsyncClient(timeout=_DEFAULT_TIMEOUT, follow_redirects=False) as client:
+            tasks = []
+            for peer in list(self.peers):
+                ok, _reason = validate_peer_url(peer, allow_local=self.allow_local)
+                if not ok:
+                    continue
+                tasks.append(client.post(f"{peer}{endpoint}", json=data))
+            if not tasks:
+                return []
             return await asyncio.gather(*tasks, return_exceptions=True)
 
     async def sync_peers(self, bootstrap_peers: List[str]):
@@ -69,7 +73,7 @@ class P2PNetwork:
         for bp in bootstrap_peers:
             self.add_peer(bp)
 
-        async with httpx.AsyncClient(timeout=_DEFAULT_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=_DEFAULT_TIMEOUT, follow_redirects=False) as client:
             for peer in list(self.peers):
                 try:
                     res = await client.get(f"{peer}/node/peers")

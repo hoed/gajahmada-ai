@@ -75,10 +75,12 @@ class AuthManager:
         identity: Optional[NodeIdentity] = None,
         audit_logger: Optional[SecurityAuditLogger] = None,
         admin_key_file: Optional[str] = None,
+        allow_generated_key: bool = True,
     ):
         self.identity = identity
         self.audit_logger = audit_logger
         self.admin_key_file = admin_key_file
+        self.allow_generated_key = allow_generated_key
         self._tokens: Dict[str, Role] = {}
         self._seen_nonces: Set[Tuple[str, str]] = set()
         self._nonce_order: Deque[Tuple[str, str]] = deque(maxlen=4096)
@@ -90,17 +92,23 @@ class AuthManager:
             except Exception:
                 self.admin_api_key = ""
         if not self.admin_api_key:
-            # Cryptographically random 256-bit secret (NEVER derived from public node_id!)
-            self.admin_api_key = "gm-admin-" + secrets.token_urlsafe(32)
-            if admin_key_file:
-                try:
-                    os.makedirs(os.path.dirname(os.path.abspath(admin_key_file)), exist_ok=True)
-                    with open(admin_key_file, "w", encoding="utf-8") as f:
-                        f.write(self.admin_api_key)
-                    os.chmod(admin_key_file, 0o600)
-                except Exception:
-                    pass
-        self._tokens[self.admin_api_key] = Role.ADMIN
+            if not allow_generated_key:
+                # Serverless disks are ephemeral. A random key written to /tmp cannot
+                # be recovered by the operator and changes on every cold start.
+                self.admin_api_key = ""
+            else:
+                # Cryptographically random 256-bit secret (NEVER derived from public node_id!)
+                self.admin_api_key = "gm-admin-" + secrets.token_urlsafe(32)
+                if admin_key_file:
+                    try:
+                        os.makedirs(os.path.dirname(os.path.abspath(admin_key_file)), exist_ok=True)
+                        with open(admin_key_file, "w", encoding="utf-8") as f:
+                            f.write(self.admin_api_key)
+                        os.chmod(admin_key_file, 0o600)
+                    except Exception:
+                        pass
+        if self.admin_api_key:
+            self._tokens[self.admin_api_key] = Role.ADMIN
 
         operator_key = os.environ.get("GAJAHMADA_OPERATOR_KEY", "").strip()
         if operator_key:

@@ -1,3 +1,4 @@
+import socket
 import tempfile
 from fastapi.testclient import TestClient
 import pytest
@@ -93,6 +94,20 @@ def test_ssrf_and_predictable_seed_prevention(monkeypatch):
     assert ok_pg is False
     ok_redis, _ = validate_peer_url("http://127.0.0.1:6379")
     assert ok_redis is False
+
+    ok_local, _ = validate_peer_url("http://127.0.0.1:8001", allow_local=True)
+    assert ok_local is True
+    ok_strict, reason_strict = validate_peer_url("http://127.0.0.1:8001", allow_local=False)
+    assert ok_strict is False
+    assert "Private/loopback" in reason_strict
+
+    def _resolve_metadata(host, *args, **kwargs):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("169.254.169.254", 0))]
+
+    monkeypatch.setattr("gajahmada_ai.security.ssrf.socket.getaddrinfo", _resolve_metadata)
+    ok_dns, reason_dns = validate_peer_url("http://looks-public.example/latest")
+    assert ok_dns is False
+    assert "metadata" in reason_dns.lower() or "Link-local" in reason_dns
 
     # Predictable default Vercel seed must be rejected if passed via env
     monkeypatch.setenv("GAJAHMADA_NODE_SEED", "gajahmada-sovereign-ai-vercel-node-v2")
