@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GajahMada AI — Sovereign Intelligence Platform</title>
+  <link rel="icon" type="image/png" href="/ui/logo.png?v=9.0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/ui/brain.css?v=1.0" />
+  <style>
+    html, body { height: auto; min-height: 100vh; overflow-y: auto; }
+    .plt-shell { min-height: 100vh; display: flex; flex-direction: column; }
+    .plt-banner {
+      padding: 8px 18px; font-family: var(--font-mono); font-size: 11px;
+      background: rgba(245, 158, 11, 0.12); border-bottom: 1px solid rgba(245, 158, 11, 0.35);
+      color: #fde68a; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
+    }
+    .plt-nav {
+      display: flex; align-items: center; gap: 5px; padding: 8px 18px;
+      background: rgba(5, 8, 16, 0.92); border-bottom: 1px solid var(--border-subtle);
+      flex-wrap: wrap;
+    }
+    .plt-link {
+      padding: 5px 10px; border-radius: 6px; text-decoration: none;
+      color: var(--txt-dim); font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+      border: 1px solid transparent; transition: all 0.15s ease;
+    }
+    .plt-link:hover { color: #f8fafc; background: rgba(56, 189, 248, 0.09); }
+    .plt-link.active { color: var(--cyan); background: rgba(0, 229, 255, 0.12); border-color: rgba(0, 229, 255, 0.4); }
+    .plt-main { flex: 1; padding: 18px; max-width: 1380px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+    .plt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+    .plt-card {
+      background: var(--bg-card); border: 1px solid var(--border-subtle);
+      border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 8px;
+    }
+    .plt-card h3 { font-size: 13.5px; color: var(--cyan); font-family: var(--font-mono); letter-spacing: 0.4px; }
+    .cap-badge {
+      display: inline-block; padding: 2px 7px; border-radius: 4px;
+      font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; letter-spacing: 0.4px;
+    }
+    .cap-ACTIVE { background: rgba(34,197,94,0.16); color: #86efac; border: 1px solid rgba(34,197,94,0.45); }
+    .cap-EXPERIMENTAL, .cap-LOCAL { background: rgba(56,189,248,0.16); color: #7dd3fc; border: 1px solid rgba(56,189,248,0.45); }
+    .cap-PLANNED, .cap-NOT { background: rgba(245,158,11,0.15); color: #fde68a; border: 1px solid rgba(245,158,11,0.45); }
+    .cap-UNAVAILABLE, .cap-DISABLED { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.45); }
+    .plt-table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 11px; }
+    .plt-table th, .plt-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid rgba(148,163,184,0.14); }
+    .plt-table th { color: var(--txt-dim); font-size: 10px; text-transform: uppercase; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+    .form-field { display: flex; flex-direction: column; gap: 4px; font-family: var(--font-mono); font-size: 10.5px; color: var(--txt-dim); }
+    .chat-box { display: flex; flex-direction: column; gap: 10px; min-height: 360px; max-height: 58vh; overflow-y: auto; padding: 12px; background: rgba(2,6,23,0.65); border: 1px solid var(--border-subtle); border-radius: 8px; }
+    .chat-msg { padding: 10px 12px; border-radius: 8px; font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; }
+    .chat-msg.user { background: rgba(59,130,246,0.16); border: 1px solid rgba(59,130,246,0.35); align-self: flex-end; max-width: 82%; }
+    .chat-msg.ai { background: rgba(15,23,42,0.85); border: 1px solid rgba(0,229,255,0.28); align-self: flex-start; max-width: 90%; }
+  </style>
+</head>
+<body>
+  <div class="plt-shell">
+    <header class="obs-header">
+      <div class="obs-brand">
+        <img src="/ui/logo.png?v=9.0" alt="GajahMada AI Official Logo" class="obs-logo" />
+        <div class="obs-title-wrap">
+          <div class="obs-title">GAJAHMADA AI — ONE INTELLIGENCE. MANY FORMS.</div>
+          <div class="obs-subtitle" id="plt-subtitle">LOADING RUNTIME TELEMETRY...</div>
+        </div>
+      </div>
+      <div class="obs-meta-bar">
+        <span class="obs-pill" id="plt-inference-pill">CHECKING INFERENCE...</span>
+        <button class="obs-btn auth" id="btn-plt-auth">🔑 AUTH</button>
+        <a class="obs-btn" href="/">🏠 HOME</a>
+        <a class="obs-btn" href="/brain">🧠 BRAIN</a>
+        <a class="obs-btn accent" href="/dashboard">📊 DASHBOARD</a>
+      </div>
+    </header>
+
+    <div class="plt-banner" id="plt-storage-banner" style="display:none"></div>
+
+    <nav class="plt-nav" id="plt-nav">
+      <a class="plt-link" href="/chat">Chat</a>
+      <a class="plt-link" href="/brain">Brain Observatory</a>
+      <a class="plt-link" href="/knowledge">Knowledge</a>
+      <a class="plt-link" href="/memory">Memory</a>
+      <a class="plt-link" href="/models">Models</a>
+      <a class="plt-link" href="/models/bumblecore">Bumblecore</a>
+      <a class="plt-link" href="/models/opticore">Opticore</a>
+      <a class="plt-link" href="/models/titanforge">Titanforge 70B</a>
+      <a class="plt-link" href="/models/neurox">NeuroX</a>
+      <a class="plt-link" href="/models/codestrike">CodeStrike</a>
+      <a class="plt-link" href="/models/knowtron">KnowTron</a>
+      <a class="plt-link" href="/model-factory">Model Factory</a>
+      <a class="plt-link" href="/training">Training</a>
+      <a class="plt-link" href="/benchmarks">Benchmarks</a>
+      <a class="plt-link" href="/infrastructure">Infrastructure</a>
+      <a class="plt-link" href="/nexus">Nexus Prime</a>
+      <a class="plt-link" href="/settings">Settings</a>
+      <a class="plt-link" href="/documentation">Documentation</a>
+    </nav>
+
+    <main class="plt-main" id="plt-root">
+      <div class="plt-card"><h3>Loading...</h3></div>
+    </main>
+  </div>
+  <script src="/ui/platform.js?v=1.0"></script>
+</body>
+</html>

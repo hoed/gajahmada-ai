@@ -1,7 +1,11 @@
-from typing import Any, Dict, List
+from __future__ import annotations
 
-from gajahmada_ai.memory.manager import MemoryManager
+from typing import TYPE_CHECKING, Any, Dict, List
+
 from gajahmada_ai.memory.models import MemoryType, VerificationStatus
+
+if TYPE_CHECKING:
+    from gajahmada_ai.memory.manager import MemoryManager
 
 
 class ExperienceExtractor:

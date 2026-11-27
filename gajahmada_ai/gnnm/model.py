@@ -154,8 +154,14 @@ if HAS_TORCH:
             targets: Optional["torch.Tensor"] = None,
         ) -> Tuple["torch.Tensor", Optional["torch.Tensor"]]:
             x = self.token_emb(input_ids)
+            use_ckpt = bool(getattr(self.cfg, "gradient_checkpointing", False)) and self.training
             for layer in self.layers:
-                x = layer(x, self.rope_cos, self.rope_sin)
+                if use_ckpt:
+                    x = torch.utils.checkpoint.checkpoint(
+                        layer, x, self.rope_cos, self.rope_sin, use_reentrant=False
+                    )
+                else:
+                    x = layer(x, self.rope_cos, self.rope_sin)
             logits = self.lm_head(self.final_norm(x))
             loss = None
             if targets is not None:

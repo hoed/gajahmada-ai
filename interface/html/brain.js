@@ -41,21 +41,34 @@ document.addEventListener('DOMContentLoaded', () => {
   const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const badge = (st) => `<span class="status-badge st-${esc(st || 'NO_DATA')}">${esc(st || 'N/A')}</span>`;
 
-  // ─── Tab Navigation ───────────────────────────────────────────────────────
-  let activeTab = 'brain-overview';
+  // ─── Tab Navigation (supports /brain/{activity,knowledge,memory,reasoning,learning}) ───
+  const PATH_TO_TAB = {
+    '/brain/activity': 'cognitive-activity',
+    '/brain/reasoning': 'cognitive-activity',
+    '/brain/knowledge': 'knowledge-universe',
+    '/brain/memory': 'memory-explorer',
+    '/brain/learning': 'learning-observatory',
+  };
+  let activeTab = PATH_TO_TAB[window.location.pathname.replace(/\/$/, '')] || 'brain-overview';
+  const activateTab = (tabId) => {
+    activeTab = tabId;
+    document.querySelectorAll('.obs-tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === tabId));
+    document.querySelectorAll('.obs-view').forEach((v) => v.classList.toggle('active', v.id === `view-${tabId}`));
+    requestAnimationFrame(() => {
+      if (activeTab === 'brain-overview') brainGraph.resize();
+      else if (activeTab === 'knowledge-universe') kgGraph.resize();
+      else if (activeTab === 'distributed-nodes') nodesGraph.resize();
+    });
+  };
   document.querySelectorAll('.obs-tab').forEach((btn) => {
     btn.addEventListener('click', () => {
-      activeTab = btn.dataset.tab;
-      document.querySelectorAll('.obs-tab').forEach((b) => b.classList.toggle('active', b === btn));
-      document.querySelectorAll('.obs-view').forEach((v) => v.classList.toggle('active', v.id === `view-${activeTab}`));
-      requestAnimationFrame(() => {
-        if (activeTab === 'brain-overview') brainGraph.resize();
-        else if (activeTab === 'knowledge-universe') kgGraph.resize();
-        else if (activeTab === 'distributed-nodes') nodesGraph.resize();
-      });
+      activateTab(btn.dataset.tab);
       refreshAllActive();
     });
   });
+  if (activeTab !== 'brain-overview') {
+    activateTab(activeTab);
+  }
 
   // ─── Reusable Interactive 2D Neural / Knowledge Graph Engine ──────────────
   const GROUP_COLORS = {

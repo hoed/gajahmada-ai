@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from gajahmada_ai.agents.scheduler import AutonomousTaskScheduler
 from gajahmada_ai.api.http_utils import resolve_client_ip
 from gajahmada_ai.api.observatory_routes import create_observatory_router
+from gajahmada_ai.api.platform_routes import create_platform_router
 from gajahmada_ai.api.v2_routes import create_v2_router
 from gajahmada_ai.blockchain.chain import AIBlockchain, Block, LedgerEventType
 from gajahmada_ai.cognition.reasoning import CognitiveReasoningPipeline
@@ -416,6 +417,7 @@ def get_runtime_context() -> Dict[str, Any]:
 
 app.include_router(create_v2_router(get_runtime_context))
 app.include_router(create_observatory_router(get_runtime_context))
+app.include_router(create_platform_router(get_runtime_context, _ROOT))
 
 
 # ─── Request models (v1 Backward Compatible with Input Bounds) ────────────
@@ -1363,9 +1365,38 @@ def serve_root_js():
 
 @app.get("/brain", include_in_schema=False)
 @app.get("/brain/", include_in_schema=False)
+@app.get("/brain/activity", include_in_schema=False)
+@app.get("/brain/knowledge", include_in_schema=False)
+@app.get("/brain/memory", include_in_schema=False)
+@app.get("/brain/reasoning", include_in_schema=False)
+@app.get("/brain/learning", include_in_schema=False)
 def serve_brain_observatory():
     return FileResponse(
         os.path.join(UI_PATH, "brain.html"),
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
+    )
+
+
+@app.get("/chat", include_in_schema=False)
+@app.get("/knowledge", include_in_schema=False)
+@app.get("/memory", include_in_schema=False)
+@app.get("/models", include_in_schema=False)
+@app.get("/models/bumblecore", include_in_schema=False)
+@app.get("/models/opticore", include_in_schema=False)
+@app.get("/models/titanforge", include_in_schema=False)
+@app.get("/models/neurox", include_in_schema=False)
+@app.get("/models/codestrike", include_in_schema=False)
+@app.get("/models/knowtron", include_in_schema=False)
+@app.get("/model-factory", include_in_schema=False)
+@app.get("/training", include_in_schema=False)
+@app.get("/benchmarks", include_in_schema=False)
+@app.get("/infrastructure", include_in_schema=False)
+@app.get("/nexus", include_in_schema=False)
+@app.get("/settings", include_in_schema=False)
+@app.get("/documentation", include_in_schema=False)
+def serve_platform_pages():
+    return FileResponse(
+        os.path.join(UI_PATH, "platform.html"),
         headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
     )
 
