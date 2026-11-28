@@ -133,6 +133,7 @@ def execute_training_run(
     steps_override: Optional[int] = None,
     target_tokens_override: Optional[int] = None,
     allow_resume_mismatch: bool = False,
+    save_every: Optional[int] = None,
 ) -> Dict[str, Any]:
     raw_cfg = load_yaml_config(config_path)
     cfg = build_config_from_yaml(raw_cfg, smoke=smoke)
@@ -256,6 +257,12 @@ def execute_training_run(
     cfg = build_config_from_yaml(raw_cfg, smoke=smoke, vocab_override=tokenizer.vocab_size)
     tokenizer_sha256 = _sha256_json({"format": "gnnm-bpe-v1", "vocab_size": tokenizer.vocab_size, "merges": tokenizer.merges})
     config_sha256 = _sha256_json(cfg.to_dict())
+    if not smoke:
+        os.makedirs(out_dir, exist_ok=True)
+        cfg.save(os.path.join(out_dir, "config.json"))
+        tokenizer.save(os.path.join(out_dir, "tokenizer.json"))
+        with open(os.path.join(out_dir, "dataset_manifest.json"), "w", encoding="utf-8") as mf:
+            json.dump(manifest, mf, indent=2)
 
     # ── 4. Build Streaming / Packed Data Sources ──
     from gajahmada_ai.gnnm.bumblecore.streaming_loader import StreamingPretrainDataset, StreamingSFTDataset
@@ -329,6 +336,69 @@ def execute_training_run(
         None if smoke else raw_cfg.get("training", {}).get("target_tokens")
     )
 
+    ckpt_every = save_every if save_every is not None else (0 if smoke else int(tr_cfg.get("save_every", 10)))
+
+    def _flush_checkpoint_and_metadata(current_train_metrics: Dict[str, Any], quick_val: bool = False) -> Dict[str, Any]:
+        v_metrics = trainer.evaluate_loss(val_pairs, max_batches=4 if quick_val else 16)
+        trainer.model.train()
+        os.makedirs(out_dir, exist_ok=True)
+        with open(os.path.join(out_dir, "dataset_manifest.json"), "w", encoding="utf-8") as mf:
+            json.dump(manifest, mf, indent=2)
+        trainer.save_resumable_checkpoint(out_dir, metrics={"train": current_train_metrics, "validation": v_metrics})
+        c_sha = sha256_file(os.path.join(out_dir, "model.pt"))
+        meta = {
+            "release": "bumblecore-2.6",
+            "run_id": run_id,
+            "stage": stage,
+            "smoke_mode": smoke,
+            "git_commit": _git_commit(),
+            "config_sha256": config_sha256,
+            "dataset_manifest_sha256": dataset_manifest_sha256,
+            "tokenizer_sha256": tokenizer_sha256,
+            "checkpoint_sha256": c_sha,
+            "exact_trainable_parameters": sum(p.numel() for p in trainer.model.parameters() if p.requires_grad),
+            "seed": trainer.seed,
+            "python_version": platform.python_version(),
+            "hardware": preflight["hardware_measured"],
+            "started_at": started_at,
+            "ended_at": datetime.now(timezone.utc).isoformat(),
+            "resumed_from": resumed_info,
+            "configured_lr": configured_lr,
+            "actual_steps": current_train_metrics["steps"],
+            "global_step": current_train_metrics["global_step"],
+            "actual_tokens_processed": current_train_metrics["tokens_processed"],
+            "token_accounting": current_train_metrics["token_accounting"],
+            "train_metrics": current_train_metrics,
+            "validation_metrics": v_metrics,
+            "checkpoint_dir": out_dir,
+        }
+        try:
+            from gajahmada_ai.gnnm.bumblecore.checkpoint_trust import sign_training_manifest
+            from gajahmada_ai.security.crypto import NodeIdentity
+
+            if os.path.isfile("node_key.pem"):
+                meta = sign_training_manifest(meta, NodeIdentity(key_path="node_key.pem"))
+        except Exception:
+            pass
+        with open(os.path.join(out_dir, "run_metadata.json"), "w", encoding="utf-8") as f:
+            json.dump(meta, f, indent=2)
+        return meta
+
+    def _periodic_on_step(entry: Dict[str, Any]) -> None:
+        if ckpt_every <= 0:
+            return
+        g_step = int(entry.get("global_step") or 0)
+        if g_step == 1 or (g_step % ckpt_every == 0):
+            snap = {
+                "steps": g_step,
+                "global_step": g_step,
+                "tokens_processed": trainer.tokens_consumed,
+                "token_accounting": trainer.token_accounting_snapshot(),
+                "final_loss": entry.get("train_loss"),
+            }
+            _flush_checkpoint_and_metadata(snap, quick_val=True)
+            print(f"[BumbleCore] Auto-saved verified checkpoint @ step {g_step} -> {out_dir}", flush=True)
+
     if stage == "sft":
         train_metrics = trainer.train_sft(
             train_pairs,
@@ -349,55 +419,10 @@ def execute_training_run(
             target_tokens=target_toks,
             val_pairs=val_pairs,
             eval_interval=max(1, steps // 2),
+            on_step=_periodic_on_step if ckpt_every > 0 else None,
         )
 
-    val_metrics = trainer.evaluate_loss(val_pairs)
-    os.makedirs(out_dir, exist_ok=True)
-    with open(os.path.join(out_dir, "dataset_manifest.json"), "w", encoding="utf-8") as mf:
-        json.dump(manifest, mf, indent=2)
-    trainer.save_resumable_checkpoint(out_dir, metrics={"train": train_metrics, "validation": val_metrics})
-    ckpt_sha256 = sha256_file(os.path.join(out_dir, "model.pt"))
-
-    ended_at = datetime.now(timezone.utc).isoformat()
-    run_meta = {
-        "release": "bumblecore-2.6",
-        "run_id": run_id,
-        "stage": stage,
-        "smoke_mode": smoke,
-        "git_commit": _git_commit(),
-        "config_sha256": config_sha256,
-        "dataset_manifest_sha256": dataset_manifest_sha256,
-        "tokenizer_sha256": tokenizer_sha256,
-        "checkpoint_sha256": ckpt_sha256,
-        "exact_trainable_parameters": sum(p.numel() for p in trainer.model.parameters() if p.requires_grad),
-        "seed": trainer.seed,
-        "python_version": platform.python_version(),
-        "hardware": preflight["hardware_measured"],
-        "started_at": started_at,
-        "ended_at": ended_at,
-        "resumed_from": resumed_info,
-        "configured_lr": configured_lr,
-        "actual_steps": train_metrics["steps"],
-        "global_step": train_metrics["global_step"],
-        "actual_tokens_processed": train_metrics["tokens_processed"],
-        "token_accounting": train_metrics["token_accounting"],
-        "train_metrics": train_metrics,
-        "validation_metrics": val_metrics,
-        "checkpoint_dir": out_dir,
-    }
-    # Sign training manifest with existing Ed25519 NodeIdentity when node_key.pem is available
-    try:
-        from gajahmada_ai.gnnm.bumblecore.checkpoint_trust import sign_training_manifest
-        from gajahmada_ai.security.crypto import NodeIdentity
-
-        if os.path.isfile("node_key.pem"):
-            run_meta = sign_training_manifest(run_meta, NodeIdentity(key_path="node_key.pem"))
-    except Exception:
-        pass
-
-    with open(os.path.join(out_dir, "run_metadata.json"), "w", encoding="utf-8") as f:
-        json.dump(run_meta, f, indent=2)
-    return run_meta
+    return _flush_checkpoint_and_metadata(train_metrics, quick_val=False)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -413,6 +438,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--steps", type=int, default=None, help="Override training step count")
     parser.add_argument("--target-tokens", type=int, default=None, help="Override target consumed token budget")
     parser.add_argument("--allow-resume-mismatch", action="store_true", help="Explicitly override dataset/tokenizer hash mismatch on resume")
+    parser.add_argument("--save-every", type=int, default=None, help="Periodic checkpoint interval in steps (default: 10 for full runs)")
     args = parser.parse_args(argv)
 
     result = execute_training_run(
@@ -427,6 +453,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         steps_override=args.steps,
         target_tokens_override=args.target_tokens,
         allow_resume_mismatch=args.allow_resume_mismatch,
+        save_every=args.save_every,
     )
     print(json.dumps(result, indent=2, default=str))
     if result.get("status") in ("PREFLIGHT_BLOCKED", "DATASET_GOVERNANCE_FAILED"):
