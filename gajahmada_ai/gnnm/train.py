@@ -325,8 +325,19 @@ def execute_training_run(
             allow_resume_mismatch=allow_resume_mismatch,
         )
 
-    if resumed_info and hasattr(train_pairs, "skip_sequences"):
-        train_pairs.skip_sequences = trainer.dataset_cursor
+    if resumed_info:
+        print(
+            f"[BumbleCore] RESUMED checkpoint -> global_step={trainer.global_step}, "
+            f"tokens_consumed={trainer.tokens_consumed:,} ({os.path.abspath(out_dir)})",
+            flush=True,
+        )
+        if hasattr(train_pairs, "skip_sequences"):
+            train_pairs.skip_sequences = trainer.dataset_cursor
+    else:
+        print(
+            f"[BumbleCore] No existing model.pt at {os.path.abspath(out_dir)} — starting fresh from step 0.",
+            flush=True,
+        )
 
     steps = steps_override if steps_override is not None else (4 if smoke else int(tr_cfg.get("max_steps", 100)))
     batch_size = 2 if smoke else int(tr_cfg.get("micro_batch_size", 2))
